@@ -1,0 +1,13 @@
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+
+# Media exports
+*.webm
+*.mp4
+*.gif
