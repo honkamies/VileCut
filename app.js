@@ -1703,9 +1703,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return 1.0;
   }
 
-  function renderGlitchText(renderCtx, textVal, textObj, time) {
-    const intensity = textObj.glitchIntensity / 100;
-    const mode = textObj.glitchMode;
+  function renderGlitchText(renderCtx, textVal, textObj, time, overrideGlitchMode, overrideGlitchIntensity) {
+    const intensity = overrideGlitchIntensity !== undefined ? overrideGlitchIntensity : (textObj.glitchIntensity / 100);
+    const mode = overrideGlitchMode !== undefined ? overrideGlitchMode : textObj.glitchMode;
     
     if (mode === 'none') {
       renderCtx.fillStyle = textObj.color;
@@ -1821,31 +1821,173 @@ document.addEventListener('DOMContentLoaded', () => {
       const oldAlpha = renderCtx.globalAlpha;
       renderCtx.globalAlpha = oldAlpha * f;
       
+      // Determine dynamic glitch style and intensity overrides during the transition phase (f < 1.0)
+      let activeGlitchMode = textObj.glitchMode;
+      let activeGlitchIntensity = textObj.glitchIntensity / 100;
+      
+      if (f < 0.95) {
+        const transPct = 1 - f;
+        if (mode === 'slide-glitch' || mode === 'glitch-reveal') {
+          activeGlitchMode = 'chaos';
+          activeGlitchIntensity = Math.max(activeGlitchIntensity, transPct * 0.95);
+        } else if (mode === 'character-scatter') {
+          activeGlitchMode = 'rgb-split';
+          activeGlitchIntensity = Math.max(activeGlitchIntensity, transPct * 0.85);
+        } else if (mode === 'fade-blur') {
+          activeGlitchMode = 'flicker';
+          activeGlitchIntensity = Math.max(activeGlitchIntensity, transPct * 0.6);
+        } else if (mode === 'scale-zoom') {
+          activeGlitchMode = 'rgb-split';
+          activeGlitchIntensity = Math.max(activeGlitchIntensity, transPct * 0.7);
+        } else if (mode === 'fade') {
+          activeGlitchMode = 'rgb-split';
+          activeGlitchIntensity = Math.max(activeGlitchIntensity, transPct * 0.4);
+        }
+      }
+      
       if ('filter' in renderCtx) {
         if (mode === 'fade-blur' && 1 - f > 0.01) {
-          renderCtx.filter = 'blur(' + ((1 - f) * 12).toFixed(1) + 'px)';
+          renderCtx.filter = 'blur(' + ((1 - f) * 25).toFixed(1) + 'px)';
         } else if (mode === 'scale-zoom' && 1 - f > 0.01) {
-          renderCtx.filter = 'blur(' + ((1 - f) * 6).toFixed(1) + 'px)';
+          renderCtx.filter = 'blur(' + ((1 - f) * 12).toFixed(1) + 'px)';
+        } else if (mode === 'slide-glitch' && 1 - f > 0.01) {
+          renderCtx.filter = 'blur(' + ((1 - f) * 8).toFixed(1) + 'px)';
+        } else if (mode === 'glitch-reveal' && 1 - f > 0.01) {
+          renderCtx.filter = 'blur(' + ((1 - f) * 10).toFixed(1) + 'px)';
         } else {
           renderCtx.filter = 'none';
         }
       }
       
       if (mode === 'scale-zoom') {
-        const scaleVal = 0.5 + 0.5 * f;
+        const transDuration = Math.min(textObj.transitionDuration !== undefined ? textObj.transitionDuration : 0.4, (textObj.endTime - textObj.startTime) / 2);
+        const isIntro = (loopTime < textObj.startTime + transDuration);
+        
+        let scaleVal;
+        if (isIntro) {
+          scaleVal = 0.1 + 0.9 * Math.pow(f, 3);
+        } else {
+          scaleVal = 1.0 + 1.5 * Math.pow(1 - f, 2);
+        }
         renderCtx.scale(scaleVal, scaleVal);
+        
+        const wobbleAngle = (1 - f) * 20 * (Math.PI / 180) * (textObj.id.charCodeAt(5) % 2 === 0 ? 1 : -1);
+        renderCtx.rotate(wobbleAngle);
+      }
+      
+      if (mode === 'fade-blur') {
+        const stretchX = 1.0 + (1 - f) * 0.25;
+        const stretchY = 1.0 - (1 - f) * 0.05;
+        renderCtx.scale(stretchX, stretchY);
       }
       
       if (mode === 'slide-glitch') {
         const transDuration = Math.min(textObj.transitionDuration !== undefined ? textObj.transitionDuration : 0.4, (textObj.endTime - textObj.startTime) / 2);
         const isIntro = (loopTime < textObj.startTime + transDuration);
         const slideDirection = isIntro ? -1 : 1;
-        const slideOffset = slideDirection * (1 - f) * 120;
-        const glitchOffset = (1 - f) * (Math.random() - 0.5) * 30 * (textObj.glitchIntensity / 100);
-        renderCtx.translate(slideOffset + glitchOffset, 0);
-      }
-      
-      if (mode === 'character-scatter') {
+        const sliceProgress = 1 - f;
+        
+        const textWidth = renderCtx.measureText(textVal).width || 100;
+        const textHeight = textObj.size;
+        const yStart = -textHeight * 1.2;
+        const yEnd = textHeight * 1.2;
+        const totalH = yEnd - yStart;
+        
+        for (let i = 0; i < 5; i++) {
+          const y1 = yStart + (totalH * i) / 5;
+          const y2 = yStart + (totalH * (i + 1)) / 5;
+          const H_slice = y2 - y1;
+          
+          renderCtx.save();
+          renderCtx.beginPath();
+          renderCtx.rect(-textWidth * 2, y1, textWidth * 4, H_slice);
+          renderCtx.clip();
+          
+          const baseSlideX = slideDirection * Math.pow(sliceProgress, 1.2) * (w * 0.65);
+          const seed = textObj.id.charCodeAt(0) + i * 23;
+          const sliceNoiseX = (getPseudoRandom(seed + time * 20) - 0.5) * 120 * sliceProgress;
+          const sliceNoiseY = (getPseudoRandom(seed + time * 25 + 7) - 0.5) * 20 * sliceProgress;
+          
+          let extraShift = 0;
+          if (sliceProgress > 0.05 && getPseudoRandom(seed + time * 37) < sliceProgress * 0.45) {
+            extraShift = (getPseudoRandom(seed + time * 47) - 0.5) * 180 * sliceProgress;
+          }
+          
+          renderCtx.translate(baseSlideX + sliceNoiseX + extraShift, sliceNoiseY);
+          renderGlitchText(renderCtx, textVal, textObj, time, activeGlitchMode, activeGlitchIntensity);
+          renderCtx.restore();
+        }
+        
+        if (sliceProgress > 0.05) {
+          const numBlocks = Math.floor(sliceProgress * 5);
+          for (let b = 0; b < numBlocks; b++) {
+            const bSeed = textObj.id.charCodeAt(1) + b * 41 + time * 15;
+            if (getPseudoRandom(bSeed) < 0.4) {
+              const blockW = textWidth * (0.15 + getPseudoRandom(bSeed + 1) * 0.45);
+              const blockH = textHeight * (0.08 + getPseudoRandom(bSeed + 2) * 0.22);
+              const baseSlideX = slideDirection * Math.pow(sliceProgress, 1.2) * (w * 0.65);
+              const blockX = (getPseudoRandom(bSeed + 3) - 0.5) * textWidth * 1.5 + baseSlideX;
+              const blockY = (getPseudoRandom(bSeed + 4) - 0.5) * textHeight * 1.3;
+              
+              const colors = ['rgba(0, 242, 254, 0.75)', 'rgba(255, 0, 127, 0.75)', 'rgba(255, 255, 255, 0.9)'];
+              renderCtx.fillStyle = colors[Math.floor(getPseudoRandom(bSeed + 5) * colors.length)];
+              renderCtx.fillRect(blockX, blockY, blockW, blockH);
+            }
+          }
+        }
+      } else if (mode === 'glitch-reveal') {
+        const sliceProgress = 1 - f;
+        
+        const textWidth = renderCtx.measureText(textVal).width || 100;
+        const textHeight = textObj.size;
+        const yStart = -textHeight * 1.2;
+        const yEnd = textHeight * 1.2;
+        const totalH = yEnd - yStart;
+        
+        for (let i = 0; i < 5; i++) {
+          const y1 = yStart + (totalH * i) / 5;
+          const y2 = yStart + (totalH * (i + 1)) / 5;
+          const H_slice = y2 - y1;
+          
+          renderCtx.save();
+          renderCtx.beginPath();
+          renderCtx.rect(-textWidth * 2, y1, textWidth * 4, H_slice);
+          renderCtx.clip();
+          
+          const seed = textObj.id.charCodeAt(0) + i * 31;
+          const sliceNoiseX = (getPseudoRandom(seed + time * 30) - 0.5) * 45 * sliceProgress;
+          const sliceNoiseY = (getPseudoRandom(seed + time * 35 + 3) - 0.5) * 8 * sliceProgress;
+          
+          let extraShift = 0;
+          if (sliceProgress > 0.05 && getPseudoRandom(seed + time * 43) < sliceProgress * 0.5) {
+            extraShift = (getPseudoRandom(seed + time * 53) - 0.5) * 75 * sliceProgress;
+          }
+          
+          renderCtx.translate(sliceNoiseX + extraShift, sliceNoiseY);
+          renderGlitchText(renderCtx, textVal, textObj, time, activeGlitchMode, activeGlitchIntensity);
+          renderCtx.restore();
+        }
+        
+        if (sliceProgress > 0.05) {
+          const numBlocks = Math.floor(sliceProgress * 6);
+          for (let b = 0; b < numBlocks; b++) {
+            const bSeed = textObj.id.charCodeAt(1) + b * 53 + time * 18;
+            if (getPseudoRandom(bSeed) < 0.45) {
+              const blockW = textWidth * (0.1 + getPseudoRandom(bSeed + 1) * 0.5);
+              const blockH = textHeight * (0.05 + getPseudoRandom(bSeed + 2) * 0.25);
+              const blockX = (getPseudoRandom(bSeed + 3) - 0.5) * textWidth * 1.6;
+              const blockY = (getPseudoRandom(bSeed + 4) - 0.5) * textHeight * 1.4;
+              
+              const colors = ['rgba(0, 242, 254, 0.8)', 'rgba(255, 0, 127, 0.8)', 'rgba(255, 255, 255, 0.95)'];
+              renderCtx.fillStyle = colors[Math.floor(getPseudoRandom(bSeed + 5) * colors.length)];
+              renderCtx.fillRect(blockX, blockY, blockW, blockH);
+            }
+          }
+        }
+      } else if (mode === 'character-scatter') {
+        const transDuration = Math.min(textObj.transitionDuration !== undefined ? textObj.transitionDuration : 0.4, (textObj.endTime - textObj.startTime) / 2);
+        const isIntro = (loopTime < textObj.startTime + transDuration);
+        
         const chars = textVal.split('');
         const charWidths = chars.map(c => renderCtx.measureText(c).width);
         const totalWidth = charWidths.reduce((sum, w) => sum + w, 0);
@@ -1859,6 +2001,18 @@ document.addEventListener('DOMContentLoaded', () => {
           
           renderCtx.save();
           
+          const staggerStrength = 0.5;
+          const charWindow = 1.0 - staggerStrength;
+          const orderIdx = isIntro ? idx : (chars.length - 1 - idx);
+          const startRatio = (orderIdx / Math.max(1, chars.length - 1)) * staggerStrength;
+          
+          let fChar = 1.0;
+          if (f <= startRatio) fChar = 0.0;
+          else if (f >= startRatio + charWindow) fChar = 1.0;
+          else fChar = (f - startRatio) / charWindow;
+          
+          const scatterProgress = 1 - fChar;
+          
           const seedX = idx * 17.1 + 1.3;
           const seedY = idx * 29.3 + 4.7;
           const seedR = idx * 41.5 + 8.1;
@@ -1867,23 +2021,30 @@ document.addEventListener('DOMContentLoaded', () => {
           const randY = getPseudoRandom(seedY) * 2 - 1;
           const randR = getPseudoRandom(seedR) * 2 - 1;
           
-          const scatterDist = (1 - f) * 150;
+          const scatterDist = Math.pow(scatterProgress, 1.8) * 350;
           const charDx = randX * scatterDist;
           const charDy = randY * scatterDist;
-          const charAngle = randR * Math.PI * (1 - f);
-          const charScale = 0.3 + 0.7 * f;
+          const charAngle = randR * Math.PI * 1.5 * scatterProgress;
+          const charScale = 0.0 + 1.0 * fChar;
           
           renderCtx.translate(charCenterX + charDx, charDy);
           renderCtx.rotate(charAngle);
           renderCtx.scale(charScale, charScale);
           
-          renderGlitchText(renderCtx, c, textObj, time);
+          let charGlitchMode = textObj.glitchMode;
+          let charGlitchIntensity = textObj.glitchIntensity / 100;
+          if (scatterProgress > 0.05) {
+            charGlitchMode = 'rgb-split';
+            charGlitchIntensity = Math.max(charGlitchIntensity, scatterProgress * 0.9);
+          }
+          
+          renderGlitchText(renderCtx, c, textObj, time, charGlitchMode, charGlitchIntensity);
           
           renderCtx.restore();
           currentX += charW;
         });
       } else {
-        renderGlitchText(renderCtx, textVal, textObj, time);
+        renderGlitchText(renderCtx, textVal, textObj, time, activeGlitchMode, activeGlitchIntensity);
       }
       
       if ('filter' in renderCtx) {
