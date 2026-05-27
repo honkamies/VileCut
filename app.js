@@ -232,6 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
     textGlitchMode: document.getElementById('text-glitch-mode'),
     textGlitchIntensity: document.getElementById('text-glitch-intensity'),
     textGlitchIntensityVal: document.getElementById('text-glitch-intensity-val'),
+    textGlitchMono: document.getElementById('text-glitch-mono'),
     textTransition: document.getElementById('text-transition'),
     textTransitionDuration: document.getElementById('text-transition-duration'),
     textTransitionDurationVal: document.getElementById('text-transition-duration-val'),
@@ -1648,6 +1649,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.textGlitchMode.value = txt.glitchMode;
         UI.textGlitchIntensity.value = txt.glitchIntensity;
         UI.textGlitchIntensityVal.innerText = `${txt.glitchIntensity}%`;
+        UI.textGlitchMono.checked = !!txt.glitchMono;
         UI.textTransition.value = txt.transitionMode || 'fade-blur';
         UI.textTransitionDuration.value = txt.transitionDuration !== undefined ? txt.transitionDuration : 0.4;
         UI.textTransitionDurationVal.innerText = `${(txt.transitionDuration !== undefined ? txt.transitionDuration : 0.4).toFixed(1)}s`;
@@ -1714,6 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderGlitchText(renderCtx, textVal, textObj, time, overrideGlitchMode, overrideGlitchIntensity) {
     const intensity = overrideGlitchIntensity !== undefined ? overrideGlitchIntensity : (textObj.glitchIntensity / 100);
     const mode = overrideGlitchMode !== undefined ? overrideGlitchMode : textObj.glitchMode;
+    const isMono = !!textObj.glitchMono;
     
     if (mode === 'none') {
       renderCtx.fillStyle = textObj.color;
@@ -1722,10 +1725,10 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (mode === 'rgb-split') {
       const shift = textObj.size * intensity * 0.12 * (0.5 + 0.5 * Math.sin(time * 30));
       
-      renderCtx.fillStyle = 'rgba(255, 0, 80, 0.85)';
+      renderCtx.fillStyle = isMono ? 'rgba(255, 255, 255, 0.75)' : 'rgba(255, 0, 80, 0.85)';
       renderCtx.fillText(textVal, -shift, 0);
       
-      renderCtx.fillStyle = 'rgba(0, 242, 254, 0.85)';
+      renderCtx.fillStyle = isMono ? 'rgba(80, 80, 80, 0.75)' : 'rgba(0, 242, 254, 0.85)';
       renderCtx.fillText(textVal, shift, 0);
       
       renderCtx.fillStyle = textObj.color;
@@ -1784,11 +1787,12 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const shift = textObj.size * intensity * 0.15 * (Math.random() - 0.5);
       const shiftY = textObj.size * intensity * 0.05 * (Math.random() - 0.5);
+      const isMono = !!textObj.glitchMono;
       
-      renderCtx.fillStyle = 'rgba(255, 0, 80, 0.8)';
+      renderCtx.fillStyle = isMono ? 'rgba(255, 255, 255, 0.75)' : 'rgba(255, 0, 80, 0.8)';
       renderCtx.fillText(scrambledText, -shift + (Math.random() - 0.5)*2, shiftY);
       
-      renderCtx.fillStyle = 'rgba(0, 242, 254, 0.8)';
+      renderCtx.fillStyle = isMono ? 'rgba(80, 80, 80, 0.75)' : 'rgba(0, 242, 254, 0.8)';
       renderCtx.fillText(scrambledText, shift + (Math.random() - 0.5)*2, -shiftY);
       
       renderCtx.fillStyle = textObj.color;
@@ -1949,7 +1953,9 @@ document.addEventListener('DOMContentLoaded', () => {
               const blockX = (getPseudoRandom(bSeed + 3) - 0.5) * textWidth * 1.5 + baseSlideX;
               const blockY = (getPseudoRandom(bSeed + 4) - 0.5) * textHeight * 1.3;
               
-              const colors = ['rgba(0, 242, 254, 0.75)', 'rgba(255, 0, 127, 0.75)', 'rgba(255, 255, 255, 0.9)'];
+              const colors = textObj.glitchMono ? 
+                ['rgba(255, 255, 255, 0.85)', 'rgba(120, 120, 120, 0.75)', 'rgba(0, 0, 0, 0.8)'] : 
+                ['rgba(0, 242, 254, 0.75)', 'rgba(255, 0, 127, 0.75)', 'rgba(255, 255, 255, 0.9)'];
               renderCtx.fillStyle = colors[Math.floor(getPseudoRandom(bSeed + 5) * colors.length)];
               renderCtx.fillRect(blockX, blockY, blockW, blockH);
             }
@@ -1998,7 +2004,9 @@ document.addEventListener('DOMContentLoaded', () => {
               const blockX = (getPseudoRandom(bSeed + 3) - 0.5) * textWidth * 1.6;
               const blockY = (getPseudoRandom(bSeed + 4) - 0.5) * textHeight * 1.4;
               
-              const colors = ['rgba(0, 242, 254, 0.8)', 'rgba(255, 0, 127, 0.8)', 'rgba(255, 255, 255, 0.95)'];
+              const colors = textObj.glitchMono ? 
+                ['rgba(255, 255, 255, 0.9)', 'rgba(120, 120, 120, 0.8)', 'rgba(0, 0, 0, 0.85)'] : 
+                ['rgba(0, 242, 254, 0.8)', 'rgba(255, 0, 127, 0.8)', 'rgba(255, 255, 255, 0.95)'];
               renderCtx.fillStyle = colors[Math.floor(getPseudoRandom(bSeed + 5) * colors.length)];
               renderCtx.fillRect(blockX, blockY, blockW, blockH);
             }
@@ -2995,6 +3003,7 @@ document.addEventListener('DOMContentLoaded', () => {
       idleWobble: 1.5,
       idleSkew: 0.03,
       glitchMode: 'rgb-split',
+      glitchMono: false,
       glitchIntensity: 50,
       transitionMode: 'fade-blur',
       transitionDuration: 0.4,
@@ -3253,6 +3262,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (txt) {
       txt.glitchIntensity = parseInt(e.target.value);
       UI.textGlitchIntensityVal.innerText = `${txt.glitchIntensity}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textGlitchMono.addEventListener('change', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.glitchMono = e.target.checked;
       renderFrame(state.time);
     }
   });
