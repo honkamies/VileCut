@@ -1811,6 +1811,15 @@ document.addEventListener('DOMContentLoaded', () => {
       renderCtx.translate(dx, dy);
       renderCtx.rotate(textObj.angle * Math.PI / 180);
       
+      // Subtle continuous idle random-like drift (rotation wobble + skew)
+      const seed = textObj.id.charCodeAt(5) || 12;
+      const idleRot = (Math.sin(time * 1.8 + seed) * 1.0 + Math.cos(time * 3.4 - seed) * 0.5) * (Math.PI / 180);
+      const idleSkewX = Math.sin(time * 1.4 - seed) * 0.02 + Math.cos(time * 3.1 + seed) * 0.008;
+      const idleSkewY = Math.cos(time * 1.9 + seed) * 0.015 + Math.sin(time * 2.8 - seed) * 0.006;
+      
+      renderCtx.rotate(idleRot);
+      renderCtx.transform(1, idleSkewY, idleSkewX, 1, 0, 0);
+      
       renderCtx.font = `${textObj.size}px "${textObj.font}"`;
       renderCtx.textAlign = 'center';
       renderCtx.textBaseline = 'middle';
