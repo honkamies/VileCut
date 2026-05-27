@@ -240,6 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     textTransition: document.getElementById('text-transition'),
     textTransitionDuration: document.getElementById('text-transition-duration'),
     textTransitionDurationVal: document.getElementById('text-transition-duration-val'),
+    btnCopyText: document.getElementById('btn-copy-text'),
     btnDeleteText: document.getElementById('btn-delete-text'),
 
     // Audio Settings Section References
@@ -274,7 +275,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btnDeleteGraphic: document.getElementById('btn-delete-graphic'),
     
     // Timeline Panel References
-    btnAddText: document.getElementById('btn-add-text'),
+    btnAddTextNew: document.getElementById('btn-add-text-new'),
+    btnAddTextSame: document.getElementById('btn-add-text-same'),
     btnAddGraphic: document.getElementById('btn-add-graphic'),
     graphicFileInput: document.getElementById('graphic-file-input'),
     btnAddAudio: document.getElementById('btn-add-audio'),
@@ -633,8 +635,10 @@ document.addEventListener('DOMContentLoaded', () => {
       state.layers = [];
       
       for (let i = 0; i < N; i++) {
-        // Select random image for this layer initially
-        const randomImgObj = state.uploadedImages[Math.floor(Math.random() * state.uploadedImages.length)];
+        // Select deterministic image for this layer initially based on index and wrapCount = 0
+        const seed = i * 17.3;
+        const imgIdx = Math.floor(getPseudoRandom(seed) * state.uploadedImages.length);
+        const randomImgObj = state.uploadedImages[imgIdx];
         state.layers.push({
           canvas: randomImgObj.layers[i],
           index: i,
@@ -1163,7 +1167,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (wrapCount !== layer.lastWrapCount) {
         layer.lastWrapCount = wrapCount;
         if (state.uploadedImages.length > 0) {
-          const randomImgObj = state.uploadedImages[Math.floor(Math.random() * state.uploadedImages.length)];
+          const seed = layer.index * 17.3 + wrapCount * 29.7;
+          const imgIdx = Math.floor(getPseudoRandom(seed) * state.uploadedImages.length);
+          const randomImgObj = state.uploadedImages[imgIdx];
           layer.canvas = randomImgObj.layers[layer.index];
           layer.sourceImageId = randomImgObj.id;
         }
@@ -1607,40 +1613,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // 2. Render Text Tracks
-    state.texts.forEach((txtObj) => {
+    const uniqueTrackIndices = [...new Set(state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0))];
+    uniqueTrackIndices.sort((a, b) => a - b);
+
+    uniqueTrackIndices.forEach((trackIdx) => {
       const row = document.createElement('div');
       row.className = 'timeline-track-row';
-      row.dataset.id = txtObj.id;
+      row.dataset.id = `text_track_${trackIdx}`;
       row.dataset.type = 'text';
+      row.dataset.trackIndex = trackIdx;
       
-      const block = document.createElement('div');
-      block.className = 'timeline-block' + (txtObj.id === state.selectedTextId ? ' selected' : '');
-      block.dataset.id = txtObj.id;
+      const trackTexts = state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === trackIdx);
       
-      const startPct = (txtObj.startTime / dur) * 100;
-      const widthPct = ((txtObj.endTime - txtObj.startTime) / dur) * 100;
+      trackTexts.forEach((txtObj) => {
+        const block = document.createElement('div');
+        block.className = 'timeline-block' + (txtObj.id === state.selectedTextId ? ' selected' : '');
+        block.dataset.id = txtObj.id;
+        
+        const startPct = (txtObj.startTime / dur) * 100;
+        const widthPct = ((txtObj.endTime - txtObj.startTime) / dur) * 100;
+        
+        block.style.left = `${startPct}%`;
+        block.style.width = `${widthPct}%`;
+        
+        const cleanLabel = document.createElement('span');
+        cleanLabel.style.pointerEvents = 'none';
+        cleanLabel.innerText = txtObj.text || '[Empty Text]';
+        block.appendChild(cleanLabel);
+        
+        const leftHandle = document.createElement('div');
+        leftHandle.className = 'timeline-block-handle left';
+        leftHandle.dataset.handle = 'left';
+        leftHandle.dataset.id = txtObj.id;
+        
+        const rightHandle = document.createElement('div');
+        rightHandle.className = 'timeline-block-handle right';
+        rightHandle.dataset.handle = 'right';
+        rightHandle.dataset.id = txtObj.id;
+        
+        block.appendChild(leftHandle);
+        block.appendChild(rightHandle);
+        row.appendChild(block);
+      });
       
-      block.style.left = `${startPct}%`;
-      block.style.width = `${widthPct}%`;
-      
-      const cleanLabel = document.createElement('span');
-      cleanLabel.style.pointerEvents = 'none';
-      cleanLabel.innerText = txtObj.text || '[Empty Text]';
-      block.appendChild(cleanLabel);
-      
-      const leftHandle = document.createElement('div');
-      leftHandle.className = 'timeline-block-handle left';
-      leftHandle.dataset.handle = 'left';
-      leftHandle.dataset.id = txtObj.id;
-      
-      const rightHandle = document.createElement('div');
-      rightHandle.className = 'timeline-block-handle right';
-      rightHandle.dataset.handle = 'right';
-      rightHandle.dataset.id = txtObj.id;
-      
-      block.appendChild(leftHandle);
-      block.appendChild(rightHandle);
-      row.appendChild(block);
       UI.timelineTracks.appendChild(row);
     });
 
@@ -2473,9 +2488,9 @@ document.addEventListener('DOMContentLoaded', () => {
       state.isPlaying = false;
       stopAudioSource();
 
-      // Reset wrap counts for all layers to align with starting time 0.0
+      // Reset wrap counts for all layers to align with starting time 0.0, using null to force initial frame recalculation
       state.layers.forEach(layer => {
-        layer.lastWrapCount = 0;
+        layer.lastWrapCount = null;
       });
 
       state.exportRecorder.ondataavailable = (e) => {
@@ -3210,17 +3225,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- TEXT OVERLAYS & TIMELINE EVENTS BINDINGS ---
 
-  // Add Text Layer
-  UI.btnAddText.addEventListener('click', () => {
-    if (state.texts.length >= 5) {
-      alert("Maximum limit of 5 text overlay tracks reached.");
+  // Add Text Layer (New Track)
+  UI.btnAddTextNew.addEventListener('click', () => {
+    if (state.texts.length >= 15) {
+      alert("Maximum limit of 15 text overlay blocks reached.");
       return;
     }
+    
+    // Find max track index
+    let maxTrackIdx = -1;
+    state.texts.forEach(t => {
+      const idx = t.trackIndex !== undefined ? t.trackIndex : 0;
+      if (idx > maxTrackIdx) maxTrackIdx = idx;
+    });
+    const targetTrackIdx = maxTrackIdx + 1;
     
     const duration = getTimelineDuration();
     const newText = {
       id: 'txt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      text: 'TEXT OVERLAY',
+      text: 'NEW TEXT TRACK',
       font: 'Outfit',
       size: 40,
       color: '#00f2fe',
@@ -3235,11 +3258,94 @@ document.addEventListener('DOMContentLoaded', () => {
       transitionMode: 'fade-blur',
       transitionDuration: 0.4,
       startTime: 0,
-      endTime: Math.min(duration, 3.0)
+      endTime: Math.min(duration, 3.0),
+      trackIndex: targetTrackIdx
     };
     
     state.texts.push(newText);
     selectText(newText.id);
+    updateTimelineTracks();
+    renderFrame(state.time);
+  });
+
+  // Add Text Layer (Same Track)
+  UI.btnAddTextSame.addEventListener('click', () => {
+    if (!state.selectedTextId) {
+      alert("Please select an existing text block on the timeline first to add a new block to the same track.");
+      return;
+    }
+    const selectedTxt = state.texts.find(t => t.id === state.selectedTextId);
+    if (!selectedTxt) return;
+    
+    if (state.texts.length >= 15) {
+      alert("Maximum limit of 15 text overlay blocks reached.");
+      return;
+    }
+    
+    const duration = getTimelineDuration();
+    let startTime = selectedTxt.endTime;
+    if (startTime >= duration - 0.2) {
+      startTime = 0.0;
+    }
+    const endTime = Math.min(duration, startTime + 3.0);
+    
+    const targetTrackIdx = selectedTxt.trackIndex !== undefined ? selectedTxt.trackIndex : 0;
+    
+    const newText = {
+      id: 'txt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      text: 'NEXT TEXT',
+      font: selectedTxt.font,
+      size: selectedTxt.size,
+      color: selectedTxt.color,
+      x: selectedTxt.x,
+      y: selectedTxt.y,
+      angle: selectedTxt.angle,
+      idleWobble: selectedTxt.idleWobble,
+      idleSkew: selectedTxt.idleSkew,
+      glitchMode: selectedTxt.glitchMode,
+      glitchMono: selectedTxt.glitchMono,
+      glitchIntensity: selectedTxt.glitchIntensity,
+      transitionMode: selectedTxt.transitionMode,
+      transitionDuration: selectedTxt.transitionDuration,
+      startTime: startTime,
+      endTime: endTime,
+      trackIndex: targetTrackIdx
+    };
+    
+    state.texts.push(newText);
+    selectText(newText.id);
+    updateTimelineTracks();
+    renderFrame(state.time);
+  });
+
+  // Duplicate Selected Text Block
+  UI.btnCopyText.addEventListener('click', () => {
+    if (!state.selectedTextId) return;
+    const selectedTxt = state.texts.find(t => t.id === state.selectedTextId);
+    if (!selectedTxt) return;
+
+    if (state.texts.length >= 15) {
+      alert("Maximum limit of 15 text overlay blocks reached.");
+      return;
+    }
+
+    const duration = getTimelineDuration();
+    let startTime = selectedTxt.endTime;
+    if (startTime >= duration - 0.2) {
+      startTime = 0.0;
+    }
+    const blockDuration = selectedTxt.endTime - selectedTxt.startTime;
+    const endTime = Math.min(duration, startTime + blockDuration);
+
+    const clonedText = {
+      ...selectedTxt,
+      id: 'txt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      startTime: startTime,
+      endTime: endTime
+    };
+
+    state.texts.push(clonedText);
+    selectText(clonedText.id);
     updateTimelineTracks();
     renderFrame(state.time);
   });
