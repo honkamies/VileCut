@@ -225,6 +225,10 @@ document.addEventListener('DOMContentLoaded', () => {
     textPosYVal: document.getElementById('text-pos-y-val'),
     textAngle: document.getElementById('text-angle'),
     textAngleVal: document.getElementById('text-angle-val'),
+    textIdleWobble: document.getElementById('text-idle-wobble'),
+    textIdleWobbleVal: document.getElementById('text-idle-wobble-val'),
+    textIdleSkew: document.getElementById('text-idle-skew'),
+    textIdleSkewVal: document.getElementById('text-idle-skew-val'),
     textGlitchMode: document.getElementById('text-glitch-mode'),
     textGlitchIntensity: document.getElementById('text-glitch-intensity'),
     textGlitchIntensityVal: document.getElementById('text-glitch-intensity-val'),
@@ -1637,6 +1641,10 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.textPosYVal.innerText = `${Math.round(txt.y * 100)}%`;
         UI.textAngle.value = txt.angle;
         UI.textAngleVal.innerText = `${txt.angle}°`;
+        UI.textIdleWobble.value = txt.idleWobble !== undefined ? txt.idleWobble : 1.5;
+        UI.textIdleWobbleVal.innerText = `${(txt.idleWobble !== undefined ? txt.idleWobble : 1.5).toFixed(1)}°`;
+        UI.textIdleSkew.value = Math.round((txt.idleSkew !== undefined ? txt.idleSkew : 0.03) * 100);
+        UI.textIdleSkewVal.innerText = `${Math.round((txt.idleSkew !== undefined ? txt.idleSkew : 0.03) * 100)}%`;
         UI.textGlitchMode.value = txt.glitchMode;
         UI.textGlitchIntensity.value = txt.glitchIntensity;
         UI.textGlitchIntensityVal.innerText = `${txt.glitchIntensity}%`;
@@ -1813,9 +1821,12 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Subtle continuous idle random-like drift (rotation wobble + skew)
       const seed = textObj.id.charCodeAt(5) || 12;
-      const idleRot = (Math.sin(time * 1.8 + seed) * 1.0 + Math.cos(time * 3.4 - seed) * 0.5) * (Math.PI / 180);
-      const idleSkewX = Math.sin(time * 1.4 - seed) * 0.02 + Math.cos(time * 3.1 + seed) * 0.008;
-      const idleSkewY = Math.cos(time * 1.9 + seed) * 0.015 + Math.sin(time * 2.8 - seed) * 0.006;
+      const maxWobble = textObj.idleWobble !== undefined ? textObj.idleWobble : 1.5;
+      const maxSkew = textObj.idleSkew !== undefined ? textObj.idleSkew : 0.03;
+      
+      const idleRot = (Math.sin(time * 1.8 + seed) * 0.65 + Math.cos(time * 3.4 - seed) * 0.35) * maxWobble * (Math.PI / 180);
+      const idleSkewX = (Math.sin(time * 1.4 - seed) * 0.65 + Math.cos(time * 3.1 + seed) * 0.35) * maxSkew;
+      const idleSkewY = (Math.cos(time * 1.9 + seed) * 0.65 + Math.sin(time * 2.8 - seed) * 0.35) * maxSkew;
       
       renderCtx.rotate(idleRot);
       renderCtx.transform(1, idleSkewY, idleSkewX, 1, 0, 0);
@@ -2981,6 +2992,8 @@ document.addEventListener('DOMContentLoaded', () => {
       x: 0.0,
       y: 0.0,
       angle: 0,
+      idleWobble: 1.5,
+      idleSkew: 0.03,
       glitchMode: 'rgb-split',
       glitchIntensity: 50,
       transitionMode: 'fade-blur',
@@ -3201,6 +3214,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (txt) {
       txt.angle = parseInt(e.target.value);
       UI.textAngleVal.innerText = `${txt.angle}°`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textIdleWobble.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.idleWobble = parseFloat(e.target.value);
+      UI.textIdleWobbleVal.innerText = `${txt.idleWobble.toFixed(1)}°`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textIdleSkew.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.idleSkew = parseFloat(e.target.value) / 100;
+      UI.textIdleSkewVal.innerText = `${Math.round(txt.idleSkew * 100)}%`;
       renderFrame(state.time);
     }
   });
