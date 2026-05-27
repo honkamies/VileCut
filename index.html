@@ -316,63 +316,80 @@
           </button>
         </div>
 
-        <!-- Static Settings Section -->
-        <div class="panel-section" id="static-settings-section" style="display: none;">
-          <h2 class="section-title"><i data-lucide="tv"></i> Static Settings</h2>
+        <!-- Graphic Settings Section -->
+        <div class="panel-section" id="graphic-settings-section" style="display: none;">
+          <h2 class="section-title"><i data-lucide="image"></i> Graphic Settings</h2>
           
-          <div class="control-group">
-            <div class="slider-header">
-              <label for="static-timeline-start">Start Time</label>
-              <span id="static-timeline-start-val" class="slider-val">0.0s</span>
-            </div>
-            <input type="range" id="static-timeline-start" min="0.0" max="60.0" step="0.1" value="0.0">
+          <div class="control-group" style="background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.1); margin-bottom: 15px;">
+            <div style="font-family: var(--font-display); font-size: 0.85rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="graphic-file-name">No File Loaded</div>
           </div>
 
           <div class="control-group">
             <div class="slider-header">
-              <label for="static-timeline-end">End Time</label>
-              <span id="static-timeline-end-val" class="slider-val">3.0s</span>
+              <label for="graphic-timeline-start">Start Time</label>
+              <span id="graphic-timeline-start-val" class="slider-val">0.0s</span>
             </div>
-            <input type="range" id="static-timeline-end" min="0.1" max="60.0" step="0.1" value="3.0">
-          </div>
-
-          <div class="control-group">
-            <label for="static-noise-type">Static Style</label>
-            <div class="select-wrapper">
-              <select id="static-noise-type">
-                <option value="analog-snow" selected>Analog Snow (TV Static)</option>
-                <option value="digital">Digital Glitch Distortion</option>
-                <option value="vhs">VHS Scanlines & Jitter</option>
-              </select>
-            </div>
+            <input type="range" id="graphic-timeline-start" min="0.0" max="60.0" step="0.1" value="0.0">
           </div>
 
           <div class="control-group">
             <div class="slider-header">
-              <label for="static-noise-intensity">Noise Level</label>
-              <span id="static-noise-intensity-val" class="slider-val">20%</span>
+              <label for="graphic-timeline-end">End Time</label>
+              <span id="graphic-timeline-end-val" class="slider-val">3.0s</span>
             </div>
-            <input type="range" id="static-noise-intensity" min="0" max="100" step="5" value="20">
+            <input type="range" id="graphic-timeline-end" min="0.1" max="60.0" step="0.1" value="3.0">
           </div>
 
           <div class="control-group">
             <div class="slider-header">
-              <label for="static-glitch-frequency">Glitch Chance</label>
-              <span id="static-glitch-frequency-val" class="slider-val">10%</span>
+              <label for="graphic-pos-x">Position X</label>
+              <span id="graphic-pos-x-val" class="slider-val">0%</span>
             </div>
-            <input type="range" id="static-glitch-frequency" min="0" max="100" step="5" value="10">
+            <input type="range" id="graphic-pos-x" min="-100" max="100" step="1" value="0">
           </div>
 
           <div class="control-group">
             <div class="slider-header">
-              <label for="static-scanlines-intensity">Scanline Intensity</label>
-              <span id="static-scanlines-intensity-val" class="slider-val">15%</span>
+              <label for="graphic-pos-y">Position Y</label>
+              <span id="graphic-pos-y-val" class="slider-val">0%</span>
             </div>
-            <input type="range" id="static-scanlines-intensity" min="0" max="100" step="5" value="15">
+            <input type="range" id="graphic-pos-y" min="-100" max="100" step="1" value="0">
           </div>
 
-          <button id="btn-delete-static" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
-            <i data-lucide="trash-2"></i> Delete Static Layer
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-scale">Scale</label>
+              <span id="graphic-scale-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="graphic-scale" min="5" max="300" step="5" value="100">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-glitch-frequency">Glitch Chance</label>
+              <span id="graphic-glitch-frequency-val" class="slider-val">10%</span>
+            </div>
+            <input type="range" id="graphic-glitch-frequency" min="0" max="100" step="5" value="10">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-glitch-amplitude">Glitch Amplitude</label>
+              <span id="graphic-glitch-amplitude-val" class="slider-val">20%</span>
+            </div>
+            <input type="range" id="graphic-glitch-amplitude" min="0" max="100" step="5" value="20">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-flicker-intensity">Flicker Intensity</label>
+              <span id="graphic-flicker-intensity-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="graphic-flicker-intensity" min="0" max="100" step="5" value="0">
+          </div>
+
+          <button id="btn-delete-graphic" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
+            <i data-lucide="trash-2"></i> Delete Graphic
           </button>
         </div>
 
@@ -450,9 +467,10 @@
               <button id="btn-add-text" class="btn secondary small-btn">
                 <i data-lucide="plus"></i> Add Text
               </button>
-              <button id="btn-add-static" class="btn secondary small-btn">
-                <i data-lucide="tv"></i> Add Static
+              <button id="btn-add-graphic" class="btn secondary small-btn">
+                <i data-lucide="image"></i> Add Graphic
               </button>
+              <input type="file" id="graphic-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="display: none;">
               <button id="btn-add-audio" class="btn secondary small-btn">
                 <i data-lucide="music"></i> Add Audio
               </button>
