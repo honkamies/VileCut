@@ -316,6 +316,66 @@
           </button>
         </div>
 
+        <!-- Static Settings Section -->
+        <div class="panel-section" id="static-settings-section" style="display: none;">
+          <h2 class="section-title"><i data-lucide="tv"></i> Static Settings</h2>
+          
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="static-timeline-start">Start Time</label>
+              <span id="static-timeline-start-val" class="slider-val">0.0s</span>
+            </div>
+            <input type="range" id="static-timeline-start" min="0.0" max="60.0" step="0.1" value="0.0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="static-timeline-end">End Time</label>
+              <span id="static-timeline-end-val" class="slider-val">3.0s</span>
+            </div>
+            <input type="range" id="static-timeline-end" min="0.1" max="60.0" step="0.1" value="3.0">
+          </div>
+
+          <div class="control-group">
+            <label for="static-noise-type">Static Style</label>
+            <div class="select-wrapper">
+              <select id="static-noise-type">
+                <option value="analog-snow" selected>Analog Snow (TV Static)</option>
+                <option value="digital">Digital Glitch Distortion</option>
+                <option value="vhs">VHS Scanlines & Jitter</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="static-noise-intensity">Noise Level</label>
+              <span id="static-noise-intensity-val" class="slider-val">20%</span>
+            </div>
+            <input type="range" id="static-noise-intensity" min="0" max="100" step="5" value="20">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="static-glitch-frequency">Glitch Chance</label>
+              <span id="static-glitch-frequency-val" class="slider-val">10%</span>
+            </div>
+            <input type="range" id="static-glitch-frequency" min="0" max="100" step="5" value="10">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="static-scanlines-intensity">Scanline Intensity</label>
+              <span id="static-scanlines-intensity-val" class="slider-val">15%</span>
+            </div>
+            <input type="range" id="static-scanlines-intensity" min="0" max="100" step="5" value="15">
+          </div>
+
+          <button id="btn-delete-static" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
+            <i data-lucide="trash-2"></i> Delete Static Layer
+          </button>
+        </div>
+
         <div class="panel-section">
           <div class="section-title-row">
             <h2 class="section-title"><i data-lucide="eye"></i> Extracted Layers</h2>
@@ -389,6 +449,9 @@
             <div style="display: flex; gap: 8px;">
               <button id="btn-add-text" class="btn secondary small-btn">
                 <i data-lucide="plus"></i> Add Text
+              </button>
+              <button id="btn-add-static" class="btn secondary small-btn">
+                <i data-lucide="tv"></i> Add Static
               </button>
               <button id="btn-add-audio" class="btn secondary small-btn">
                 <i data-lucide="music"></i> Add Audio

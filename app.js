@@ -72,6 +72,10 @@ document.addEventListener('DOMContentLoaded', () => {
     audioTrack: null,
     selectedAudio: false,
 
+    // Static Overlays
+    statics: [],
+    selectedStaticId: null,
+
     // Motion parameters
     isPlaying: true,
     time: 0,
@@ -247,9 +251,25 @@ document.addEventListener('DOMContentLoaded', () => {
     audioVolume: document.getElementById('audio-volume'),
     audioVolumeVal: document.getElementById('audio-volume-val'),
     btnDeleteAudio: document.getElementById('btn-delete-audio'),
+
+    // Static Settings Section References
+    staticSettingsSection: document.getElementById('static-settings-section'),
+    staticTimelineStart: document.getElementById('static-timeline-start'),
+    staticTimelineStartVal: document.getElementById('static-timeline-start-val'),
+    staticTimelineEnd: document.getElementById('static-timeline-end'),
+    staticTimelineEndVal: document.getElementById('static-timeline-end-val'),
+    staticNoiseType: document.getElementById('static-noise-type'),
+    staticNoiseIntensity: document.getElementById('static-noise-intensity'),
+    staticNoiseIntensityVal: document.getElementById('static-noise-intensity-val'),
+    staticGlitchFrequency: document.getElementById('static-glitch-frequency'),
+    staticGlitchFrequencyVal: document.getElementById('static-glitch-frequency-val'),
+    staticScanlinesIntensity: document.getElementById('static-scanlines-intensity'),
+    staticScanlinesIntensityVal: document.getElementById('static-scanlines-intensity-val'),
+    btnDeleteStatic: document.getElementById('btn-delete-static'),
     
     // Timeline Panel References
     btnAddText: document.getElementById('btn-add-text'),
+    btnAddStatic: document.getElementById('btn-add-static'),
     btnAddAudio: document.getElementById('btn-add-audio'),
     audioFileInput: document.getElementById('audio-file-input'),
     timelineTimecode: document.getElementById('timeline-timecode'),
@@ -271,6 +291,30 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Rendering main context
   const ctx = UI.mainCanvas.getContext('2d', { willReadFrequently: true });
+
+  // Pre-rendered offscreen noise textures for high-performance static rendering
+  const noiseCanvases = [];
+  function initNoiseTextures() {
+    const W = 192;
+    const H = 108;
+    for (let frame = 0; frame < 4; frame++) {
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.createImageData(W, H);
+      const pixels = imgData.data;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const val = Math.floor(Math.random() * 256);
+        pixels[i] = val;     // R
+        pixels[i + 1] = val; // G
+        pixels[i + 2] = val; // B
+        pixels[i + 3] = 255; // A
+      }
+      ctx.putImageData(imgData, 0, 0);
+      noiseCanvases.push(canvas);
+    }
+  }
 
   // --- IMAGE PROCESSOR (LAYERING AND MASKING) ---
   class ImageProcessor {
@@ -1316,6 +1360,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Draw Text Overlays over the final output
     drawTextOverlays(ctx, canvasW, canvasH, renderTime);
 
+    // Draw Static Glitch & Interference Overlays
+    drawStaticOverlays(ctx, canvasW, canvasH, renderTime);
+
     // Draw Global Fade In/Out Overlay
     if (state.videoFadeActive) {
       const dur = getTimelineDuration();
@@ -1482,13 +1529,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function clampStaticIntervals() {
+    const dur = getTimelineDuration();
+    state.statics.forEach(stc => {
+      if (stc.startTime >= dur) {
+        const blockLen = stc.endTime - stc.startTime;
+        stc.startTime = Math.max(0, dur - blockLen);
+        stc.endTime = dur;
+      } else if (stc.endTime > dur) {
+        stc.endTime = dur;
+      }
+      
+      if (stc.endTime - stc.startTime < 0.2) {
+        stc.endTime = Math.min(dur, stc.startTime + 0.2);
+        stc.startTime = Math.max(0, stc.endTime - 0.2);
+      }
+    });
+  }
+
   function updateTimelineTracks() {
     if (!UI.timelineTracks) return;
     clampTextIntervals();
+    clampStaticIntervals();
     UI.timelineTracks.innerHTML = '';
     
-    if (state.texts.length === 0 && !state.audioTrack) {
-      UI.timelineTracks.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding-top: 15px; font-family: var(--font-display);">No text overlays or soundtrack. Click "Add Text" or "Add Audio" to start.</div>';
+    if (state.texts.length === 0 && !state.audioTrack && state.statics.length === 0) {
+      UI.timelineTracks.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding-top: 15px; font-family: var(--font-display);">No text overlays, static overlays or soundtrack. Click buttons above to start.</div>';
       return;
     }
     
@@ -1592,6 +1658,50 @@ document.addEventListener('DOMContentLoaded', () => {
       row.appendChild(block);
       UI.timelineTracks.appendChild(row);
     });
+
+    // 3. Render Static Tracks
+    state.statics.forEach((stcObj) => {
+      const row = document.createElement('div');
+      row.className = 'timeline-track-row';
+      row.dataset.id = stcObj.id;
+      row.dataset.type = 'static';
+      
+      const block = document.createElement('div');
+      block.className = 'timeline-block static-block' + (stcObj.id === state.selectedStaticId ? ' selected' : '');
+      block.dataset.id = stcObj.id;
+      
+      const startPct = (stcObj.startTime / dur) * 100;
+      const widthPct = ((stcObj.endTime - stcObj.startTime) / dur) * 100;
+      
+      block.style.left = `${startPct}%`;
+      block.style.width = `${widthPct}%`;
+      
+      const cleanLabel = document.createElement('span');
+      cleanLabel.style.pointerEvents = 'none';
+      
+      let styleLabel = 'Static';
+      if (stcObj.style === 'analog-snow') styleLabel = 'Analog Snow';
+      else if (stcObj.style === 'digital') styleLabel = 'Digital Glitch';
+      else if (stcObj.style === 'vhs') styleLabel = 'VHS Static';
+      
+      cleanLabel.innerText = `📺 ${styleLabel} (${stcObj.intensity}%)`;
+      block.appendChild(cleanLabel);
+      
+      const leftHandle = document.createElement('div');
+      leftHandle.className = 'timeline-block-handle left';
+      leftHandle.dataset.handle = 'left';
+      leftHandle.dataset.id = stcObj.id;
+      
+      const rightHandle = document.createElement('div');
+      rightHandle.className = 'timeline-block-handle right';
+      rightHandle.dataset.handle = 'right';
+      rightHandle.dataset.id = stcObj.id;
+      
+      block.appendChild(leftHandle);
+      block.appendChild(rightHandle);
+      row.appendChild(block);
+      UI.timelineTracks.appendChild(row);
+    });
   }
 
   function updatePlayhead() {
@@ -1622,7 +1732,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function selectText(id) {
     state.selectedTextId = id;
     state.selectedAudio = false;
+    state.selectedStaticId = null;
     UI.audioSettingsSection.style.display = 'none';
+    UI.staticSettingsSection.style.display = 'none';
 
     if (id === null) {
       UI.textSettingsSection.style.display = 'none';
@@ -1662,7 +1774,9 @@ document.addEventListener('DOMContentLoaded', () => {
     state.selectedAudio = isSelected;
     if (isSelected) {
       state.selectedTextId = null;
+      state.selectedStaticId = null;
       UI.textSettingsSection.style.display = 'none';
+      UI.staticSettingsSection.style.display = 'none';
     }
     
     if (!isSelected || !state.audioTrack) {
@@ -1683,6 +1797,40 @@ document.addEventListener('DOMContentLoaded', () => {
       
       UI.audioVolume.value = Math.round(track.volume * 100);
       UI.audioVolumeVal.innerText = `${Math.round(track.volume * 100)}%`;
+    }
+    updateTimelineTracks();
+  }
+
+  function selectStatic(id) {
+    state.selectedStaticId = id;
+    state.selectedTextId = null;
+    state.selectedAudio = false;
+    UI.textSettingsSection.style.display = 'none';
+    UI.audioSettingsSection.style.display = 'none';
+
+    if (id === null) {
+      UI.staticSettingsSection.style.display = 'none';
+    } else {
+      const stc = state.statics.find(s => s.id === id);
+      if (stc) {
+        UI.staticSettingsSection.style.display = 'flex';
+        UI.staticSettingsSection.classList.remove('collapsed');
+        
+        UI.staticTimelineStart.value = stc.startTime;
+        UI.staticTimelineStartVal.innerText = `${stc.startTime.toFixed(1)}s`;
+        UI.staticTimelineEnd.value = stc.endTime;
+        UI.staticTimelineEndVal.innerText = `${stc.endTime.toFixed(1)}s`;
+        
+        UI.staticNoiseType.value = stc.style || 'analog-snow';
+        UI.staticNoiseIntensity.value = stc.intensity !== undefined ? stc.intensity : 20;
+        UI.staticNoiseIntensityVal.innerText = `${stc.intensity !== undefined ? stc.intensity : 20}%`;
+        
+        UI.staticGlitchFrequency.value = stc.glitchFrequency !== undefined ? stc.glitchFrequency : 10;
+        UI.staticGlitchFrequencyVal.innerText = `${stc.glitchFrequency !== undefined ? stc.glitchFrequency : 10}%`;
+        
+        UI.staticScanlinesIntensity.value = stc.scanlinesIntensity !== undefined ? stc.scanlinesIntensity : 15;
+        UI.staticScanlinesIntensityVal.innerText = `${stc.scanlinesIntensity !== undefined ? stc.scanlinesIntensity : 15}%`;
+      }
     }
     updateTimelineTracks();
   }
@@ -2080,6 +2228,117 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       renderCtx.globalAlpha = oldAlpha;
       renderCtx.restore();
+    });
+  }
+
+  function drawStaticOverlays(renderCtx, w, h, time) {
+    if (state.statics.length === 0) return;
+    
+    state.statics.forEach(stc => {
+      // Check if current time falls within static overlay active interval
+      const dur = getTimelineDuration();
+      const loopTime = ((time % dur) + dur) % dur;
+      if (loopTime >= stc.startTime && loopTime <= stc.endTime) {
+        const intensity = stc.intensity !== undefined ? stc.intensity : 20;
+        const glitchFreq = stc.glitchFrequency !== undefined ? stc.glitchFrequency : 10;
+        const scanlineInt = stc.scanlinesIntensity !== undefined ? stc.scanlinesIntensity : 15;
+        
+        const frameIdx = Math.floor(loopTime * 30);
+        const randVal = getPseudoRandom(frameIdx + 571.29);
+        const shouldGlitch = randVal < (glitchFreq / 100);
+        
+        // 1. Digital Shearing / Jitter (For 'digital' and 'vhs' styles)
+        if (shouldGlitch && (stc.style === 'digital' || stc.style === 'vhs')) {
+          const slicesCount = stc.style === 'digital' ? 8 : 4;
+          const maxOffset = (intensity / 100) * 40; // max offset in px
+          
+          for (let i = 0; i < slicesCount; i++) {
+            const seed = frameIdx * 10 + i;
+            const sliceH = h / slicesCount;
+            const srcY = i * sliceH;
+            const offset = (getPseudoRandom(seed) - 0.5) * 2 * maxOffset;
+            
+            renderCtx.save();
+            renderCtx.beginPath();
+            renderCtx.rect(0, srcY, w, sliceH);
+            renderCtx.clip();
+            renderCtx.drawImage(renderCtx.canvas, offset, 0);
+            renderCtx.restore();
+          }
+        }
+        
+        // 2. Analog Snow (TV Static)
+        if (stc.style === 'analog-snow' && intensity > 0 && noiseCanvases.length > 0) {
+          renderCtx.save();
+          renderCtx.globalAlpha = intensity / 100;
+          renderCtx.imageSmoothingEnabled = false;
+          
+          const noiseCanvas = noiseCanvases[frameIdx % noiseCanvases.length];
+          const flipX = getPseudoRandom(frameIdx + 11.1) < 0.5 ? -1 : 1;
+          const flipY = getPseudoRandom(frameIdx + 22.2) < 0.5 ? -1 : 1;
+          
+          renderCtx.translate(w / 2, h / 2);
+          renderCtx.scale(flipX, flipY);
+          renderCtx.drawImage(noiseCanvas, -w / 2, -h / 2, w, h);
+          renderCtx.restore();
+        }
+        
+        // 3. Scanlines
+        if (scanlineInt > 0) {
+          renderCtx.save();
+          renderCtx.globalAlpha = scanlineInt / 100;
+          renderCtx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+          
+          const scanlineSpacing = 4;
+          for (let y = 0; y < h; y += scanlineSpacing) {
+            renderCtx.fillRect(0, y, w, 1.5);
+          }
+          renderCtx.restore();
+        }
+        
+        // 4. Rolling VHS tracking bar
+        if (stc.style === 'vhs' && intensity > 0) {
+          renderCtx.save();
+          
+          const speed = h / (dur || 5);
+          const barY = (loopTime * speed) % h;
+          const barH = 15 + (intensity / 100) * 35;
+          renderCtx.globalAlpha = (intensity / 100) * 0.7;
+          
+          renderCtx.imageSmoothingEnabled = false;
+          const noiseCanvas = noiseCanvases[(frameIdx + 1) % noiseCanvases.length];
+          renderCtx.drawImage(noiseCanvas, 0, barY - barH / 2, w, barH);
+          
+          if (getPseudoRandom(frameIdx + 77.7) < 0.8) {
+            const shift = (getPseudoRandom(frameIdx + 88.8) - 0.5) * 15 * (intensity / 100);
+            renderCtx.save();
+            renderCtx.beginPath();
+            renderCtx.rect(0, barY - barH / 2, w, barH);
+            renderCtx.clip();
+            renderCtx.drawImage(renderCtx.canvas, shift, 0);
+            renderCtx.restore();
+          }
+          
+          renderCtx.restore();
+        }
+
+        // 5. Digital blocks
+        if (stc.style === 'digital' && shouldGlitch && intensity > 0) {
+          renderCtx.save();
+          const blocksCount = Math.floor(3 + (intensity / 100) * 8);
+          for (let b = 0; b < blocksCount; b++) {
+            const blockW = 40 + getPseudoRandom(frameIdx + b * 2) * 150;
+            const blockH = 10 + getPseudoRandom(frameIdx + b * 3) * 60;
+            const bx = getPseudoRandom(frameIdx + b * 4) * (w - blockW);
+            const by = getPseudoRandom(frameIdx + b * 5) * (h - blockH);
+            
+            const grayVal = Math.floor(getPseudoRandom(frameIdx + b * 6) * 255);
+            renderCtx.fillStyle = `rgba(${grayVal}, ${grayVal}, ${grayVal}, ${0.1 + 0.3 * (intensity / 100)})`;
+            renderCtx.fillRect(bx, by, blockW, blockH);
+          }
+          renderCtx.restore();
+        }
+      }
     });
   }
 
@@ -2762,6 +3021,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     state.selectedTextId = null;
     selectText(null);
+    state.statics = [];
+    state.selectedStaticId = null;
+    selectStatic(null);
     updateTimelineRuler();
     updateTimelineTracks();
     updatePlayhead();
@@ -3025,6 +3287,111 @@ document.addEventListener('DOMContentLoaded', () => {
       state.texts.splice(index, 1);
       selectText(null);
       updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  // Add Static Layer
+  UI.btnAddStatic.addEventListener('click', () => {
+    if (state.statics.length >= 5) {
+      alert("Maximum limit of 5 static overlay tracks reached.");
+      return;
+    }
+    
+    const duration = getTimelineDuration();
+    const newStatic = {
+      id: 'stc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      startTime: 0,
+      endTime: Math.min(duration, 3.0),
+      style: 'analog-snow',
+      intensity: 20,
+      glitchFrequency: 10,
+      scanlinesIntensity: 15
+    };
+    
+    state.statics.push(newStatic);
+    selectStatic(newStatic.id);
+    updateTimelineTracks();
+    renderFrame(state.time);
+  });
+
+  // Delete Static Layer
+  UI.btnDeleteStatic.addEventListener('click', () => {
+    if (!state.selectedStaticId) return;
+    const index = state.statics.findIndex(s => s.id === state.selectedStaticId);
+    if (index !== -1) {
+      state.statics.splice(index, 1);
+      selectStatic(null);
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  // Static Settings bindings
+  UI.staticTimelineStart.addEventListener('input', (e) => {
+    if (!state.selectedStaticId) return;
+    const stc = state.statics.find(s => s.id === state.selectedStaticId);
+    if (stc) {
+      const val = parseFloat(e.target.value);
+      stc.startTime = Math.min(stc.endTime - 0.2, val);
+      UI.staticTimelineStartVal.innerText = `${stc.startTime.toFixed(1)}s`;
+      e.target.value = stc.startTime;
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  UI.staticTimelineEnd.addEventListener('input', (e) => {
+    if (!state.selectedStaticId) return;
+    const stc = state.statics.find(s => s.id === state.selectedStaticId);
+    if (stc) {
+      const val = parseFloat(e.target.value);
+      const duration = getTimelineDuration();
+      stc.endTime = Math.max(stc.startTime + 0.2, Math.min(duration, val));
+      UI.staticTimelineEndVal.innerText = `${stc.endTime.toFixed(1)}s`;
+      e.target.value = stc.endTime;
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  UI.staticNoiseType.addEventListener('change', (e) => {
+    if (!state.selectedStaticId) return;
+    const stc = state.statics.find(s => s.id === state.selectedStaticId);
+    if (stc) {
+      stc.style = e.target.value;
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  UI.staticNoiseIntensity.addEventListener('input', (e) => {
+    if (!state.selectedStaticId) return;
+    const stc = state.statics.find(s => s.id === state.selectedStaticId);
+    if (stc) {
+      stc.intensity = parseInt(e.target.value);
+      UI.staticNoiseIntensityVal.innerText = `${stc.intensity}%`;
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  UI.staticGlitchFrequency.addEventListener('input', (e) => {
+    if (!state.selectedStaticId) return;
+    const stc = state.statics.find(s => s.id === state.selectedStaticId);
+    if (stc) {
+      stc.glitchFrequency = parseInt(e.target.value);
+      UI.staticGlitchFrequencyVal.innerText = `${stc.glitchFrequency}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.staticScanlinesIntensity.addEventListener('input', (e) => {
+    if (!state.selectedStaticId) return;
+    const stc = state.statics.find(s => s.id === state.selectedStaticId);
+    if (stc) {
+      stc.scanlinesIntensity = parseInt(e.target.value);
+      UI.staticScanlinesIntensityVal.innerText = `${stc.scanlinesIntensity}%`;
       renderFrame(state.time);
     }
   });
@@ -3358,6 +3725,8 @@ document.addEventListener('DOMContentLoaded', () => {
       dragTextId = txtId;
       if (txtId === 'audio') {
         selectAudio(true);
+      } else if (txtId.startsWith('stc_')) {
+        selectStatic(txtId);
       } else {
         selectText(txtId);
       }
@@ -3368,6 +3737,8 @@ document.addEventListener('DOMContentLoaded', () => {
       dragTextId = txtId;
       if (txtId === 'audio') {
         selectAudio(true);
+      } else if (txtId.startsWith('stc_')) {
+        selectStatic(txtId);
       } else {
         selectText(txtId);
       }
@@ -3389,6 +3760,13 @@ document.addEventListener('DOMContentLoaded', () => {
           dragStartBlockStart = track.timelineStart;
           dragStartBlockEnd = track.timelineStart + track.duration;
           dragStartSourceOffset = track.sourceOffset;
+        }
+      } else if (dragTextId.startsWith('stc_')) {
+        const stc = state.statics.find(s => s.id === dragTextId);
+        if (stc) {
+          dragStartMouseX = e.clientX;
+          dragStartBlockStart = stc.startTime;
+          dragStartBlockEnd = stc.endTime;
         }
       } else {
         const txt = state.texts.find(t => t.id === dragTextId);
@@ -3441,6 +3819,45 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           updateTimelineTracks();
         }
+      } else if (dragTextId.startsWith('stc_')) {
+        const stc = state.statics.find(s => s.id === dragTextId);
+        if (stc) {
+          if (dragMode === 'move') {
+            let newStart = dragStartBlockStart + dxSec;
+            let newEnd = dragStartBlockEnd + dxSec;
+            const blockLen = dragStartBlockEnd - dragStartBlockStart;
+            
+            if (newStart < 0) {
+              newStart = 0;
+              newEnd = blockLen;
+            }
+            if (newEnd > duration) {
+              newEnd = duration;
+              newStart = duration - blockLen;
+            }
+            
+            stc.startTime = newStart;
+            stc.endTime = newEnd;
+          } else if (dragMode === 'resize-left') {
+            let newStart = dragStartBlockStart + dxSec;
+            newStart = Math.max(0, Math.min(stc.endTime - 0.2, newStart));
+            stc.startTime = newStart;
+          } else if (dragMode === 'resize-right') {
+            let newEnd = dragStartBlockEnd + dxSec;
+            newEnd = Math.min(duration, Math.max(stc.startTime + 0.2, newEnd));
+            stc.endTime = newEnd;
+          }
+          
+          if (state.selectedStaticId === stc.id) {
+            UI.staticTimelineStart.value = stc.startTime;
+            UI.staticTimelineStartVal.innerText = `${stc.startTime.toFixed(1)}s`;
+            UI.staticTimelineEnd.value = stc.endTime;
+            UI.staticTimelineEndVal.innerText = `${stc.endTime.toFixed(1)}s`;
+          }
+          
+          updateTimelineTracks();
+          renderFrame(state.time);
+        }
       } else {
         const txt = state.texts.find(t => t.id === dragTextId);
         if (txt) {
@@ -3481,6 +3898,9 @@ document.addEventListener('DOMContentLoaded', () => {
     dragMode = null;
     dragTextId = null;
   });
+
+  // Initialize noise textures
+  initNoiseTextures();
 
   // Draw initial graph, estimate readouts, and timeline elements
   drawMaskGraph();

@@ -1119,6 +1119,16 @@ select:focus, select:hover {
   color: var(--text-primary);
   box-shadow: 0 0 10px rgba(255, 0, 127, 0.35);
 }
+.timeline-block.static-block {
+  background: linear-gradient(90deg, rgba(150, 150, 150, 0.15) 0%, rgba(200, 200, 200, 0.15) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.timeline-block.static-block.selected {
+  background: linear-gradient(90deg, rgba(200, 200, 200, 0.3) 0%, rgba(255, 255, 255, 0.3) 100%);
+  border-color: #ffffff;
+  color: var(--text-primary);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
 .timeline-block span {
   position: relative;
   z-index: 1;
