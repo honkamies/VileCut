@@ -2,6 +2,8 @@
 
 A standalone browser-based web application designed to transform static images into infinite-diving, depth-sliced video loops. Perfect for generating hypnotic, symmetrical backgrounds and glitches for social media layouts.
 
+I asked AGY to create this as I needed something like this to my underground metal band. I don't have time to do all these in Davinci Resolve and in the end this was fun.
+
 ---
 
 ## Features
