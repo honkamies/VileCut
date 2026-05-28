@@ -10,6 +10,7 @@ I asked AGY to create this as I needed something like this to my underground met
 
 ## Features
 - **Adaptive Luminosity Slicing**: Automatically splits images into distinct, detail-balanced depth bands using pixel-count histograms.
+- **Layer Edge Fade (Vignette)**: Adjustable blending slider (0% to 50%) to smoothly fade out layer borders and blend different images seamlessly.
 - **Layer Inspector Preview**: Live visual card with custom backgrounds (Checkerboard, Black, White, Magenta) to examine isolated mask details.
 - **Infinite Diving Engine**: Exponential zoom camera tunnel ($S(z) = d^{(z - 0.5) \cdot 2.0}$) creating true depth perspective.
 - **Aspect Ratio Selector**: Instantly crop and scale frames for social media ratios (**9:16 Portrait**, **1:1 Square**, **4:5 Feed**, **16:9 Landscape**, **21:9 Cinema**).
@@ -19,9 +20,22 @@ I asked AGY to create this as I needed something like this to my underground met
 ---
 
 ## Local Usage
-Since this is a client-side HTML5/JS application, there are no build steps required:
-1. Double-click `index.html` to open the editor directly in your web browser.
-2. Drag and drop your images or browse to select files.
+
+Because this application uses modular ES6 Javascript, modern browsers block loading scripts directly from the filesystem (`file:///` URLs) due to security/CORS restrictions. An HTTP server is required.
+
+We have included automated launchers to start a lightweight server with zero configuration:
+
+### Running on Windows:
+1. Double-click **`run.bat`**.
+2. The launcher will search for **Python** or **Node.js** to start a server.
+3. If neither is installed, it will automatically offer to install Python 3 via Windows Package Manager (`winget`). Accept the Windows UAC prompts, let it install, close the window, and click `run.bat` again.
+4. The server will launch and automatically open your default browser to **`http://localhost:8000`**.
+
+### Running on macOS or Linux:
+1. Open a terminal in this directory.
+2. Make the launcher executable: `chmod +x run.sh`
+3. Run the launcher: `./run.sh`
+4. The app will serve at **`http://localhost:8000`**.
 
 ---
 
@@ -54,7 +68,20 @@ The application will be available at `http://localhost:8080`.
 ## Repository Contents
 - `index.html` - Application layout and user controls.
 - `style.css` - Neomorphic cyan/purple glassmorphic stylesheet.
-- `app.js` - Slicing, rendering, and WebM capture logic.
-- `Dockerfile` - Alpine-based Nginx container definition.
+- `js/` - Directory containing the modular ES6 Javascript engine:
+  - `state.js` - Central application state manager.
+  - `ui.js` - DOM element selection mapping.
+  - `utils.js` - General helper functions (fonts, math, color convert).
+  - `masking.js` - ImageProcessor (layer extraction, edge vignette, histogram quantiles).
+  - `glitch.js` - GlitchManager (pixel sorting, shakes, splits).
+  - `audio.js` - Audio synchronization and timeline playback nodes.
+  - `overlays.js` - Text and Graphic canvas overlays drawers.
+  - `timeline.js` - Timeline tracks renderer and mouse drag/resize handlers.
+  - `exporter.js` - VideoExporter WebM recorder.
+  - `app.js` - Main entry module, binding sidebars and event listeners.
+- `fonts/` - Directory for pre-loading custom fonts (configured in `fonts/fonts.json`).
+- `run.bat` - One-click Windows server launcher (with winget installer check).
+- `run.sh` - One-click macOS/Linux server launcher.
+- `Dockerfile` - Alpine-based Nginx container definition (updated for ES6 directory copies).
 - `docker-compose.yml` - Portainer-compatible compose stack file.
 - `.gitignore` - Standard gitignore configurations.

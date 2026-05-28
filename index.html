@@ -104,6 +104,14 @@
             <input type="range" id="mask-feather" min="0.05" max="0.8" step="0.05" value="0.3">
           </div>
 
+          <div class="control-group" id="layer-edge-fade-group">
+            <div class="slider-header">
+              <label for="layer-edge-fade">Layer Edge Fade (Vignette)</label>
+              <span id="layer-edge-fade-val" class="slider-val">10%</span>
+            </div>
+            <input type="range" id="layer-edge-fade" min="0" max="50" step="1" value="10">
+          </div>
+
           <div class="control-group" id="color-range-hue-group" style="display: none;">
             <div class="slider-header">
               <label for="hue-tolerance">Hue Spread</label>
@@ -170,7 +178,7 @@
                 <label for="text-size">Size</label>
                 <span id="text-size-val" class="slider-val">40px</span>
               </div>
-              <input type="range" id="text-size" min="12" max="120" step="1" value="40">
+              <input type="range" id="text-size" min="12" max="300" step="1" value="40">
             </div>
 
             <div class="control-group">
@@ -214,18 +222,18 @@
           <div class="grid-2-col">
             <div class="control-group">
               <div class="slider-header">
-                <label for="text-idle-wobble">Idle Wobble</label>
-                <span id="text-idle-wobble-val" class="slider-val">1.5°</span>
+                <label for="text-idle-wobble">Idle Jitter</label>
+                <span id="text-idle-wobble-val" class="slider-val">5.0px</span>
               </div>
-              <input type="range" id="text-idle-wobble" min="0" max="10" step="0.5" value="1.5">
+              <input type="range" id="text-idle-wobble" min="0" max="50" step="0.5" value="5.0">
             </div>
 
             <div class="control-group">
               <div class="slider-header">
-                <label for="text-idle-skew">Idle Skew</label>
-                <span id="text-idle-skew-val" class="slider-val">3%</span>
+                <label for="text-idle-skew">Glitch Twitch</label>
+                <span id="text-idle-skew-val" class="slider-val">10%</span>
               </div>
-              <input type="range" id="text-idle-skew" min="0" max="20" step="1" value="3">
+              <input type="range" id="text-idle-skew" min="0" max="100" step="1" value="10">
             </div>
           </div>
 
@@ -742,6 +750,6 @@
   </div>
 
   <!-- JS -->
-  <script src="app.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -11,3 +11,7 @@ desktop.ini
 *.webm
 *.mp4
 *.gif
+
+# Agent Workspaces and logs
+modular_test/
+walkthrough.md
