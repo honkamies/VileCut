@@ -62,6 +62,7 @@ export const state = {
 
   // Exporter
   isExporting: false,
+  exportFormat: 'mp4',
   exportRecorder: null,
   exportChunks: [],
   exportFrame: 0,

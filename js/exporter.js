@@ -4,6 +4,7 @@ import { getTimelineDuration } from './utils.js';
 import { stopAudioSource, getAudioContext, exportAudioNode, setExportAudioNode, syncExportAudio, syncAudioPlayback } from './audio.js';
 import { GlitchManager } from './glitch.js';
 import { renderFrame, resizeMainCanvas } from './renderer.js';
+import { Muxer, ArrayBufferTarget } from './mp4-muxer.js';
 
 export class VideoExporter {
   static async export() {
@@ -63,11 +64,277 @@ export class VideoExporter {
       }
     }
 
+    // Crucial for H.264 WebCodecs encoders: width/height must be even numbers
+    resW = Math.round(resW / 2) * 2;
+    resH = Math.round(resH / 2) * 2;
+
     UI.mainCanvas.width = resW;
     UI.mainCanvas.height = resH;
 
+    // Check if we should use the new MP4 WebCodecs exporter or WebM fallback
+    const hasWebCodecs = typeof window.VideoEncoder !== 'undefined';
+    const useWebCodecsMP4 = state.exportFormat === 'mp4' && hasWebCodecs;
 
+    if (useWebCodecsMP4) {
+      try {
+        await VideoExporter.exportMP4(duration, fps, resW, resH, originalW, originalH);
+      } catch (err) {
+        console.error("MP4 WebCodecs export failed, falling back to WebM:", err);
+        alert("MP4 export failed: " + err.message + ". Falling back to WebM.");
+        // Restore canvas size and run WebM export
+        UI.mainCanvas.width = resW;
+        UI.mainCanvas.height = resH;
+        VideoExporter.exportWebM(duration, fps, resW, resH, originalW, originalH);
+      }
+    } else {
+      VideoExporter.exportWebM(duration, fps, resW, resH, originalW, originalH);
+    }
+  }
 
+  static async exportMP4(duration, fps, resW, resH, originalW, originalH) {
+    const totalFrames = Math.ceil(duration * fps);
+    const hasAudio = !!state.audioTrack;
+
+    // 1. Initialize Muxer
+    const muxer = new Muxer({
+      target: new ArrayBufferTarget(),
+      video: {
+        codec: 'avc',
+        width: resW,
+        height: resH
+      },
+      audio: hasAudio ? {
+        codec: 'aac',
+        numberOfChannels: 2,
+        sampleRate: 44100
+      } : undefined,
+      fastStart: 'in-memory'
+    });
+
+    // 2. Setup Encoders
+    let videoEncoder = null;
+    let audioEncoder = null;
+
+    try {
+      videoEncoder = new VideoEncoder({
+        output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
+        error: (e) => {
+          console.error("VideoEncoder error during export:", e);
+          throw new Error("Video encoder error: " + e.message);
+        }
+      });
+      videoEncoder.configure({
+        codec: 'avc1.4d002a', // H.264 Main Profile, Level 4.2
+        width: resW,
+        height: resH,
+        bitrate: 6000000,
+        framerate: fps,
+        latencyMode: 'quality'
+      });
+    } catch (e) {
+      console.error("VideoEncoder configuration failed:", e);
+      throw new Error("Could not configure VideoEncoder. H.264 profile avc1.4d002a may not be supported by this browser.");
+    }
+
+    const tempPlaying = state.isPlaying;
+    state.isPlaying = false;
+    stopAudioSource();
+
+    // Reset wrap counts for all layers to align with starting time 0.0
+    state.layers.forEach(layer => {
+      layer.lastWrapCount = null;
+    });
+
+    // 3. Audio Encoding (if soundtrack is present)
+    if (hasAudio) {
+      const sampleRate = 44100;
+      const totalAudioFrames = Math.ceil(duration * sampleRate);
+      
+      UI.exportFrameCount.innerText = `Preparing audio...`;
+      UI.exportProgressBar.style.width = `0%`;
+      UI.exportPercent.innerText = `0%`;
+
+      try {
+        const offlineCtx = new OfflineAudioContext(2, totalAudioFrames, sampleRate);
+        const dur = getTimelineDuration();
+        const track = state.audioTrack;
+
+        // Schedule soundtrack instances
+        for (let loopStartTime = 0; loopStartTime < duration; loopStartTime += dur) {
+          const playStart = loopStartTime + track.timelineStart;
+          const playEnd = playStart + track.duration;
+          const loopEnd = loopStartTime + dur;
+          
+          const actualStart = Math.max(playStart, 0);
+          const actualEnd = Math.min(playEnd, loopEnd, duration);
+          
+          if (actualStart < actualEnd) {
+            const relativeOffset = actualStart - playStart;
+            const filePlayStart = track.sourceOffset + relativeOffset;
+            const playDuration = actualEnd - actualStart;
+            
+            if (filePlayStart >= 0 && filePlayStart < track.buffer.duration) {
+              const source = offlineCtx.createBufferSource();
+              source.buffer = track.buffer;
+              
+              const gainNode = offlineCtx.createGain();
+              gainNode.gain.value = track.volume !== undefined ? track.volume : 0.8;
+              
+              source.connect(gainNode);
+              gainNode.connect(offlineCtx.destination);
+              
+              source.start(actualStart, filePlayStart, playDuration);
+            }
+          }
+        }
+
+        const renderedBuffer = await offlineCtx.startRendering();
+
+        // Configure audio encoder
+        audioEncoder = new AudioEncoder({
+          output: (chunk, metadata) => muxer.addAudioChunk(chunk, metadata),
+          error: (e) => {
+            console.error("AudioEncoder error during export:", e);
+            throw new Error("Audio encoder error: " + e.message);
+          }
+        });
+        audioEncoder.configure({
+          codec: 'mp4a.40.2', // AAC-LC
+          numberOfChannels: 2,
+          sampleRate: sampleRate,
+          bitrate: 128000
+        });
+
+        // Encode audio in chunks of 1024 frames
+        const leftChannel = renderedBuffer.getChannelData(0);
+        const rightChannel = renderedBuffer.getChannelData(1);
+        const totalSamples = renderedBuffer.length;
+        const frameSize = 1024;
+        let sampleIndex = 0;
+
+        while (sampleIndex < totalSamples) {
+          if (state.exportCancel) break;
+          const framesToEncode = Math.min(frameSize, totalSamples - sampleIndex);
+          const audioBuffer = new Float32Array(2 * framesToEncode);
+          audioBuffer.set(leftChannel.subarray(sampleIndex, sampleIndex + framesToEncode), 0);
+          audioBuffer.set(rightChannel.subarray(sampleIndex, sampleIndex + framesToEncode), framesToEncode);
+          
+          const timestamp = Math.round((sampleIndex / sampleRate) * 1000000);
+          const audioData = new AudioData({
+            format: 'f32-planar',
+            sampleRate: sampleRate,
+            numberOfFrames: framesToEncode,
+            numberOfChannels: 2,
+            timestamp: timestamp,
+            data: audioBuffer
+          });
+          
+          audioEncoder.encode(audioData);
+          audioData.close();
+          sampleIndex += framesToEncode;
+          
+          if (sampleIndex % (frameSize * 50) === 0) {
+            const audioPct = Math.min(100, Math.round((sampleIndex / totalSamples) * 100));
+            UI.exportProgressBar.style.width = `${audioPct}%`;
+            UI.exportFrameCount.innerText = `Processing Audio: ${audioPct}%`;
+            UI.exportPercent.innerText = `${audioPct}%`;
+            await new Promise(resolve => requestAnimationFrame(resolve));
+          }
+        }
+        await audioEncoder.flush();
+      } catch (audioErr) {
+        console.error("Audio encoding failed:", audioErr);
+        throw new Error("Audio encoding failed: " + audioErr.message);
+      }
+    }
+
+    if (state.exportCancel) {
+      if (videoEncoder) videoEncoder.close();
+      if (audioEncoder) audioEncoder.close();
+      state.isPlaying = tempPlaying;
+      if (state.isPlaying) syncAudioPlayback();
+      VideoExporter.endExport(originalW, originalH);
+      return;
+    }
+
+    // 4. Video Encoding Loop
+    try {
+      for (let i = 0; i < totalFrames; i++) {
+        if (state.exportCancel) break;
+
+        state.time = i / fps;
+        
+        if (state.glitchEnabled) {
+          GlitchManager.update(1 / fps);
+        }
+        
+        renderFrame(state.time);
+
+        const timestamp = Math.round((i / fps) * 1000000);
+        const frame = new VideoFrame(UI.mainCanvas, { timestamp });
+        
+        videoEncoder.encode(frame, { keyFrame: i % 30 === 0 });
+        frame.close();
+
+        // UI progress update
+        const pct = Math.round((i / totalFrames) * 100);
+        UI.exportProgressBar.style.width = `${pct}%`;
+        UI.exportFrameCount.innerText = `Rendering Video: Frame ${i + 1} / ${totalFrames}`;
+        UI.exportPercent.innerText = `${pct}%`;
+
+        // Yield to allow browser UI updates
+        await new Promise(resolve => requestAnimationFrame(resolve));
+
+        // Enforce backpressure queue limit to prevent OOM
+        while (videoEncoder.encodeQueueSize > 4) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
+
+      if (state.exportCancel) {
+        if (videoEncoder) videoEncoder.close();
+        if (audioEncoder) audioEncoder.close();
+        state.isPlaying = tempPlaying;
+        if (state.isPlaying) syncAudioPlayback();
+        VideoExporter.endExport(originalW, originalH);
+        return;
+      }
+
+      await videoEncoder.flush();
+
+      // 5. Finalize and Download
+      muxer.finalize();
+
+      const { buffer } = muxer.target;
+      const blob = new Blob([buffer], { type: 'video/mp4' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `videomaddness_${Date.now()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    } catch (videoErr) {
+      console.error("Video encoding failed:", videoErr);
+      throw videoErr;
+    } finally {
+      if (videoEncoder) videoEncoder.close();
+      if (audioEncoder) audioEncoder.close();
+      
+      state.isPlaying = tempPlaying;
+      if (state.isPlaying) {
+        syncAudioPlayback();
+      }
+      VideoExporter.endExport(originalW, originalH);
+    }
+  }
+
+  static exportWebM(duration, fps, resW, resH, originalW, originalH) {
     // Initialize export audio routing
     if (state.audioTrack) {
       try {
@@ -208,3 +475,4 @@ export class VideoExporter {
     resizeMainCanvas();
   }
 }
+

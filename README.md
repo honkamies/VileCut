@@ -15,7 +15,7 @@ I asked AGY to create this as I needed something like this to my underground met
 - **Infinite Diving Engine**: Exponential zoom camera tunnel ($S(z) = d^{(z - 0.5) \cdot 2.0}$) creating true depth perspective.
 - **Aspect Ratio Selector**: Instantly crop and scale frames for social media ratios (**9:16 Portrait**, **1:1 Square**, **4:5 Feed**, **16:9 Landscape**, **21:9 Cinema**).
 - **Cybernetic Glitch FX**: Post-process RGB channel splitting, horizontal pixel-sorting, and screen shaking (switched off by default).
-- **Exporting Engine**: Frame-by-frame deterministic WebM exporter. Generates full quality mobile portrait videos ($1080 \times 1920$) or landscape formats.
+- **Exporting Engine**: Client-side H.264/MP4 video generation via the browser's WebCodecs API and `mp4-muxer.js` (including offline timeline rendering and encoding of audio soundtracks), ensuring high compatibility with Instagram, TikTok, and media players. Automatically falls back to WebM (MediaRecorder) on browsers where WebCodecs H.264 encoding is unsupported.
 
 ---
 

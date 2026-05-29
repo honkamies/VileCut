@@ -505,6 +505,10 @@ document.addEventListener('DOMContentLoaded', () => {
     UI.exportLoops.value = 1;
     state.exportLoops = 1;
     UI.exportLoopsVal.innerText = '1';
+    if (UI.exportFormat) {
+      UI.exportFormat.value = 'mp4';
+    }
+    state.exportFormat = 'mp4';
     UI.exportDurationGroup.style.display = 'flex';
     UI.exportLoopsGroup.style.display = 'none';
     updateExportEstimate();
@@ -714,6 +718,12 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTimelineTracks();
     updatePlayhead();
   });
+
+  if (UI.exportFormat) {
+    UI.exportFormat.addEventListener('change', (e) => {
+      state.exportFormat = e.target.value;
+    });
+  }
 
   UI.themeSelect.addEventListener('change', (e) => {
     const val = e.target.value;
@@ -1331,6 +1341,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initial draw and helper triggers
   drawMaskGraph();
+  if (UI.exportFormat) {
+    state.exportFormat = UI.exportFormat.value;
+  }
   updateExportEstimate();
   updateTimelineRuler();
   updateTimelineTracks();
