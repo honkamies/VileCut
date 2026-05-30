@@ -74,7 +74,7 @@ winget install --id Python.Python.3.12
 if %errorlevel% equ 0 (
     echo.
     echo SUCCESS: Python has been installed successfully!
-    echo IMPORTANT: You must close this window and run run.bat again to start the server.
+    echo IMPORTANT: You must close this window and run run_Windows.bat again to start the server.
 ) else (
     echo.
     echo ERROR: winget installation failed or was cancelled.

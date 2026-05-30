@@ -24,8 +24,8 @@ Videomaddness/
 ├── index.html              # HTML layout, sidebar parameters panel, and bottom timeline
 ├── style.css               # Neomorphic cyan/purple glassmorphic stylesheet
 ├── README.md               # Project documentation and features
-├── run.bat                 # Windows local server launcher (starts Python/Node HTTP servers)
-├── run.sh                  # macOS/Linux local server launcher
+├── run_Windows.bat         # Windows local server launcher (starts Python/Node HTTP servers)
+├── run_Mac_Linux.sh        # macOS/Linux local server launcher
 ├── Dockerfile              # Alpine-Nginx container definition for hosting
 ├── docker-compose.yml      # Portainer-ready compose stack definition
 ├── screenshot.png          # Main interface preview image

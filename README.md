@@ -26,15 +26,15 @@ Because this application uses modular ES6 Javascript, modern browsers block load
 We have included automated launchers to start a lightweight server with zero configuration:
 
 ### Running on Windows:
-1. Double-click **`run.bat`**.
+1. Double-click **`run_Windows.bat`**.
 2. The launcher will search for **Python** or **Node.js** to start a server.
-3. If neither is installed, it will automatically offer to install Python 3 via Windows Package Manager (`winget`). Accept the Windows UAC prompts, let it install, close the window, and click `run.bat` again.
+3. If neither is installed, it will automatically offer to install Python 3 via Windows Package Manager (`winget`). Accept the Windows UAC prompts, let it install, close the window, and click `run_Windows.bat` again.
 4. The server will launch and automatically open your default browser to **`http://localhost:8000`**.
 
 ### Running on macOS or Linux:
 1. Open a terminal in this directory.
-2. Make the launcher executable: `chmod +x run.sh`
-3. Run the launcher: `./run.sh`
+2. Make the launcher executable: `chmod +x run_Mac_Linux.sh`
+3. Run the launcher: `./run_Mac_Linux.sh`
 4. The app will serve at **`http://localhost:8000`**.
 
 ---
@@ -80,8 +80,8 @@ The application will be available at `http://localhost:8080`.
   - `exporter.js` - VideoExporter WebM recorder.
   - `app.js` - Main entry module, binding sidebars and event listeners.
 - `fonts/` - Directory for pre-loading custom fonts (configured in `fonts/fonts.json`).
-- `run.bat` - One-click Windows server launcher (with winget installer check).
-- `run.sh` - One-click macOS/Linux server launcher.
+- `run_Windows.bat` - One-click Windows server launcher (with winget installer check).
+- `run_Mac_Linux.sh` - One-click macOS/Linux server launcher.
 - `Dockerfile` - Alpine-based Nginx container definition (updated for ES6 directory copies).
 - `docker-compose.yml` - Portainer-compatible compose stack file.
 - `.gitignore` - Standard gitignore configurations.
