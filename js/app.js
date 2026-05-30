@@ -220,6 +220,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function updateMp4WarningVisibility() {
+    if (!UI.mp4Warning) return;
+    const hasWebCodecs = typeof window.VideoEncoder !== 'undefined';
+    if (state.exportFormat === 'mp4' && !hasWebCodecs) {
+      UI.mp4Warning.style.display = 'flex';
+    } else {
+      UI.mp4Warning.style.display = 'none';
+    }
+  }
+
   // --- ANIMATION LOOP ---
   function animationLoop(timestamp) {
     // If exporting, let the exporter handle render steps.
@@ -530,6 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
       UI.exportFormat.value = 'mp4';
     }
     state.exportFormat = 'mp4';
+    updateMp4WarningVisibility();
     UI.exportDurationGroup.style.display = 'flex';
     UI.exportLoopsGroup.style.display = 'none';
     updateExportEstimate();
@@ -714,6 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (UI.exportFormat) {
         UI.exportFormat.value = 'mp4';
       }
+      updateMp4WarningVisibility();
 
       state.exportFps = 30;
       UI.exportFps.value = '30';
@@ -953,6 +965,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (UI.exportFormat) {
     UI.exportFormat.addEventListener('change', (e) => {
       state.exportFormat = e.target.value;
+      updateMp4WarningVisibility();
     });
   }
 
@@ -1575,6 +1588,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (UI.exportFormat) {
     state.exportFormat = UI.exportFormat.value;
   }
+  updateMp4WarningVisibility();
   if (UI.glitchMonochrome) {
     state.glitchMonochrome = UI.glitchMonochrome.checked;
   }

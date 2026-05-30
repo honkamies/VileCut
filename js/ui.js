@@ -88,6 +88,7 @@ export const UI = {
   exportLoopsGroup: document.getElementById('export-loops-group'),
   exportEstimateText: document.getElementById('export-estimate-text'),
   exportFormat: document.getElementById('export-format'),
+  mp4Warning: document.getElementById('mp4-warning'),
   exportFps: document.getElementById('export-fps'),
   exportResolution: document.getElementById('export-resolution'),
   btnExportVideo: document.getElementById('btn-export-video'),
