@@ -49,6 +49,12 @@ export const state = {
   kaleidoscopeSlices: 8,
 
   // Glitches
+  glitchStyleRgbSort: true,
+  glitchStyleVhs: false,
+  glitchStyleBlock: false,
+  glitchStyleLiquid: false,
+  glitchStyleRandom: false,
+  activeSpikeStyle: null,
   rgbSplit: 0,
   pixelSort: 0,
   glitchFrequency: 5, // % probability

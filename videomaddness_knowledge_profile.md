@@ -75,8 +75,12 @@ Draws the isolated layers in a loop based on time `t`.
     $\text{opacity} = \sin(\pi \cdot z)$.
 
 ### ROOM: Cybernetic Glitch & Monochrome FX (js/glitch.js)
-1.  **RGB Split**: Shifts the Red channel horizontally to the left by `shift` pixels and the Blue channel to the right, creating colored fringes.
-2.  **Pixel Sorting**: Sorts pixels horizontally within random rows based on brightness thresholds.
+1.  **Stackable Glitch Styles**: Integrates multiple checkboxes to apply glitch effects in series:
+    *   **RGB Split & Pixel Sorting**: Channel displacement and brightness-based pixel shifting.
+    *   **Analog VCR Scanline Sag**: Time-based horizontal sinusoidal offsets on scanlines and random edge tearing.
+    *   **Digital Block Tearing**: Localized block translation shifting blocks of pixels in x/y coordinates.
+    *   **GPU Liquid Warp**: SVG-turbulence displacement distortion filter applied onto offscreen buffer redraws.
+2.  **Random-Pool Triggering**: If `state.glitchStyleRandom` is enabled, glitch triggers randomly select exactly one of the checked styles to spike during a trigger pulse duration, while other active styles remain at their idle slider settings. If disabled, all active styles stack and spike simultaneously during triggers.
 3.  **Monochrome Conversion**: If `state.glitchMonochrome` is active, loops through the post-processed canvas pixel buffer and performs a weighted grayscale conversion ($Y = 0.299R + 0.587G + 0.114B$), rendering all splits, sorting, and displacement motion in pure high-contrast black-and-white.
 
 ### ROOM: H.264/AAC MP4 Export (js/exporter.js)

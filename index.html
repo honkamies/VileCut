@@ -609,6 +609,32 @@
             <label class="switch-label" for="glitch-enabled">Glitch FX Enabled</label>
             <input type="checkbox" id="glitch-enabled">
           </div>
+          <div class="control-group">
+            <label>Active Glitch Styles (Stackable)</label>
+            <div class="checkbox-list-container">
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-rgb" checked>
+                <label for="glitch-style-rgb">RGB & Pixel Sort</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-vhs">
+                <label for="glitch-style-vhs">Analog VCR Scanline Sag</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-block">
+                <label for="glitch-style-block">Digital Block Tearing</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-liquid">
+                <label for="glitch-style-liquid">Liquid Warp Filter (GPU)</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group checkbox-group" style="margin-top: 10px;">
+            <label for="glitch-style-random">Randomize Style on Trigger</label>
+            <input type="checkbox" id="glitch-style-random">
+          </div>
           <div class="divider"></div>
 
           <div class="control-group">
@@ -769,6 +795,16 @@
       </div>
     </div>
   </div>
+
+  <!-- SVG Filters for Cybernetic Glitches -->
+  <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" width="0" height="0">
+    <defs>
+      <filter id="liquid-warp-filter">
+        <feTurbulence type="fractalNoise" id="liquid-noise" baseFrequency="0.02 0.08" numOctaves="1" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" id="liquid-displace" scale="0" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
 
   <!-- JS -->
   <script type="module" src="js/app.js"></script>

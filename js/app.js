@@ -326,6 +326,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const bindGlitchCheckbox = (elem, stateKey) => {
+    if (elem) {
+      elem.addEventListener('change', (e) => {
+        state[stateKey] = e.target.checked;
+        renderFrame(state.time);
+      });
+    }
+  };
+  bindGlitchCheckbox(UI.glitchStyleRgbSort, 'glitchStyleRgbSort');
+  bindGlitchCheckbox(UI.glitchStyleVhs, 'glitchStyleVhs');
+  bindGlitchCheckbox(UI.glitchStyleBlock, 'glitchStyleBlock');
+  bindGlitchCheckbox(UI.glitchStyleLiquid, 'glitchStyleLiquid');
+  bindGlitchCheckbox(UI.glitchStyleRandom, 'glitchStyleRandom');
+
   // Inspector Background Switcher Bindings
   UI.inspectorBgSelectors.forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -544,6 +558,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     state.glitchMonochrome = false;
 
+    if (UI.glitchStyleRgbSort) UI.glitchStyleRgbSort.checked = true;
+    if (UI.glitchStyleVhs) UI.glitchStyleVhs.checked = false;
+    if (UI.glitchStyleBlock) UI.glitchStyleBlock.checked = false;
+    if (UI.glitchStyleLiquid) UI.glitchStyleLiquid.checked = false;
+    if (UI.glitchStyleRandom) UI.glitchStyleRandom.checked = false;
+    state.glitchStyleRgbSort = true;
+    state.glitchStyleVhs = false;
+    state.glitchStyleBlock = false;
+    state.glitchStyleLiquid = false;
+    state.glitchStyleRandom = false;
+    state.activeSpikeStyle = null;
+
     UI.videoFadeActive.checked = false;
     state.videoFadeActive = false;
     UI.videoFadeDivider.style.display = 'none';
@@ -670,6 +696,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (UI.glitchMonochrome) {
         UI.glitchMonochrome.checked = false;
       }
+
+      state.glitchStyleRgbSort = true;
+      if (UI.glitchStyleRgbSort) UI.glitchStyleRgbSort.checked = true;
+      state.glitchStyleVhs = false;
+      if (UI.glitchStyleVhs) UI.glitchStyleVhs.checked = false;
+      state.glitchStyleBlock = false;
+      if (UI.glitchStyleBlock) UI.glitchStyleBlock.checked = false;
+      state.glitchStyleLiquid = false;
+      if (UI.glitchStyleLiquid) UI.glitchStyleLiquid.checked = false;
+      state.glitchStyleRandom = false;
+      if (UI.glitchStyleRandom) UI.glitchStyleRandom.checked = false;
+      state.activeSpikeStyle = null;
 
       // 5. Exporter Settings
       state.exportFormat = 'mp4';
@@ -1540,6 +1578,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (UI.glitchMonochrome) {
     state.glitchMonochrome = UI.glitchMonochrome.checked;
   }
+  if (UI.glitchStyleRgbSort) state.glitchStyleRgbSort = UI.glitchStyleRgbSort.checked;
+  if (UI.glitchStyleVhs) state.glitchStyleVhs = UI.glitchStyleVhs.checked;
+  if (UI.glitchStyleBlock) state.glitchStyleBlock = UI.glitchStyleBlock.checked;
+  if (UI.glitchStyleLiquid) state.glitchStyleLiquid = UI.glitchStyleLiquid.checked;
+  if (UI.glitchStyleRandom) state.glitchStyleRandom = UI.glitchStyleRandom.checked;
   updateExportEstimate();
   updateTimelineRuler();
   updateTimelineTracks();

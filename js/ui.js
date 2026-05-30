@@ -62,6 +62,11 @@ export const UI = {
   kSlicesVal: document.getElementById('k-slices-val'),
   kaleidoscopeSlicesGroup: document.getElementById('kaleidoscope-slices-group'),
 
+  glitchStyleRgbSort: document.getElementById('glitch-style-rgb'),
+  glitchStyleVhs: document.getElementById('glitch-style-vhs'),
+  glitchStyleBlock: document.getElementById('glitch-style-block'),
+  glitchStyleLiquid: document.getElementById('glitch-style-liquid'),
+  glitchStyleRandom: document.getElementById('glitch-style-random'),
   rgbSplit: document.getElementById('rgb-split'),
   rgbSplitVal: document.getElementById('rgb-split-val'),
   glitchMonochrome: document.getElementById('glitch-monochrome'),
