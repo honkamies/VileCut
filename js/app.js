@@ -553,6 +553,182 @@ document.addEventListener('DOMContentLoaded', () => {
     drawMaskGraph();
   });
 
+  if (UI.btnReloadApp) {
+    UI.btnReloadApp.addEventListener('click', () => {
+      location.reload();
+    });
+  }
+
+  if (UI.btnResetSettingsOnly) {
+    UI.btnResetSettingsOnly.addEventListener('click', () => {
+      // 1. Time & playback state
+      state.time = 0;
+      stopAudioSource();
+      state.cameraAngle = 0;
+      state.isPlaying = true;
+      UI.btnPlayPause.classList.add('active');
+      UI.playPauseIcon.setAttribute('data-lucide', 'pause');
+      state.lastFrameTime = performance.now();
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+
+      // 2. Masking parameters
+      state.maskType = 'adaptive-luminosity';
+      UI.maskType.value = 'adaptive-luminosity';
+      UI.luminositySmoothnessGroup.style.display = 'flex';
+      UI.colorRangeHueGroup.style.display = 'none';
+
+      state.layerCount = 5;
+      UI.layerCount.value = 5;
+      UI.layerCountVal.innerText = '5';
+
+      state.maskFeather = 0.3;
+      UI.maskFeather.value = 0.3;
+      UI.maskFeatherVal.innerText = '0.30';
+
+      state.hueTolerance = 45;
+      UI.hueTolerance.value = 45;
+      UI.hueToleranceVal.innerText = '45°';
+
+      state.layerEdgeFade = 10;
+      UI.layerEdgeFade.value = 10;
+      UI.layerEdgeFadeVal.innerText = '10%';
+
+      state.randomBoundaries = [];
+
+      // 3. Viewport/Motion Parameters
+      state.aspectRatio = 'original';
+      UI.aspectRatio.value = 'original';
+      resizeMainCanvas();
+
+      state.zoomSpeed = 0.05;
+      UI.zoomSpeed.value = 0.05;
+      UI.zoomSpeedVal.innerText = '0.05';
+
+      state.zoomDepth = 4.0;
+      UI.zoomDepth.value = 4.0;
+      UI.zoomDepthVal.innerText = '4.0';
+
+      state.cameraRotation = 0;
+      UI.cameraRotation.value = 0;
+      UI.cameraRotationVal.innerText = '0.0°/s';
+
+      state.cameraDrift = 0.0;
+      UI.cameraDrift.value = 0;
+      UI.cameraDriftVal.innerText = '0.0';
+
+      state.mirrorMode = 'none';
+      UI.mirrorMode.value = 'none';
+      UI.kaleidoscopeSlicesGroup.style.display = 'none';
+
+      state.kaleidoscopeSlices = 8;
+      UI.kSlices.value = 8;
+      UI.kSlicesVal.innerText = '8';
+
+      state.gridActive = false;
+      UI.btnToggleGrid.classList.remove('active');
+      UI.mainCanvas.parentElement.classList.remove('composition-grid');
+
+      // 4. Glitch FX
+      state.rgbSplit = 0;
+      UI.rgbSplit.value = 0;
+      UI.rgbSplitVal.innerText = '0 px';
+
+      state.pixelSort = 0;
+      UI.pixelSort.value = 0;
+      UI.pixelSortVal.innerText = '0%';
+
+      state.glitchFrequency = 5;
+      UI.glitchFrequency.value = 5;
+      UI.glitchFrequencyVal.innerText = '5%';
+
+      state.glitchSeverity = 10;
+      UI.glitchSeverity.value = 10;
+      UI.glitchSeverityVal.innerText = '10px';
+
+      state.depthModulation = 0;
+      UI.depthModulation.value = 0;
+      UI.depthModulationVal.innerText = '0%';
+
+      state.glitchEnabled = false;
+      UI.glitchEnabled.checked = false;
+
+      // 5. Exporter Settings
+      state.exportFormat = 'mp4';
+      if (UI.exportFormat) {
+        UI.exportFormat.value = 'mp4';
+      }
+
+      state.exportFps = 30;
+      UI.exportFps.value = '30';
+
+      state.exportResolution = 'viewport';
+      UI.exportResolution.value = 'viewport';
+
+      state.exportMode = 'duration';
+      UI.exportMode.value = 'duration';
+
+      state.exportDuration = 5;
+      UI.exportDuration.value = 5;
+      UI.exportDurationVal.innerText = '5s';
+      if (UI.timelineDurationSlider) {
+        UI.timelineDurationSlider.value = 5;
+      }
+      if (UI.timelineDurationVal) {
+        UI.timelineDurationVal.innerText = '5s';
+      }
+      if (UI.timelineDurationControl) {
+        UI.timelineDurationControl.classList.remove('disabled');
+      }
+
+      state.exportLoops = 1;
+      UI.exportLoops.value = 1;
+      UI.exportLoopsVal.innerText = '1';
+
+      UI.exportDurationGroup.style.display = 'flex';
+      UI.exportLoopsGroup.style.display = 'none';
+
+      state.videoFadeActive = false;
+      UI.videoFadeActive.checked = false;
+      UI.videoFadeDivider.style.display = 'none';
+      UI.videoFadeDurationGroup.style.display = 'none';
+
+      state.videoFadeDuration = 0.5;
+      UI.videoFadeDuration.value = 0.5;
+      UI.videoFadeDurationVal.innerText = '0.5s';
+
+      // 6. Overlays (Texts, Graphics, Audio)
+      state.texts = [];
+      state.selectedTextId = null;
+      selectText(null);
+
+      state.graphics = [];
+      state.selectedGraphicId = null;
+      selectGraphic(null);
+
+      state.audioTrack = null;
+      selectAudio(false);
+
+      // 7. Re-process layer stacks to apply default mask settings
+      if (state.uploadedImages.length > 0) {
+        ImageProcessor.reprocessAllImagesLayers();
+        ImageProcessor.initializeRenderStack();
+      }
+
+      // 8. Update timelines and canvas
+      updateExportEstimate();
+      updateTimelineRuler();
+      updateTimelineTracks();
+      updatePlayhead();
+      drawMaskGraph();
+      renderFrame(0);
+
+      // 9. Sync audio
+      syncAudioPlayback();
+    });
+  }
+
   UI.btnFullscreen.addEventListener('click', () => {
     const container = UI.mainCanvas.parentElement;
     if (!document.fullscreenElement) {

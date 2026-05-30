@@ -33,6 +33,8 @@ export const UI = {
   glitchFlash: document.getElementById('glitch-flash'),
   fpsValue: document.getElementById('fps-value'),
   themeSelect: document.getElementById('theme-select'),
+  btnResetSettingsOnly: document.getElementById('btn-reset-settings-only'),
+  btnReloadApp: document.getElementById('btn-reload-app'),
 
   btnPlayPause: document.getElementById('btn-play-pause'),
   playPauseIcon: document.getElementById('play-pause-icon'),

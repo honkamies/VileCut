@@ -1624,3 +1624,25 @@ select:focus, select:hover {
   font-family: var(--font-display);
 }
 
+.btn-header {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: var(--bg-control);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
+}
+
+.btn-header:hover {
+  border-color: var(--cyan);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+
