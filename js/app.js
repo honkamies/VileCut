@@ -319,6 +319,13 @@ document.addEventListener('DOMContentLoaded', () => {
     state.glitchEnabled = e.target.checked;
   });
 
+  if (UI.glitchMonochrome) {
+    UI.glitchMonochrome.addEventListener('change', (e) => {
+      state.glitchMonochrome = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+
   // Inspector Background Switcher Bindings
   UI.inspectorBgSelectors.forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -532,6 +539,11 @@ document.addEventListener('DOMContentLoaded', () => {
     UI.glitchEnabled.checked = false;
     state.glitchEnabled = false;
 
+    if (UI.glitchMonochrome) {
+      UI.glitchMonochrome.checked = false;
+    }
+    state.glitchMonochrome = false;
+
     UI.videoFadeActive.checked = false;
     state.videoFadeActive = false;
     UI.videoFadeDivider.style.display = 'none';
@@ -653,6 +665,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       state.glitchEnabled = false;
       UI.glitchEnabled.checked = false;
+
+      state.glitchMonochrome = false;
+      if (UI.glitchMonochrome) {
+        UI.glitchMonochrome.checked = false;
+      }
 
       // 5. Exporter Settings
       state.exportFormat = 'mp4';
@@ -1519,6 +1536,9 @@ document.addEventListener('DOMContentLoaded', () => {
   drawMaskGraph();
   if (UI.exportFormat) {
     state.exportFormat = UI.exportFormat.value;
+  }
+  if (UI.glitchMonochrome) {
+    state.glitchMonochrome = UI.glitchMonochrome.checked;
   }
   updateExportEstimate();
   updateTimelineRuler();

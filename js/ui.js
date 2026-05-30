@@ -64,6 +64,7 @@ export const UI = {
 
   rgbSplit: document.getElementById('rgb-split'),
   rgbSplitVal: document.getElementById('rgb-split-val'),
+  glitchMonochrome: document.getElementById('glitch-monochrome'),
   pixelSort: document.getElementById('pixel-sort'),
   pixelSortVal: document.getElementById('pixel-sort-val'),
   glitchFrequency: document.getElementById('glitch-frequency'),

@@ -54,7 +54,7 @@ The central `state` object coordinates data binding:
 *   `layerEdgeFade`: Rectangular border soft fade percentage (`0` to `50%`, default `10%`).
 *   `zoomSpeed` / `zoomDepth`: Controls speed and exponential zoom spacing.
 *   `mirrorMode`: Radial symmetries (`'none'`, `'horizontal'`, `'vertical'`, `'quad'`, `'kaleidoscope'`).
-*   `rgbSplit` / `pixelSort` / `depthModulation`: Cybernetic Glitch parameters.
+*   `rgbSplit` / `pixelSort` / `depthModulation` / `glitchMonochrome`: Cybernetic Glitch parameters.
 *   `texts` / `graphics`: Array of overlay timeline elements with parameters (`startTime`, `endTime`, positions, glitches, transitions).
 *   `audioTrack`: Sound track model of `{ fileName, buffer, timelineStart, sourceOffset, duration, volume, peaks }`.
 *   `exportFormat`: `'mp4'` (default) or `'webm'`.
@@ -73,6 +73,11 @@ Draws the isolated layers in a loop based on time `t`.
 *   **Scale Factor**: $S(z_i) = \text{zoomDepth}^{(z_i - 0.5) \cdot 2.0}$
 *   **Auto-Wrapping & Seamless Fades**: Prevents pop-in by smoothly fading layers to `opacity = 0` at the extreme front ($z \approx 1$) and back ($z \approx 0$) bounds using sinusoidal opacity scaling:
     $\text{opacity} = \sin(\pi \cdot z)$.
+
+### ROOM: Cybernetic Glitch & Monochrome FX (js/glitch.js)
+1.  **RGB Split**: Shifts the Red channel horizontally to the left by `shift` pixels and the Blue channel to the right, creating colored fringes.
+2.  **Pixel Sorting**: Sorts pixels horizontally within random rows based on brightness thresholds.
+3.  **Monochrome Conversion**: If `state.glitchMonochrome` is active, loops through the post-processed canvas pixel buffer and performs a weighted grayscale conversion ($Y = 0.299R + 0.587G + 0.114B$), rendering all splits, sorting, and displacement motion in pure high-contrast black-and-white.
 
 ### ROOM: H.264/AAC MP4 Export (js/exporter.js)
 Bypasses real-time captures using sequential frame-by-frame offline encoding:

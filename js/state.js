@@ -54,6 +54,7 @@ export const state = {
   glitchFrequency: 5, // % probability
   glitchSeverity: 10,  // px displacement
   depthModulation: 0,
+  glitchMonochrome: false,
   glitchActive: false,
   glitchTimer: 0,
   shakeX: 0,
