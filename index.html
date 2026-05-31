@@ -482,7 +482,7 @@
                 <span id="timeline-duration-val">5s</span>
               </div>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <button id="btn-add-text-new" class="btn secondary small-btn" title="Add text on a new track">
                 <i data-lucide="plus-square"></i> + Text (New Track)
               </button>
@@ -497,6 +497,13 @@
                 <i data-lucide="music"></i> Add Audio
               </button>
               <input type="file" id="audio-file-input" accept="audio/mp3,audio/mpeg,audio/*" style="display: none;">
+              <div class="divider-vertical" style="width: 1px; height: 16px; background: var(--border-subtle); margin: 0 4px;"></div>
+              <button id="btn-timeline-zoom" class="btn secondary small-btn" style="cursor: ew-resize;" title="Hold click and drag left/right to zoom">
+                <i data-lucide="zoom-in"></i> Drag to Zoom
+              </button>
+              <button id="btn-timeline-fit" class="btn secondary small-btn" title="Fit timeline to screen">
+                <i data-lucide="maximize-2"></i> Fit Screen
+              </button>
             </div>
           </div>
           <div class="timeline-body-wrapper">

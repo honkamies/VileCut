@@ -55,7 +55,7 @@ The central `state` object coordinates data binding:
 *   `zoomSpeed` / `zoomDepth`: Controls speed and exponential zoom spacing.
 *   `mirrorMode`: Radial symmetries (`'none'`, `'horizontal'`, `'vertical'`, `'quad'`, `'kaleidoscope'`).
 *   `rgbSplit` / `pixelSort` / `depthModulation` / `glitchMonochrome`: Cybernetic Glitch parameters.
-*   `texts` / `graphics`: Array of overlay timeline elements with parameters (`startTime`, `endTime`, positions, glitches, transitions).
+*   `texts` / `graphics` / `timelineZoom`: Array of overlay timeline elements, their parameters, and the active horizontal timeline zoom multiplier (`0.15x` to `15.0x`, default `1.0x`).
 *   `audioTrack`: Sound track model of `{ fileName, buffer, timelineStart, sourceOffset, duration, volume, peaks }`.
 *   `exportFormat`: `'mp4'` (default) or `'webm'`.
 
@@ -82,6 +82,13 @@ Draws the isolated layers in a loop based on time `t`.
     *   **GPU Liquid Warp**: SVG-turbulence displacement distortion filter applied onto offscreen buffer redraws.
 2.  **Random-Pool Triggering**: If `state.glitchStyleRandom` is enabled, glitch triggers randomly select exactly one of the checked styles to spike during a trigger pulse duration, while other active styles remain at their idle slider settings. If disabled, all active styles stack and spike simultaneously during triggers.
 3.  **Monochrome Conversion**: If `state.glitchMonochrome` is active, loops through the post-processed canvas pixel buffer and performs a weighted grayscale conversion ($Y = 0.299R + 0.587G + 0.114B$), rendering all splits, sorting, and displacement motion in pure high-contrast black-and-white.
+
+### ROOM: Timeline Zooming & Scaling (js/timeline.js)
+1.  **Dynamic Pixels Per Second**: Sets layout scaling factor `pixelsPerSecond = 30 * state.timelineZoom`. All timeline blocks, playhead, and tick offsets are drawn in percentages relative to the duration `dur` so they automatically stretch/shrink smoothly inside the container.
+2.  **Dynamic Tick Intervals**: Ticks on the timeline ruler dynamically recalculate spacing depending on zoom (ranging from fine `0.1s` marks at high magnification to macro `10.0s` segments when zoomed out).
+3.  **Interactive Control**:
+    *   **Drag to Zoom**: Mouse movement tracks horizontal delta (`dx`) on mousedown, mapping it to a clamped zoom range of `0.15x` to `15.0x`.
+    *   **Fit Screen**: Solves target pixels-per-second: `targetPps = (wrapper.clientWidth - 8) / dur`, setting the zoom scale so the loop duration perfectly spans the timeline body width with no scrolling necessary.
 
 ### ROOM: H.264/AAC MP4 Export (js/exporter.js)
 Bypasses real-time captures using sequential frame-by-frame offline encoding:

@@ -180,5 +180,7 @@ export const UI = {
   timelineTracks: document.getElementById('timeline-tracks'),
   timelinePlayhead: document.getElementById('timeline-playhead'),
   timelineTracksContainer: document.getElementById('timeline-tracks-container'),
-  btnResetRotation: document.getElementById('btn-reset-rotation')
+  btnResetRotation: document.getElementById('btn-reset-rotation'),
+  btnTimelineZoom: document.getElementById('btn-timeline-zoom'),
+  btnTimelineFit: document.getElementById('btn-timeline-fit')
 };

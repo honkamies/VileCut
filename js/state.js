@@ -33,6 +33,7 @@ export const state = {
   selectedGraphicId: null,
 
   // Motion parameters
+  timelineZoom: 1.0,
   isPlaying: true,
   time: 0,
   lastFrameTime: 0,

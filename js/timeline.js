@@ -11,6 +11,10 @@ let dragStartBlockStart = 0;
 let dragStartBlockEnd = 0;
 let dragStartSourceOffset = 0;
 
+let isZoomDragging = false;
+let zoomDragStartX = 0;
+let zoomDragStartZoom = 1.0;
+
 function clampTextIntervals() {
   const dur = getTimelineDuration();
   state.texts.forEach(txt => {
@@ -217,21 +221,36 @@ export function updateTimelineRuler() {
     UI.timelineDurationVal.innerText = `${dur.toFixed(1)}s`;
   }
   
-  const pixelsPerSecond = 30;
-  const widthPx = Math.max(700, Math.round(dur * pixelsPerSecond));
+  const pixelsPerSecond = 30 * state.timelineZoom;
+  const wrapper = UI.timelinePlayhead?.closest('.timeline-body-wrapper');
+  const minWidth = wrapper ? wrapper.clientWidth : 700;
+  const widthPx = Math.max(minWidth, Math.round(dur * pixelsPerSecond));
   UI.timelineTracksContainer.style.width = `${widthPx}px`;
 
   UI.timelineRuler.innerHTML = '';
   
-  let interval = 0.5;
-  if (dur > 30) interval = 5.0;
-  else if (dur > 15) interval = 2.0;
-  else if (dur > 5) interval = 1.0;
+  let interval = 1.0;
+  const spacingAt1Sec = pixelsPerSecond;
+  if (spacingAt1Sec < 15) {
+    interval = 10.0;
+  } else if (spacingAt1Sec < 35) {
+    interval = 5.0;
+  } else if (spacingAt1Sec < 75) {
+    interval = 2.0;
+  } else if (spacingAt1Sec < 150) {
+    interval = 1.0;
+  } else if (spacingAt1Sec < 350) {
+    interval = 0.5;
+  } else {
+    interval = 0.1;
+  }
   
   for (let t = 0; t <= dur; t += interval) {
     const percent = (t / dur) * 100;
     const tick = document.createElement('div');
-    tick.className = 'ruler-tick' + (t % 1 === 0 ? ' major' : '');
+    // For 0.1s intervals, major ticks are at whole seconds
+    const isMajor = interval < 1.0 ? (Math.abs(t - Math.round(t)) < 0.01) : (t % 1 === 0);
+    tick.className = 'ruler-tick' + (isMajor ? ' major' : '');
     tick.style.left = `${percent}%`;
     tick.innerText = `${t.toFixed(1)}s`;
     UI.timelineRuler.appendChild(tick);
@@ -446,6 +465,14 @@ export function initTimelineEvents() {
   });
 
   window.addEventListener('mousemove', (e) => {
+    if (isZoomDragging) {
+      const dx = e.clientX - zoomDragStartX;
+      state.timelineZoom = Math.max(0.15, Math.min(15.0, zoomDragStartZoom + dx * 0.015));
+      updateTimelineRuler();
+      updateTimelineTracks();
+      updatePlayhead();
+      return;
+    }
     if (!dragMode) return;
     
     const rect = UI.timelineTracksContainer.getBoundingClientRect();
@@ -559,7 +586,40 @@ export function initTimelineEvents() {
   });
 
   window.addEventListener('mouseup', () => {
+    if (isZoomDragging) {
+      isZoomDragging = false;
+      document.body.style.cursor = '';
+    }
     dragMode = null;
     dragTextId = null;
   });
+
+  if (UI.btnTimelineZoom) {
+    UI.btnTimelineZoom.addEventListener('mousedown', (e) => {
+      isZoomDragging = true;
+      zoomDragStartX = e.clientX;
+      zoomDragStartZoom = state.timelineZoom;
+      e.preventDefault();
+      document.body.style.cursor = 'ew-resize';
+    });
+    
+    UI.btnTimelineZoom.addEventListener('dblclick', () => {
+      if (UI.btnTimelineFit) UI.btnTimelineFit.click();
+    });
+  }
+
+  if (UI.btnTimelineFit) {
+    UI.btnTimelineFit.addEventListener('click', () => {
+      const wrapper = UI.timelinePlayhead?.closest('.timeline-body-wrapper');
+      if (wrapper) {
+        const dur = getTimelineDuration();
+        const wrapperWidth = wrapper.clientWidth - 8;
+        const targetPps = Math.max(10, wrapperWidth / dur);
+        state.timelineZoom = targetPps / 30;
+        updateTimelineRuler();
+        updateTimelineTracks();
+        updatePlayhead();
+      }
+    });
+  }
 }

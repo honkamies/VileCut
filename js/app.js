@@ -541,6 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     state.exportFormat = 'mp4';
     updateMp4WarningVisibility();
+    state.timelineZoom = 1.0;
     UI.exportDurationGroup.style.display = 'flex';
     UI.exportLoopsGroup.style.display = 'none';
     updateExportEstimate();
@@ -726,6 +727,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.exportFormat.value = 'mp4';
       }
       updateMp4WarningVisibility();
+      state.timelineZoom = 1.0;
 
       state.exportFps = 30;
       UI.exportFps.value = '30';
@@ -1169,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
           img: img,
           fileName: file.name,
           startTime: 0,
-          endTime: Math.min(duration, 3.0),
+          endTime: duration,
           x: 0.0,
           y: 0.0,
           scale: 100,
