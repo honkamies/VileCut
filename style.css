@@ -1298,7 +1298,16 @@ select:focus, select:hover {
   gap: 6px;
   z-index: 4;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
 }
+
+.canvas-container:hover .viewport-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 
 .viewport-btn {
   background: transparent;

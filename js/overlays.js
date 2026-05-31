@@ -116,7 +116,8 @@ export function drawTextOverlays(renderCtx, w, h, time) {
   const dur = getTimelineDuration();
   const loopTime = ((time % dur) + dur) % dur;
   
-  state.texts.forEach((textObj) => {
+  const sortedTexts = [...state.texts].sort((a, b) => (a.trackIndex !== undefined ? a.trackIndex : 0) - (b.trackIndex !== undefined ? b.trackIndex : 0));
+  sortedTexts.forEach((textObj) => {
     if (loopTime < textObj.startTime || loopTime > textObj.endTime) return;
     
     const f = getTransitionProgress(textObj, loopTime);

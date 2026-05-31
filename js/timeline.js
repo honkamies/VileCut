@@ -7,6 +7,8 @@ import { renderFrame } from './renderer.js';
 let dragMode = null; // 'seek', 'move', 'resize-left', 'resize-right'
 let dragTextId = null;
 let dragStartMouseX = 0;
+let dragStartMouseY = 0;
+let lastDragTrackY = 0;
 let dragStartBlockStart = 0;
 let dragStartBlockEnd = 0;
 let dragStartSourceOffset = 0;
@@ -14,6 +16,7 @@ let dragStartSourceOffset = 0;
 let isZoomDragging = false;
 let zoomDragStartX = 0;
 let zoomDragStartZoom = 1.0;
+
 
 function clampTextIntervals() {
   const dur = getTimelineDuration();
@@ -49,6 +52,15 @@ function clampGraphicIntervals() {
       grp.startTime = Math.max(0, grp.endTime - 0.2);
     }
   });
+}
+
+export function normalizeTextTracks() {
+  const uniqueIndices = [...new Set(state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0))].sort((a, b) => a - b);
+  state.texts.forEach(t => {
+    const oldIdx = t.trackIndex !== undefined ? t.trackIndex : 0;
+    t.trackIndex = uniqueIndices.indexOf(oldIdx);
+  });
+  state.texts.sort((a, b) => (a.trackIndex || 0) - (b.trackIndex || 0));
 }
 
 export function updateTimelineTracks() {
@@ -438,6 +450,8 @@ export function initTimelineEvents() {
     }
     
     if (dragMode && dragTextId) {
+      dragStartMouseY = e.clientY;
+      lastDragTrackY = e.clientY;
       if (dragTextId === 'audio') {
         const track = state.audioTrack;
         if (track) {
@@ -463,6 +477,7 @@ export function initTimelineEvents() {
       }
     }
   });
+
 
   window.addEventListener('mousemove', (e) => {
     if (isZoomDragging) {
@@ -529,6 +544,23 @@ export function initTimelineEvents() {
             
             grp.startTime = newStart;
             grp.endTime = newEnd;
+
+            // Vertical drag layer re-ordering
+            const dy = e.clientY - lastDragTrackY;
+            if (Math.abs(dy) > 24) {
+              const idx = state.graphics.findIndex(g => g.id === dragTextId);
+              if (dy > 0 && idx < state.graphics.length - 1) {
+                const temp = state.graphics[idx];
+                state.graphics[idx] = state.graphics[idx + 1];
+                state.graphics[idx + 1] = temp;
+                lastDragTrackY = e.clientY;
+              } else if (dy < 0 && idx > 0) {
+                const temp = state.graphics[idx];
+                state.graphics[idx] = state.graphics[idx - 1];
+                state.graphics[idx - 1] = temp;
+                lastDragTrackY = e.clientY;
+              }
+            }
           } else if (dragMode === 'resize-left') {
             let newStart = dragStartBlockStart + dxSec;
             newStart = Math.max(0, Math.min(grp.endTime - 0.2, newStart));
@@ -568,6 +600,19 @@ export function initTimelineEvents() {
             
             txt.startTime = newStart;
             txt.endTime = newEnd;
+
+            // Vertical drag track re-ordering
+            const dy = e.clientY - lastDragTrackY;
+            if (Math.abs(dy) > 24) {
+              const currentTrackIdx = txt.trackIndex !== undefined ? txt.trackIndex : 0;
+              if (dy > 0) {
+                txt.trackIndex = currentTrackIdx + 1;
+                lastDragTrackY = e.clientY;
+              } else if (dy < 0 && currentTrackIdx > 0) {
+                txt.trackIndex = currentTrackIdx - 1;
+                lastDragTrackY = e.clientY;
+              }
+            }
           } else if (dragMode === 'resize-left') {
             let newStart = dragStartBlockStart + dxSec;
             newStart = Math.max(0, Math.min(txt.endTime - 0.2, newStart));
@@ -589,6 +634,11 @@ export function initTimelineEvents() {
     if (isZoomDragging) {
       isZoomDragging = false;
       document.body.style.cursor = '';
+    }
+    if (dragMode === 'move') {
+      normalizeTextTracks();
+      updateTimelineTracks();
+      renderFrame(state.time);
     }
     dragMode = null;
     dragTextId = null;
