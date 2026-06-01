@@ -22,7 +22,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VIDEOMADDNESS</h1>
-        <span class="version-tag">v1.1.0</span>
+        <span class="version-tag">v1.2.0</span>
       </div>
       <div class="header-actions">
         <div id="fps-monitor" class="monitor-badge">
@@ -320,8 +320,6 @@
             <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 2px;">When the audio starts relative to the video loop start. Can be negative.</div>
           </div>
 
-
-
           <div class="control-group">
             <div class="slider-header">
               <label for="audio-volume">Volume</label>
@@ -334,6 +332,20 @@
             <i data-lucide="trash-2"></i> Delete Soundtrack
           </button>
         </div>
+
+        <!-- Video Settings Section -->
+        <div class="panel-section" id="video-settings-section" style="display: none;">
+          <h2 class="section-title"><i data-lucide="video"></i> Video Settings</h2>
+          
+          <div class="control-group" style="background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.1); margin-bottom: 15px;">
+            <div style="font-family: var(--font-display); font-size: 0.85rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="video-file-name">No Video Loaded</div>
+          </div>
+
+          <button id="btn-delete-video" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
+            <i data-lucide="trash-2"></i> Delete Video Background
+          </button>
+        </div>
+
 
         <!-- Graphic Settings Section -->
         <div class="panel-section" id="graphic-settings-section" style="display: none;">
@@ -497,6 +509,10 @@
                 <i data-lucide="music"></i>
               </button>
               <input type="file" id="audio-file-input" accept="audio/mp3,audio/mpeg,audio/*" style="display: none;">
+              <button id="btn-add-video" class="btn secondary small-btn" title="Add Video Background">
+                <i data-lucide="video"></i>
+              </button>
+              <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/*" style="display: none;">
               <div class="divider-vertical" style="width: 1px; height: 16px; background: var(--border-subtle); margin: 0 4px;"></div>
               <button id="btn-timeline-zoom" class="btn secondary small-btn" style="cursor: ew-resize;" title="Drag left/right to zoom (Double-click to Fit)">
                 <i data-lucide="zoom-in"></i>

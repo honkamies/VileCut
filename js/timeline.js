@@ -69,14 +69,38 @@ export function updateTimelineTracks() {
   clampGraphicIntervals();
   UI.timelineTracks.innerHTML = '';
   
-  if (state.texts.length === 0 && !state.audioTrack && state.graphics.length === 0) {
-    UI.timelineTracks.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding-top: 15px; font-family: var(--font-display);">No overlays or soundtrack. Add Text, Graphic, or Audio to start.</div>';
+  if (state.texts.length === 0 && !state.audioTrack && state.graphics.length === 0 && !state.videoTrack) {
+    UI.timelineTracks.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding-top: 15px; font-family: var(--font-display);">No overlays or soundtrack. Add Text, Graphic, Audio, or Video to start.</div>';
     return;
   }
   
   const dur = getTimelineDuration();
 
-  // 1. Render Audio Track (if active)
+  // 1. Render Video Track (if active)
+  if (state.videoTrack) {
+    const track = state.videoTrack;
+    const row = document.createElement('div');
+    row.className = 'timeline-track-row video-track-row';
+    row.dataset.id = 'video';
+    row.dataset.type = 'video';
+    
+    const block = document.createElement('div');
+    block.className = 'timeline-block video-block' + (state.selectedVideo ? ' selected' : '');
+    block.dataset.id = 'video';
+    
+    block.style.left = '0%';
+    block.style.width = '100%';
+    
+    const cleanLabel = document.createElement('span');
+    cleanLabel.style.pointerEvents = 'none';
+    cleanLabel.innerText = `🎥 Background Video: ${track.fileName}`;
+    block.appendChild(cleanLabel);
+    
+    row.appendChild(block);
+    UI.timelineTracks.appendChild(row);
+  }
+
+  // 1.5. Render Audio Track (if active)
   if (state.audioTrack) {
     const track = state.audioTrack;
     const row = document.createElement('div');
@@ -296,8 +320,10 @@ export function selectText(id) {
   state.selectedTextId = id;
   state.selectedAudio = false;
   state.selectedGraphicId = null;
+  state.selectedVideo = false;
   UI.audioSettingsSection.style.display = 'none';
   UI.graphicSettingsSection.style.display = 'none';
+  UI.videoSettingsSection.style.display = 'none';
 
   if (id === null) {
     UI.textSettingsSection.style.display = 'none';
@@ -338,8 +364,10 @@ export function selectAudio(isSelected) {
   if (isSelected) {
     state.selectedTextId = null;
     state.selectedGraphicId = null;
+    state.selectedVideo = false;
     UI.textSettingsSection.style.display = 'none';
     UI.graphicSettingsSection.style.display = 'none';
+    UI.videoSettingsSection.style.display = 'none';
   }
   
   if (!isSelected || !state.audioTrack) {
@@ -364,12 +392,36 @@ export function selectAudio(isSelected) {
   updateTimelineTracks();
 }
 
+export function selectVideo(isSelected) {
+  state.selectedVideo = isSelected;
+  if (isSelected) {
+    state.selectedTextId = null;
+    state.selectedGraphicId = null;
+    state.selectedAudio = false;
+    UI.textSettingsSection.style.display = 'none';
+    UI.graphicSettingsSection.style.display = 'none';
+    UI.audioSettingsSection.style.display = 'none';
+  }
+  
+  if (!isSelected || !state.videoTrack) {
+    UI.videoSettingsSection.style.display = 'none';
+  } else {
+    const track = state.videoTrack;
+    UI.videoSettingsSection.style.display = 'flex';
+    UI.videoSettingsSection.classList.remove('collapsed');
+    UI.videoFileName.innerText = track.fileName;
+  }
+  updateTimelineTracks();
+}
+
 export function selectGraphic(id) {
   state.selectedGraphicId = id;
   state.selectedTextId = null;
   state.selectedAudio = false;
+  state.selectedVideo = false;
   UI.textSettingsSection.style.display = 'none';
   UI.audioSettingsSection.style.display = 'none';
+  UI.videoSettingsSection.style.display = 'none';
 
   if (id === null) {
     UI.graphicSettingsSection.style.display = 'none';
@@ -422,6 +474,8 @@ export function initTimelineEvents() {
       dragTextId = txtId;
       if (txtId === 'audio') {
         selectAudio(true);
+      } else if (txtId === 'video') {
+        selectVideo(true);
       } else if (txtId.startsWith('grp_')) {
         selectGraphic(txtId);
       } else {
@@ -434,6 +488,8 @@ export function initTimelineEvents() {
       dragTextId = txtId;
       if (txtId === 'audio') {
         selectAudio(true);
+      } else if (txtId === 'video') {
+        selectVideo(true);
       } else if (txtId.startsWith('grp_')) {
         selectGraphic(txtId);
       } else {

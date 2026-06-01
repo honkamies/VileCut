@@ -64,8 +64,20 @@ export function renderFrame(renderTime) {
   const bw = bufferCanvas.width;
   const bh = bufferCanvas.height;
   
-  offscreenCtx.fillStyle = '#000000';
-  offscreenCtx.fillRect(0, 0, bw, bh);
+  if (state.videoTrack && state.videoTrack.element) {
+    const video = state.videoTrack.element;
+    const vw = video.videoWidth || video.width || bw;
+    const vh = video.videoHeight || video.height || bh;
+    const coverScale = Math.max(bw / vw, bh / vh);
+    const drawW = vw * coverScale;
+    const drawH = vh * coverScale;
+    const drawX = (bw - drawW) / 2;
+    const drawY = (bh - drawH) / 2;
+    offscreenCtx.drawImage(video, drawX, drawY, drawW, drawH);
+  } else {
+    offscreenCtx.fillStyle = '#000000';
+    offscreenCtx.fillRect(0, 0, bw, bh);
+  }
 
   const dur = getTimelineDuration();
   const speed = getAdjustedZoomSpeed(dur);

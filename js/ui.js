@@ -142,6 +142,13 @@ export const UI = {
   audioVolumeVal: document.getElementById('audio-volume-val'),
   btnDeleteAudio: document.getElementById('btn-delete-audio'),
 
+  // Video Settings Section References
+  videoSettingsSection: document.getElementById('video-settings-section'),
+  videoFileName: document.getElementById('video-file-name'),
+  btnDeleteVideo: document.getElementById('btn-delete-video'),
+  btnAddVideo: document.getElementById('btn-add-video'),
+  videoFileInput: document.getElementById('video-file-input'),
+
   // Graphic Settings Section References
   graphicSettingsSection: document.getElementById('graphic-settings-section'),
   graphicFileName: document.getElementById('graphic-file-name'),

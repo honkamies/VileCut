@@ -2,6 +2,13 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.2.0] - 2026-06-01
+
+### Added
+- **Background Video Track**: Support for uploading and rendering a full-length background video (MP4, WebM) behind all isolated layer depth stacks and overlays.
+- **Playback Synchronization**: Real-time sync of the video background playback state and current time with the active timeline loop duration, correcting temporal drift dynamically.
+- **Frame-Perfect Video Export**: Exporter seeking mechanism that pauses the video background and awaits the browser's `seeked` event using a Promise (with fallback safety timeout) to ensure zero frame drift or stuttering in exported H.264 MP4 and WebM videos.
+
 ## [1.1.0] - 2026-05-31
 
 ### Added

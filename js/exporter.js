@@ -139,6 +139,9 @@ export class VideoExporter {
     const tempPlaying = state.isPlaying;
     state.isPlaying = false;
     stopAudioSource();
+    if (state.videoTrack && state.videoTrack.element) {
+      state.videoTrack.element.pause();
+    }
 
     // Reset wrap counts for all layers to align with starting time 0.0
     state.layers.forEach(layer => {
@@ -263,6 +266,24 @@ export class VideoExporter {
         if (state.exportCancel) break;
 
         state.time = i / fps;
+
+        if (state.videoTrack && state.videoTrack.element) {
+          const video = state.videoTrack.element;
+          const dur = getTimelineDuration();
+          const loopTime = state.time % dur;
+          await new Promise(resolve => {
+            let resolved = false;
+            const onSeeked = () => {
+              if (resolved) return;
+              resolved = true;
+              video.removeEventListener('seeked', onSeeked);
+              resolve();
+            };
+            video.addEventListener('seeked', onSeeked);
+            video.currentTime = loopTime;
+            setTimeout(onSeeked, 100);
+          });
+        }
         
         if (state.glitchEnabled) {
           GlitchManager.update(1 / fps);
@@ -383,6 +404,9 @@ export class VideoExporter {
     const tempPlaying = state.isPlaying;
     state.isPlaying = false;
     stopAudioSource();
+    if (state.videoTrack && state.videoTrack.element) {
+      state.videoTrack.element.pause();
+    }
 
     // Reset wrap counts for all layers to align with starting time 0.0, using null to force initial frame recalculation
     state.layers.forEach(layer => {
@@ -443,6 +467,24 @@ export class VideoExporter {
       }
 
       state.time = elapsed;
+
+      if (state.videoTrack && state.videoTrack.element) {
+        const video = state.videoTrack.element;
+        const dur = getTimelineDuration();
+        const loopTime = state.time % dur;
+        await new Promise(resolve => {
+          let resolved = false;
+          const onSeeked = () => {
+            if (resolved) return;
+            resolved = true;
+            video.removeEventListener('seeked', onSeeked);
+            resolve();
+          };
+          video.addEventListener('seeked', onSeeked);
+          video.currentTime = loopTime;
+          setTimeout(onSeeked, 100);
+        });
+      }
 
       // Audio sync during export (calls isolated logic inside audio.js)
       lastExportLoopIndex = syncExportAudio(state.time, lastExportLoopIndex);

@@ -28,6 +28,11 @@ export const state = {
   audioTrack: null,
   selectedAudio: false,
 
+  // Video Background Track
+  videoTrack: null,
+  selectedVideo: false,
+
+
   // Graphic Overlays
   graphics: [],
   selectedGraphicId: null,

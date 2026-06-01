@@ -11,6 +11,7 @@ import {
   updatePlayhead,
   selectText,
   selectAudio,
+  selectVideo,
   selectGraphic,
   initTimelineEvents
 } from './timeline.js';
@@ -230,6 +231,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function syncVideoPlayback() {
+    if (!state.videoTrack || !state.videoTrack.element) return;
+    const video = state.videoTrack.element;
+    const dur = getTimelineDuration();
+    
+    if (state.isPlaying && state.imageLoaded) {
+      if (video.paused) {
+        video.play().catch(e => console.log("Video auto-play blocked:", e));
+      }
+      const loopTime = state.time % dur;
+      const diff = Math.abs(video.currentTime - loopTime);
+      if (diff > 0.15) {
+        video.currentTime = loopTime;
+      }
+    } else {
+      if (!video.paused) {
+        video.pause();
+      }
+      const loopTime = state.time % dur;
+      if (Math.abs(video.currentTime - loopTime) > 0.05) {
+        video.currentTime = loopTime;
+      }
+    }
+  }
+
   // --- ANIMATION LOOP ---
   function animationLoop(timestamp) {
     // If exporting, let the exporter handle render steps.
@@ -277,6 +303,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       renderFrame(state.time);
       updatePlayhead();
+    }
+
+    if (state.videoTrack) {
+      syncVideoPlayback();
     }
 
     requestAnimationFrame(animationLoop);
@@ -462,6 +492,9 @@ document.addEventListener('DOMContentLoaded', () => {
       UI.btnPlayPause.classList.remove('active');
       UI.playPauseIcon.setAttribute('data-lucide', 'play');
       stopAudioSource();
+    }
+    if (state.videoTrack) {
+      syncVideoPlayback();
     }
     if (typeof lucide !== 'undefined') {
       lucide.createIcons();
@@ -778,6 +811,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       state.audioTrack = null;
       selectAudio(false);
+
+      if (state.videoTrack) {
+        if (state.videoTrack.element) {
+          state.videoTrack.element.pause();
+        }
+        URL.revokeObjectURL(state.videoTrack.url);
+      }
+      state.videoTrack = null;
+      selectVideo(false);
+      if (UI.videoFileInput) {
+        UI.videoFileInput.value = '';
+      }
 
       // 7. Re-process layer stacks to apply default mask settings
       if (state.uploadedImages.length > 0) {
@@ -1395,6 +1440,64 @@ document.addEventListener('DOMContentLoaded', () => {
     selectAudio(false);
     updateTimelineTracks();
   });
+
+  // --- VIDEO TIMELINE EVENTS & BINDINGS ---
+  if (UI.btnAddVideo) {
+    UI.btnAddVideo.addEventListener('click', () => {
+      UI.videoFileInput.click();
+    });
+  }
+
+  if (UI.videoFileInput) {
+    UI.videoFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      UI.canvasLoading.classList.remove('hidden');
+
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.src = url;
+      video.muted = true;
+      video.playsInline = true;
+      video.loop = false;
+
+      video.addEventListener('loadedmetadata', () => {
+        state.videoTrack = {
+          fileName: file.name,
+          file: file,
+          url: url,
+          element: video,
+          duration: video.duration
+        };
+        selectVideo(true);
+        UI.canvasLoading.classList.add('hidden');
+        renderFrame(state.time);
+      });
+
+      video.addEventListener('error', (err) => {
+        console.error("Video load error:", err);
+        alert("Failed to load video file. Please check format compatibility.");
+        UI.canvasLoading.classList.add('hidden');
+      });
+    });
+  }
+
+  if (UI.btnDeleteVideo) {
+    UI.btnDeleteVideo.addEventListener('click', () => {
+      if (state.videoTrack) {
+        if (state.videoTrack.element) {
+          state.videoTrack.element.pause();
+        }
+        URL.revokeObjectURL(state.videoTrack.url);
+      }
+      state.videoTrack = null;
+      selectVideo(false);
+      updateTimelineTracks();
+      renderFrame(state.time);
+    });
+  }
+
 
   // Text Inputs updates
   UI.textContent.addEventListener('input', (e) => {
