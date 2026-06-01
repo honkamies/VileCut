@@ -32,6 +32,11 @@ export const state = {
   videoTrack: null,
   selectedVideo: false,
 
+  // Glitch Triggers on Timeline
+  glitchTriggers: [],
+  selectedGlitchTriggerId: null,
+  prevTime: 0,
+
 
   // Graphic Overlays
   graphics: [],

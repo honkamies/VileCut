@@ -189,5 +189,16 @@ export const UI = {
   timelineTracksContainer: document.getElementById('timeline-tracks-container'),
   btnResetRotation: document.getElementById('btn-reset-rotation'),
   btnTimelineZoom: document.getElementById('btn-timeline-zoom'),
-  btnTimelineFit: document.getElementById('btn-timeline-fit')
+  btnTimelineFit: document.getElementById('btn-timeline-fit'),
+
+  // Glitch Trigger References
+  btnAddGlitchTrigger: document.getElementById('btn-add-glitch-trigger'),
+  glitchTriggerSettingsSection: document.getElementById('glitch-trigger-settings-section'),
+  glitchTriggerTime: document.getElementById('glitch-trigger-time'),
+  glitchTriggerTimeVal: document.getElementById('glitch-trigger-time-val'),
+  glitchTriggerDuration: document.getElementById('glitch-trigger-duration'),
+  glitchTriggerDurationVal: document.getElementById('glitch-trigger-duration-val'),
+  glitchTriggerSeverity: document.getElementById('glitch-trigger-severity'),
+  glitchTriggerSeverityVal: document.getElementById('glitch-trigger-severity-val'),
+  btnDeleteGlitchTrigger: document.getElementById('btn-delete-glitch-trigger')
 };

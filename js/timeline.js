@@ -69,8 +69,8 @@ export function updateTimelineTracks() {
   clampGraphicIntervals();
   UI.timelineTracks.innerHTML = '';
   
-  if (state.texts.length === 0 && !state.audioTrack && state.graphics.length === 0 && !state.videoTrack) {
-    UI.timelineTracks.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding-top: 15px; font-family: var(--font-display);">No overlays or soundtrack. Add Text, Graphic, Audio, or Video to start.</div>';
+  if (state.texts.length === 0 && !state.audioTrack && state.graphics.length === 0 && !state.videoTrack && state.glitchTriggers.length === 0) {
+    UI.timelineTracks.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding-top: 15px; font-family: var(--font-display);">No overlays or soundtrack. Add Text, Graphic, Audio, Video, or Glitch Trigger to start.</div>';
     return;
   }
   
@@ -246,6 +246,45 @@ export function updateTimelineTracks() {
     row.appendChild(block);
     UI.timelineTracks.appendChild(row);
   });
+
+  // 4. Render Glitch Trigger Track (if any triggers exist)
+  if (state.glitchTriggers && state.glitchTriggers.length > 0) {
+    const row = document.createElement('div');
+    row.className = 'timeline-track-row glitch-trigger-track-row';
+    row.dataset.id = 'glitch-triggers';
+    row.dataset.type = 'glitch-trigger';
+    
+    state.glitchTriggers.forEach((trigger) => {
+      const block = document.createElement('div');
+      block.className = 'timeline-block glitch-trigger-block' + (trigger.id === state.selectedGlitchTriggerId ? ' selected' : '');
+      block.dataset.id = trigger.id;
+      
+      block.style.position = 'absolute';
+      block.style.left = `${(trigger.time / dur) * 100}%`;
+      block.style.width = '18px';
+      block.style.height = '100%';
+      block.style.transform = 'translateX(-50%)';
+      block.style.cursor = 'ew-resize';
+      block.style.display = 'flex';
+      block.style.alignItems = 'center';
+      block.style.justifyContent = 'center';
+      block.style.background = trigger.id === state.selectedGlitchTriggerId ? 'var(--pink)' : 'rgba(255, 0, 127, 0.4)';
+      block.style.border = '1px solid var(--pink)';
+      block.style.boxShadow = trigger.id === state.selectedGlitchTriggerId ? '0 0 10px var(--pink)' : '0 0 4px rgba(255, 0, 127, 0.3)';
+      block.style.borderRadius = '3px';
+      
+      const icon = document.createElement('span');
+      icon.style.pointerEvents = 'none';
+      icon.style.fontSize = '0.7rem';
+      icon.style.color = '#ffffff';
+      icon.innerText = '⚡';
+      block.appendChild(icon);
+      
+      row.appendChild(block);
+    });
+    
+    UI.timelineTracks.appendChild(row);
+  }
 }
 
 export function updateTimelineRuler() {
@@ -321,9 +360,11 @@ export function selectText(id) {
   state.selectedAudio = false;
   state.selectedGraphicId = null;
   state.selectedVideo = false;
+  state.selectedGlitchTriggerId = null;
   UI.audioSettingsSection.style.display = 'none';
   UI.graphicSettingsSection.style.display = 'none';
   UI.videoSettingsSection.style.display = 'none';
+  if (UI.glitchTriggerSettingsSection) UI.glitchTriggerSettingsSection.style.display = 'none';
 
   if (id === null) {
     UI.textSettingsSection.style.display = 'none';
@@ -365,9 +406,11 @@ export function selectAudio(isSelected) {
     state.selectedTextId = null;
     state.selectedGraphicId = null;
     state.selectedVideo = false;
+    state.selectedGlitchTriggerId = null;
     UI.textSettingsSection.style.display = 'none';
     UI.graphicSettingsSection.style.display = 'none';
     UI.videoSettingsSection.style.display = 'none';
+    if (UI.glitchTriggerSettingsSection) UI.glitchTriggerSettingsSection.style.display = 'none';
   }
   
   if (!isSelected || !state.audioTrack) {
@@ -398,9 +441,11 @@ export function selectVideo(isSelected) {
     state.selectedTextId = null;
     state.selectedGraphicId = null;
     state.selectedAudio = false;
+    state.selectedGlitchTriggerId = null;
     UI.textSettingsSection.style.display = 'none';
     UI.graphicSettingsSection.style.display = 'none';
     UI.audioSettingsSection.style.display = 'none';
+    if (UI.glitchTriggerSettingsSection) UI.glitchTriggerSettingsSection.style.display = 'none';
   }
   
   if (!isSelected || !state.videoTrack) {
@@ -414,14 +459,62 @@ export function selectVideo(isSelected) {
   updateTimelineTracks();
 }
 
+export function selectGlitchTrigger(triggerId) {
+  state.selectedTextId = null;
+  state.selectedAudio = false;
+  state.selectedVideo = false;
+  state.selectedGraphicId = null;
+  state.selectedGlitchTriggerId = triggerId;
+
+  // Clear selections on other blocks in UI
+  document.querySelectorAll('.timeline-block').forEach(b => b.classList.remove('selected'));
+  if (triggerId) {
+    const activeBlock = document.querySelector(`.timeline-block[data-id="${triggerId}"]`);
+    if (activeBlock) activeBlock.classList.add('selected');
+  }
+
+  // Update sidebar panel visibility
+  UI.textSettingsSection.style.display = 'none';
+  UI.audioSettingsSection.style.display = 'none';
+  UI.videoSettingsSection.style.display = 'none';
+  UI.graphicSettingsSection.style.display = 'none';
+
+  if (!triggerId || !state.glitchTriggers) {
+    if (UI.glitchTriggerSettingsSection) UI.glitchTriggerSettingsSection.style.display = 'none';
+  } else {
+    const trigger = state.glitchTriggers.find(t => t.id === triggerId);
+    if (trigger && UI.glitchTriggerSettingsSection) {
+      UI.glitchTriggerSettingsSection.style.display = 'flex';
+      UI.glitchTriggerSettingsSection.classList.remove('collapsed');
+      
+      if (UI.glitchTriggerTime) {
+        UI.glitchTriggerTime.value = trigger.time;
+        UI.glitchTriggerTime.max = getTimelineDuration();
+        if (UI.glitchTriggerTimeVal) UI.glitchTriggerTimeVal.innerText = `${trigger.time.toFixed(2)}s`;
+      }
+      if (UI.glitchTriggerDuration) {
+        UI.glitchTriggerDuration.value = trigger.duration;
+        if (UI.glitchTriggerDurationVal) UI.glitchTriggerDurationVal.innerText = `${trigger.duration.toFixed(2)}s`;
+      }
+      if (UI.glitchTriggerSeverity) {
+        UI.glitchTriggerSeverity.value = trigger.severity;
+        if (UI.glitchTriggerSeverityVal) UI.glitchTriggerSeverityVal.innerText = `${trigger.severity}px`;
+      }
+    }
+  }
+  updateTimelineTracks();
+}
+
 export function selectGraphic(id) {
   state.selectedGraphicId = id;
   state.selectedTextId = null;
   state.selectedAudio = false;
   state.selectedVideo = false;
+  state.selectedGlitchTriggerId = null;
   UI.textSettingsSection.style.display = 'none';
   UI.audioSettingsSection.style.display = 'none';
   UI.videoSettingsSection.style.display = 'none';
+  if (UI.glitchTriggerSettingsSection) UI.glitchTriggerSettingsSection.style.display = 'none';
 
   if (id === null) {
     UI.graphicSettingsSection.style.display = 'none';
@@ -492,6 +585,8 @@ export function initTimelineEvents() {
         selectVideo(true);
       } else if (txtId.startsWith('grp_')) {
         selectGraphic(txtId);
+      } else if (txtId.startsWith('gt_')) {
+        selectGlitchTrigger(txtId);
       } else {
         selectText(txtId);
       }
@@ -500,6 +595,7 @@ export function initTimelineEvents() {
       const mouseX = e.clientX - rect.left;
       const pct = mouseX / rect.width;
       state.time = Math.max(0, Math.min(duration, pct * duration));
+      state.prevTime = state.time;
       updatePlayhead();
       renderFrame(state.time);
       syncAudioPlayback();
@@ -522,6 +618,12 @@ export function initTimelineEvents() {
           dragStartMouseX = e.clientX;
           dragStartBlockStart = grp.startTime;
           dragStartBlockEnd = grp.endTime;
+        }
+      } else if (dragTextId.startsWith('gt_')) {
+        const trigger = state.glitchTriggers.find(t => t.id === dragTextId);
+        if (trigger) {
+          dragStartMouseX = e.clientX;
+          dragStartBlockStart = trigger.time;
         }
       } else {
         const txt = state.texts.find(t => t.id === dragTextId);
@@ -553,6 +655,7 @@ export function initTimelineEvents() {
       const mouseX = e.clientX - rect.left;
       const pct = mouseX / rect.width;
       state.time = Math.max(0, Math.min(duration, pct * duration));
+      state.prevTime = state.time;
       updatePlayhead();
       renderFrame(state.time);
       syncAudioPlayback();
@@ -634,6 +737,20 @@ export function initTimelineEvents() {
             UI.graphicTimelineEndVal.innerText = `${grp.endTime.toFixed(1)}s`;
           }
           
+          updateTimelineTracks();
+          renderFrame(state.time);
+        }
+      } else if (dragTextId.startsWith('gt_')) {
+        const trigger = state.glitchTriggers.find(t => t.id === dragTextId);
+        if (trigger) {
+          if (dragMode === 'move') {
+            const newTime = dragStartBlockStart + dxSec;
+            trigger.time = Math.max(0, Math.min(duration, newTime));
+          }
+          if (state.selectedGlitchTriggerId === trigger.id) {
+            UI.glitchTriggerTime.value = trigger.time;
+            UI.glitchTriggerTimeVal.innerText = `${trigger.time.toFixed(2)}s`;
+          }
           updateTimelineTracks();
           renderFrame(state.time);
         }

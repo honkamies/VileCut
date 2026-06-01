@@ -13,6 +13,7 @@ import {
   selectAudio,
   selectVideo,
   selectGraphic,
+  selectGlitchTrigger,
   initTimelineEvents
 } from './timeline.js';
 import { VideoExporter } from './exporter.js';
@@ -231,6 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function updateGlitchTriggerButtonState() {
+    if (UI.btnAddGlitchTrigger) {
+      UI.btnAddGlitchTrigger.disabled = !state.glitchEnabled;
+    }
+  }
+
   function syncVideoPlayback() {
     if (!state.videoTrack || !state.videoTrack.element) return;
     const video = state.videoTrack.element;
@@ -276,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (state.isPlaying && state.imageLoaded) {
       const dur = getTimelineDuration();
+      state.prevTime = state.time;
       state.time += dt;
       
       let wrapped = false;
@@ -357,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Toggle Switches Bindings
   UI.glitchEnabled.addEventListener('change', (e) => {
     state.glitchEnabled = e.target.checked;
+    updateGlitchTriggerButtonState();
   });
 
   if (UI.glitchMonochrome) {
@@ -487,6 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
       UI.btnPlayPause.classList.add('active');
       UI.playPauseIcon.setAttribute('data-lucide', 'pause');
       state.lastFrameTime = performance.now();
+      state.prevTime = state.time;
       syncAudioPlayback();
     } else {
       UI.btnPlayPause.classList.remove('active');
@@ -634,6 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderFrame(0);
     drawMaskGraph();
+    updateGlitchTriggerButtonState();
   });
 
   if (UI.btnReloadApp) {
@@ -809,6 +820,10 @@ document.addEventListener('DOMContentLoaded', () => {
       state.selectedGraphicId = null;
       selectGraphic(null);
 
+      state.glitchTriggers = [];
+      state.selectedGlitchTriggerId = null;
+      selectGlitchTrigger(null);
+
       state.audioTrack = null;
       selectAudio(false);
 
@@ -840,6 +855,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 9. Sync audio
       syncAudioPlayback();
+      updateGlitchTriggerButtonState();
     });
   }
 
@@ -1702,12 +1718,89 @@ document.addEventListener('DOMContentLoaded', () => {
   if (UI.glitchStyleBlock) state.glitchStyleBlock = UI.glitchStyleBlock.checked;
   if (UI.glitchStyleLiquid) state.glitchStyleLiquid = UI.glitchStyleLiquid.checked;
   if (UI.glitchStyleRandom) state.glitchStyleRandom = UI.glitchStyleRandom.checked;
+  // Glitch Trigger bindings
+  if (UI.btnAddGlitchTrigger) {
+    UI.btnAddGlitchTrigger.addEventListener('click', () => {
+      if (state.glitchTriggers.length >= 10) {
+        alert("Maximum limit of 10 glitch trigger points reached.");
+        return;
+      }
+      const newTrigger = {
+        id: 'gt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        time: state.time,
+        duration: 0.35,
+        severity: 10
+      };
+      state.glitchTriggers.push(newTrigger);
+      selectGlitchTrigger(newTrigger.id);
+      updateTimelineTracks();
+      renderFrame(state.time);
+    });
+  }
+
+  if (UI.btnDeleteGlitchTrigger) {
+    UI.btnDeleteGlitchTrigger.addEventListener('click', () => {
+      if (!state.selectedGlitchTriggerId) return;
+      const index = state.glitchTriggers.findIndex(t => t.id === state.selectedGlitchTriggerId);
+      if (index !== -1) {
+        state.glitchTriggers.splice(index, 1);
+        selectGlitchTrigger(null);
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.glitchTriggerTime) {
+    UI.glitchTriggerTime.addEventListener('input', (e) => {
+      if (!state.selectedGlitchTriggerId) return;
+      const trigger = state.glitchTriggers.find(t => t.id === state.selectedGlitchTriggerId);
+      if (trigger) {
+        trigger.time = parseFloat(e.target.value);
+        if (UI.glitchTriggerTimeVal) {
+          UI.glitchTriggerTimeVal.innerText = `${trigger.time.toFixed(2)}s`;
+        }
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.glitchTriggerDuration) {
+    UI.glitchTriggerDuration.addEventListener('input', (e) => {
+      if (!state.selectedGlitchTriggerId) return;
+      const trigger = state.glitchTriggers.find(t => t.id === state.selectedGlitchTriggerId);
+      if (trigger) {
+        trigger.duration = parseFloat(e.target.value);
+        if (UI.glitchTriggerDurationVal) {
+          UI.glitchTriggerDurationVal.innerText = `${trigger.duration.toFixed(2)}s`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.glitchTriggerSeverity) {
+    UI.glitchTriggerSeverity.addEventListener('input', (e) => {
+      if (!state.selectedGlitchTriggerId) return;
+      const trigger = state.glitchTriggers.find(t => t.id === state.selectedGlitchTriggerId);
+      if (trigger) {
+        trigger.severity = parseInt(e.target.value);
+        if (UI.glitchTriggerSeverityVal) {
+          UI.glitchTriggerSeverityVal.innerText = `${trigger.severity}px`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
   updateExportEstimate();
   updateTimelineRuler();
   updateTimelineTracks();
   updatePlayhead();
   initTimelineEvents();
   loadConfiguredFonts();
+  updateGlitchTriggerButtonState();
 
   // Handle keyboard shortcuts (Spacebar for play/pause)
   window.addEventListener('keydown', (e) => {

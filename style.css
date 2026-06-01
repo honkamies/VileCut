@@ -722,6 +722,14 @@ select:focus, select:hover {
   box-shadow: 0 0 10px rgba(0, 242, 254, 0.08);
 }
 
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none !important;
+  border-color: var(--border-subtle) !important;
+}
+
 .icon-btn {
   background: var(--bg-control);
   border: 1px solid var(--border-subtle);

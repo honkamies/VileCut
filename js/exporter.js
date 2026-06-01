@@ -265,6 +265,7 @@ export class VideoExporter {
       for (let i = 0; i < totalFrames; i++) {
         if (state.exportCancel) break;
 
+        state.prevTime = state.time;
         state.time = i / fps;
 
         if (state.videoTrack && state.videoTrack.element) {
@@ -466,6 +467,7 @@ export class VideoExporter {
         return;
       }
 
+      state.prevTime = state.time;
       state.time = elapsed;
 
       if (state.videoTrack && state.videoTrack.element) {

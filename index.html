@@ -22,7 +22,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VIDEOMADDNESS</h1>
-        <span class="version-tag">v1.2.0</span>
+        <span class="version-tag">v1.3.0</span>
       </div>
       <div class="header-actions">
         <div id="fps-monitor" class="monitor-badge">
@@ -346,6 +346,39 @@
           </button>
         </div>
 
+        <!-- Glitch Trigger Settings Section -->
+        <div class="panel-section" id="glitch-trigger-settings-section" style="display: none;">
+          <h2 class="section-title"><i data-lucide="zap"></i> Glitch Trigger Settings</h2>
+          
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="glitch-trigger-time">Trigger Time</label>
+              <span id="glitch-trigger-time-val" class="slider-val">0.00s</span>
+            </div>
+            <input type="range" id="glitch-trigger-time" min="0.0" max="60.0" step="0.01" value="0.00">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="glitch-trigger-duration">Glitch Duration</label>
+              <span id="glitch-trigger-duration-val" class="slider-val">0.35s</span>
+            </div>
+            <input type="range" id="glitch-trigger-duration" min="0.05" max="2.0" step="0.05" value="0.35">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="glitch-trigger-severity">Glitch Severity</label>
+              <span id="glitch-trigger-severity-val" class="slider-val">10px</span>
+            </div>
+            <input type="range" id="glitch-trigger-severity" min="1" max="100" step="1" value="10">
+          </div>
+
+          <button id="btn-delete-glitch-trigger" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
+            <i data-lucide="trash-2"></i> Delete Trigger
+          </button>
+        </div>
+
 
         <!-- Graphic Settings Section -->
         <div class="panel-section" id="graphic-settings-section" style="display: none;">
@@ -513,6 +546,9 @@
                 <i data-lucide="video"></i>
               </button>
               <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/*" style="display: none;">
+              <button id="btn-add-glitch-trigger" class="btn secondary small-btn" title="Add Glitch Trigger" disabled>
+                <i data-lucide="zap" style="color: var(--pink);"></i>
+              </button>
               <div class="divider-vertical" style="width: 1px; height: 16px; background: var(--border-subtle); margin: 0 4px;"></div>
               <button id="btn-timeline-zoom" class="btn secondary small-btn" style="cursor: ew-resize;" title="Drag left/right to zoom (Double-click to Fit)">
                 <i data-lucide="zoom-in"></i>

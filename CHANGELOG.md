@@ -2,6 +2,13 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.3.0] - 2026-06-01
+
+### Added
+- **Timeline-Locked Glitch Triggers (⚡)**: Added timeline-locked trigger markers that execute cybernetic glitch spikes (with customized duration and severity overrides) at exact times on the timeline.
+- **UX Button Dimming**: Dimmed and disabled the timeline "Add Glitch Trigger (⚡)" button unless the sidebar's general "Cybernetic Glitch FX" toggle is switched on, preventing setup confusion.
+- **Dynamic Trigger Evaluation**: Real-time playback and video export pipelines evaluate sub-frame changes between steps, ensuring glitch triggers execute reliably at the exact timeline crossing.
+
 ## [1.2.0] - 2026-06-01
 
 ### Added

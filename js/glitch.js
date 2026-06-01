@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { UI } from './ui.js';
+import { getTimelineDuration } from './utils.js';
 
 export class GlitchManager {
   static update(dt) {
@@ -11,18 +12,51 @@ export class GlitchManager {
       return;
     }
 
+    // Check playhead crossings for pinned timeline triggers
+    if (((state.isPlaying && state.imageLoaded) || state.isExporting) && state.glitchTriggers.length > 0) {
+      const prev = state.prevTime !== undefined ? state.prevTime : state.time;
+      const curr = state.time;
+      const dur = getTimelineDuration();
+
+      state.glitchTriggers.forEach(trigger => {
+        let triggered = false;
+        if (prev < curr) {
+          if (prev <= trigger.time && curr > trigger.time) {
+            triggered = true;
+          }
+        } else if (prev > curr) {
+          // Wrapped around loop boundary
+          if (trigger.time >= prev || trigger.time < curr) {
+            triggered = true;
+          }
+        }
+        if (triggered) {
+          console.log(`[GlitchTrigger] Playhead crossed trigger at ${trigger.time.toFixed(2)}s (prev: ${prev.toFixed(2)}s, curr: ${curr.toFixed(2)}s)`);
+          GlitchManager.triggerGlitch(trigger.duration, trigger.severity);
+        }
+      });
+    }
+
     if (state.glitchActive) {
       state.glitchTimer -= dt;
       if (state.glitchTimer <= 0) {
         state.glitchActive = false;
         state.activeSpikeStyle = null;
+        state.activeGlitchDuration = null;
+        state.activeGlitchSeverity = null;
         state.shakeX = 0;
         state.shakeY = 0;
         state.shakeRot = 0;
       } else {
-        const decay = state.glitchTimer / 0.35;
-        state.shakeX = (Math.random() - 0.5) * state.glitchSeverity * decay;
-        state.shakeY = (Math.random() - 0.5) * state.glitchSeverity * decay;
+        const decayDuration = state.activeGlitchDuration !== undefined && state.activeGlitchDuration !== null 
+          ? state.activeGlitchDuration 
+          : 0.35;
+        const decay = Math.max(0, Math.min(1.0, state.glitchTimer / decayDuration));
+        const sev = state.activeGlitchSeverity !== undefined && state.activeGlitchSeverity !== null 
+          ? state.activeGlitchSeverity 
+          : state.glitchSeverity;
+        state.shakeX = (Math.random() - 0.5) * sev * decay;
+        state.shakeY = (Math.random() - 0.5) * sev * decay;
         state.shakeRot = (Math.random() - 0.5) * 0.05 * decay;
       }
     } else {
@@ -36,10 +70,16 @@ export class GlitchManager {
     }
   }
 
-  static triggerGlitch() {
-    if (!state.glitchEnabled) return;
+  static triggerGlitch(customDuration, customSeverity) {
+    if (!state.glitchEnabled) {
+      console.log("[GlitchTrigger] Glitch is disabled in settings. Ignoring trigger.");
+      return;
+    }
+    console.log(`[GlitchTrigger] Triggering glitch: duration=${customDuration}, severity=${customSeverity}`);
     state.glitchActive = true;
-    state.glitchTimer = 0.2 + Math.random() * 0.25;
+    state.activeGlitchDuration = customDuration !== undefined ? customDuration : (0.2 + Math.random() * 0.25);
+    state.glitchTimer = state.activeGlitchDuration;
+    state.activeGlitchSeverity = customSeverity !== undefined ? customSeverity : state.glitchSeverity;
 
     if (state.glitchStyleRandom) {
       const pool = [];
@@ -70,6 +110,10 @@ export class GlitchManager {
   static applyPostProcessGlitches(renderCtx, w, h) {
     if (!state.glitchEnabled) return;
 
+    const activeSeverity = state.activeGlitchSeverity !== undefined && state.activeGlitchSeverity !== null 
+      ? state.activeGlitchSeverity 
+      : state.glitchSeverity;
+
     // Helper to determine if a style is spiking
     const checkSpike = (styleName) => {
       if (!state.glitchActive) return false;
@@ -82,7 +126,7 @@ export class GlitchManager {
       const isSpiking = checkSpike('rgb-pixel-sort');
       let shift = state.rgbSplit;
       if (isSpiking) {
-        shift += Math.round(state.glitchSeverity * 0.5);
+        shift += Math.round(activeSeverity * 0.5);
       }
 
       if (shift > 0) {
@@ -182,7 +226,7 @@ export class GlitchManager {
       const isSpiking = checkSpike('vhs-sync-sag');
       let amplitude = state.rgbSplit * 1.5;
       if (isSpiking) {
-        amplitude += state.glitchSeverity * 0.8;
+        amplitude += activeSeverity * 0.8;
       }
 
       if (amplitude > 0) {
@@ -228,7 +272,7 @@ export class GlitchManager {
       const isSpiking = checkSpike('digital-block-tear');
       let severity = state.rgbSplit;
       if (isSpiking) {
-        severity += state.glitchSeverity;
+        severity += activeSeverity;
       }
 
       if (severity > 0) {
@@ -297,7 +341,7 @@ export class GlitchManager {
       if (scaleEl && noiseEl) {
         let severity = state.rgbSplit * 1.5;
         if (isSpiking) {
-          severity += state.glitchSeverity * 3.5;
+          severity += activeSeverity * 3.5;
         }
 
         scaleEl.setAttribute('scale', severity);
