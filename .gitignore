@@ -11,6 +11,7 @@ desktop.ini
 *.webm
 *.mp4
 *.gif
+*.wav
 
 # Agent Workspaces and logs
 modular_test/
