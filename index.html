@@ -339,11 +339,25 @@
           
           <div class="control-group" style="background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.1); margin-bottom: 15px;">
             <div style="font-family: var(--font-display); font-size: 0.85rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="video-file-name">No Video Loaded</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);" id="video-file-duration">Length: 0.0s</div>
           </div>
 
-          <button id="btn-delete-video" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
-            <i data-lucide="trash-2"></i> Delete Video Background
-          </button>
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="video-timeline-start">Timeline Position</label>
+              <span id="video-timeline-start-val" class="slider-val">0.0s</span>
+            </div>
+            <input type="range" id="video-timeline-start" min="0.0" max="60.0" step="0.1" value="0.0">
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
+            <button id="btn-duplicate-video" class="btn secondary" style="flex: 1; border-color: rgba(0, 242, 254, 0.25);">
+              <i data-lucide="copy"></i> Duplicate
+            </button>
+            <button id="btn-delete-video" class="btn secondary" style="flex: 1; color: var(--pink); border-color: rgba(255, 0, 127, 0.25);">
+              <i data-lucide="trash-2"></i> Delete
+            </button>
+          </div>
         </div>
 
         <!-- Glitch Trigger Settings Section -->

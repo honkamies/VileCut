@@ -64,8 +64,9 @@ export function renderFrame(renderTime) {
   const bw = bufferCanvas.width;
   const bh = bufferCanvas.height;
   
-  if (state.videoTrack && state.videoTrack.element) {
-    const video = state.videoTrack.element;
+  const activeBlock = state.videoBlocks ? state.videoBlocks.find(b => renderTime >= b.startTime && renderTime < b.endTime) : null;
+  if (activeBlock && activeBlock.element) {
+    const video = activeBlock.element;
     const vw = video.videoWidth || video.width || bw;
     const vh = video.videoHeight || video.height || bh;
     const coverScale = Math.max(bw / vw, bh / vh);

@@ -145,6 +145,10 @@ export const UI = {
   // Video Settings Section References
   videoSettingsSection: document.getElementById('video-settings-section'),
   videoFileName: document.getElementById('video-file-name'),
+  videoFileDuration: document.getElementById('video-file-duration'),
+  videoTimelineStart: document.getElementById('video-timeline-start'),
+  videoTimelineStartVal: document.getElementById('video-timeline-start-val'),
+  btnDuplicateVideo: document.getElementById('btn-duplicate-video'),
   btnDeleteVideo: document.getElementById('btn-delete-video'),
   btnAddVideo: document.getElementById('btn-add-video'),
   videoFileInput: document.getElementById('video-file-input'),

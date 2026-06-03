@@ -29,8 +29,8 @@ export const state = {
   selectedAudio: false,
 
   // Video Background Track
-  videoTrack: null,
-  selectedVideo: false,
+  videoBlocks: [],
+  selectedVideoId: null,
 
   // Glitch Triggers on Timeline
   glitchTriggers: [],

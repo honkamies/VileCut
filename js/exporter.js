@@ -139,8 +139,10 @@ export class VideoExporter {
     const tempPlaying = state.isPlaying;
     state.isPlaying = false;
     stopAudioSource();
-    if (state.videoTrack && state.videoTrack.element) {
-      state.videoTrack.element.pause();
+    if (state.videoBlocks && state.videoBlocks.length > 0) {
+      state.videoBlocks.forEach(b => {
+        if (b.element) b.element.pause();
+      });
     }
 
     // Reset wrap counts for all layers to align with starting time 0.0
@@ -268,10 +270,12 @@ export class VideoExporter {
         state.prevTime = state.time;
         state.time = i / fps;
 
-        if (state.videoTrack && state.videoTrack.element) {
-          const video = state.videoTrack.element;
-          const dur = getTimelineDuration();
-          const loopTime = state.time % dur;
+        const dur = getTimelineDuration();
+        const loopTime = state.time % dur;
+        const activeBlock = state.videoBlocks ? state.videoBlocks.find(b => loopTime >= b.startTime && loopTime < b.endTime) : null;
+        if (activeBlock && activeBlock.element) {
+          const video = activeBlock.element;
+          const relativeTime = loopTime - activeBlock.startTime;
           await new Promise(resolve => {
             let resolved = false;
             const onSeeked = () => {
@@ -281,7 +285,7 @@ export class VideoExporter {
               resolve();
             };
             video.addEventListener('seeked', onSeeked);
-            video.currentTime = loopTime;
+            video.currentTime = relativeTime;
             setTimeout(onSeeked, 100);
           });
         }
@@ -405,8 +409,10 @@ export class VideoExporter {
     const tempPlaying = state.isPlaying;
     state.isPlaying = false;
     stopAudioSource();
-    if (state.videoTrack && state.videoTrack.element) {
-      state.videoTrack.element.pause();
+    if (state.videoBlocks && state.videoBlocks.length > 0) {
+      state.videoBlocks.forEach(b => {
+        if (b.element) b.element.pause();
+      });
     }
 
     // Reset wrap counts for all layers to align with starting time 0.0, using null to force initial frame recalculation
@@ -470,10 +476,12 @@ export class VideoExporter {
       state.prevTime = state.time;
       state.time = elapsed;
 
-      if (state.videoTrack && state.videoTrack.element) {
-        const video = state.videoTrack.element;
-        const dur = getTimelineDuration();
-        const loopTime = state.time % dur;
+      const dur = getTimelineDuration();
+      const loopTime = state.time % dur;
+      const activeBlock = state.videoBlocks ? state.videoBlocks.find(b => loopTime >= b.startTime && loopTime < b.endTime) : null;
+      if (activeBlock && activeBlock.element) {
+        const video = activeBlock.element;
+        const relativeTime = loopTime - activeBlock.startTime;
         await new Promise(resolve => {
           let resolved = false;
           const onSeeked = () => {
@@ -483,7 +491,7 @@ export class VideoExporter {
             resolve();
           };
           video.addEventListener('seeked', onSeeked);
-          video.currentTime = loopTime;
+          video.currentTime = relativeTime;
           setTimeout(onSeeked, 100);
         });
       }

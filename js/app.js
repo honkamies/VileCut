@@ -252,28 +252,40 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function syncVideoPlayback() {
-    if (!state.videoTrack || !state.videoTrack.element) return;
-    const video = state.videoTrack.element;
+    if (!state.videoBlocks || state.videoBlocks.length === 0) return;
     const dur = getTimelineDuration();
+    const playheadTime = state.time % dur;
     
-    if (state.isPlaying && state.imageLoaded) {
-      if (video.paused) {
-        video.play().catch(e => console.log("Video auto-play blocked:", e));
+    state.videoBlocks.forEach(block => {
+      const video = block.element;
+      if (!video) return;
+      
+      const isActive = (playheadTime >= block.startTime && playheadTime < block.endTime);
+      
+      if (isActive) {
+        const targetTime = playheadTime - block.startTime;
+        if (state.isPlaying && state.imageLoaded) {
+          if (video.paused) {
+            video.play().catch(e => console.log("Video auto-play blocked:", e));
+          }
+          const diff = Math.abs(video.currentTime - targetTime);
+          if (diff > 0.15) {
+            video.currentTime = targetTime;
+          }
+        } else {
+          if (!video.paused) {
+            video.pause();
+          }
+          if (Math.abs(video.currentTime - targetTime) > 0.05) {
+            video.currentTime = targetTime;
+          }
+        }
+      } else {
+        if (!video.paused) {
+          video.pause();
+        }
       }
-      const loopTime = state.time % dur;
-      const diff = Math.abs(video.currentTime - loopTime);
-      if (diff > 0.15) {
-        video.currentTime = loopTime;
-      }
-    } else {
-      if (!video.paused) {
-        video.pause();
-      }
-      const loopTime = state.time % dur;
-      if (Math.abs(video.currentTime - loopTime) > 0.05) {
-        video.currentTime = loopTime;
-      }
-    }
+    });
   }
 
   // --- ANIMATION LOOP ---
@@ -326,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updatePlayhead();
     }
 
-    if (state.videoTrack) {
+    if (state.videoBlocks && state.videoBlocks.length > 0) {
       syncVideoPlayback();
     }
 
@@ -516,7 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
       UI.playPauseIcon.setAttribute('data-lucide', 'play');
       stopAudioSource();
     }
-    if (state.videoTrack) {
+    if (state.videoBlocks && state.videoBlocks.length > 0) {
       syncVideoPlayback();
     }
     if (typeof lucide !== 'undefined') {
@@ -840,14 +852,17 @@ document.addEventListener('DOMContentLoaded', () => {
       state.audioTrack = null;
       selectAudio(false);
 
-      if (state.videoTrack) {
-        if (state.videoTrack.element) {
-          state.videoTrack.element.pause();
-        }
-        URL.revokeObjectURL(state.videoTrack.url);
+      if (state.videoBlocks && state.videoBlocks.length > 0) {
+        state.videoBlocks.forEach(block => {
+          if (block.element) {
+            block.element.pause();
+          }
+          URL.revokeObjectURL(block.url);
+        });
       }
-      state.videoTrack = null;
-      selectVideo(false);
+      state.videoBlocks = [];
+      state.selectedVideoId = null;
+      selectVideo(null);
       if (UI.videoFileInput) {
         UI.videoFileInput.value = '';
       }
@@ -1492,14 +1507,32 @@ document.addEventListener('DOMContentLoaded', () => {
       video.loop = false;
 
       video.addEventListener('loadedmetadata', () => {
-        state.videoTrack = {
+        const dur = getTimelineDuration();
+        
+        let startTime = 0;
+        if (state.videoBlocks && state.videoBlocks.length > 0) {
+          state.videoBlocks.forEach(b => {
+            if (b.endTime > startTime) {
+              startTime = b.endTime;
+            }
+          });
+        }
+        if (startTime >= dur - 0.2) {
+          startTime = 0;
+        }
+        
+        const newBlock = {
+          id: 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
           fileName: file.name,
           file: file,
           url: url,
           element: video,
-          duration: video.duration
+          duration: video.duration,
+          startTime: startTime,
+          endTime: Math.min(dur, startTime + video.duration)
         };
-        selectVideo(true);
+        state.videoBlocks.push(newBlock);
+        selectVideo(newBlock.id);
         UI.canvasLoading.classList.add('hidden');
         renderFrame(state.time);
       });
@@ -1509,21 +1542,86 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("Failed to load video file. Please check format compatibility.");
         UI.canvasLoading.classList.add('hidden');
       });
+      e.target.value = '';
     });
   }
 
   if (UI.btnDeleteVideo) {
     UI.btnDeleteVideo.addEventListener('click', () => {
-      if (state.videoTrack) {
-        if (state.videoTrack.element) {
-          state.videoTrack.element.pause();
+      if (!state.selectedVideoId) return;
+      const index = state.videoBlocks.findIndex(v => v.id === state.selectedVideoId);
+      if (index !== -1) {
+        const block = state.videoBlocks[index];
+        if (block.element) {
+          block.element.pause();
         }
-        URL.revokeObjectURL(state.videoTrack.url);
+        
+        // Revoke Object URL if no other block is using it
+        const isUrlUsedElsewhere = state.videoBlocks.some((v, idx) => idx !== index && v.url === block.url);
+        if (!isUrlUsedElsewhere) {
+          URL.revokeObjectURL(block.url);
+        }
+        
+        state.videoBlocks.splice(index, 1);
+        selectVideo(null);
+        renderFrame(state.time);
       }
-      state.videoTrack = null;
-      selectVideo(false);
-      updateTimelineTracks();
-      renderFrame(state.time);
+    });
+  }
+
+  if (UI.btnDuplicateVideo) {
+    UI.btnDuplicateVideo.addEventListener('click', () => {
+      if (!state.selectedVideoId) return;
+      const selectedBlock = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (!selectedBlock) return;
+      
+      const dur = getTimelineDuration();
+      let startTime = selectedBlock.endTime;
+      if (startTime >= dur - 0.2) startTime = 0.0;
+      const blockDuration = selectedBlock.endTime - selectedBlock.startTime;
+      const endTime = Math.min(dur, startTime + blockDuration);
+      
+      const clonedVideo = document.createElement('video');
+      clonedVideo.src = selectedBlock.url;
+      clonedVideo.muted = true;
+      clonedVideo.playsInline = true;
+      clonedVideo.loop = false;
+      
+      clonedVideo.addEventListener('loadedmetadata', () => {
+        const newBlock = {
+          ...selectedBlock,
+          id: 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          element: clonedVideo,
+          startTime: startTime,
+          endTime: endTime
+        };
+        state.videoBlocks.push(newBlock);
+        selectVideo(newBlock.id);
+        renderFrame(state.time);
+      });
+    });
+  }
+
+  if (UI.videoTimelineStart) {
+    UI.videoTimelineStart.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        const val = parseFloat(e.target.value);
+        const loopDur = getTimelineDuration();
+        const blockLen = block.endTime - block.startTime;
+        
+        block.startTime = Math.min(loopDur - 0.2, val);
+        block.endTime = Math.min(loopDur, block.startTime + blockLen);
+        
+        if (UI.videoTimelineStartVal) {
+          UI.videoTimelineStartVal.innerText = `${block.startTime.toFixed(1)}s`;
+        }
+        e.target.value = block.startTime;
+        
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
     });
   }
 

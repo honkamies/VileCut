@@ -54,6 +54,30 @@ function clampGraphicIntervals() {
   });
 }
 
+function clampVideoIntervals() {
+  const dur = getTimelineDuration();
+  if (!state.videoBlocks) return;
+  state.videoBlocks.forEach(vid => {
+    if (vid.startTime >= dur) {
+      const blockLen = Math.min(vid.duration, vid.endTime - vid.startTime);
+      vid.startTime = Math.max(0, dur - blockLen);
+      vid.endTime = dur;
+    } else if (vid.endTime > dur) {
+      vid.endTime = dur;
+    }
+    
+    // Prevent video block from being longer than the source file duration
+    if (vid.endTime - vid.startTime > vid.duration) {
+      vid.endTime = vid.startTime + vid.duration;
+    }
+    
+    if (vid.endTime - vid.startTime < 0.2) {
+      vid.endTime = Math.min(dur, vid.startTime + 0.2);
+      vid.startTime = Math.max(0, vid.endTime - 0.2);
+    }
+  });
+}
+
 export function normalizeTextTracks() {
   const uniqueIndices = [...new Set(state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0))].sort((a, b) => a - b);
   state.texts.forEach(t => {
@@ -67,9 +91,10 @@ export function updateTimelineTracks() {
   if (!UI.timelineTracks) return;
   clampTextIntervals();
   clampGraphicIntervals();
+  clampVideoIntervals();
   UI.timelineTracks.innerHTML = '';
   
-  if (state.texts.length === 0 && !state.audioTrack && state.graphics.length === 0 && !state.videoTrack && state.glitchTriggers.length === 0) {
+  if (state.texts.length === 0 && !state.audioTrack && state.graphics.length === 0 && (!state.videoBlocks || state.videoBlocks.length === 0) && state.glitchTriggers.length === 0) {
     UI.timelineTracks.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding-top: 15px; font-family: var(--font-display);">No overlays or soundtrack. Add Text, Graphic, Audio, Video, or Glitch Trigger to start.</div>';
     return;
   }
@@ -77,26 +102,35 @@ export function updateTimelineTracks() {
   const dur = getTimelineDuration();
 
   // 1. Render Video Track (if active)
-  if (state.videoTrack) {
-    const track = state.videoTrack;
+  if (state.videoBlocks && state.videoBlocks.length > 0) {
     const row = document.createElement('div');
     row.className = 'timeline-track-row video-track-row';
-    row.dataset.id = 'video';
+    row.dataset.id = 'video_track';
     row.dataset.type = 'video';
     
-    const block = document.createElement('div');
-    block.className = 'timeline-block video-block' + (state.selectedVideo ? ' selected' : '');
-    block.dataset.id = 'video';
+    state.videoBlocks.forEach((vidObj) => {
+      const block = document.createElement('div');
+      block.className = 'timeline-block video-block' + (vidObj.id === state.selectedVideoId ? ' selected' : '');
+      block.dataset.id = vidObj.id;
+      
+      const startPct = (vidObj.startTime / dur) * 100;
+      const widthPct = ((vidObj.endTime - vidObj.startTime) / dur) * 100;
+      
+      block.style.left = `${startPct}%`;
+      block.style.width = `${widthPct}%`;
+      
+      const cleanLabel = document.createElement('span');
+      cleanLabel.style.pointerEvents = 'none';
+      
+      const truncName = vidObj.fileName && vidObj.fileName.length > 18
+        ? vidObj.fileName.substring(0, 15) + '...'
+        : vidObj.fileName || 'Video';
+      cleanLabel.innerText = `🎥 ${truncName}`;
+      block.appendChild(cleanLabel);
+      
+      row.appendChild(block);
+    });
     
-    block.style.left = '0%';
-    block.style.width = '100%';
-    
-    const cleanLabel = document.createElement('span');
-    cleanLabel.style.pointerEvents = 'none';
-    cleanLabel.innerText = `🎥 Background Video: ${track.fileName}`;
-    block.appendChild(cleanLabel);
-    
-    row.appendChild(block);
     UI.timelineTracks.appendChild(row);
   }
 
@@ -359,7 +393,7 @@ export function selectText(id) {
   state.selectedTextId = id;
   state.selectedAudio = false;
   state.selectedGraphicId = null;
-  state.selectedVideo = false;
+  state.selectedVideoId = null;
   state.selectedGlitchTriggerId = null;
   UI.audioSettingsSection.style.display = 'none';
   UI.graphicSettingsSection.style.display = 'none';
@@ -405,7 +439,7 @@ export function selectAudio(isSelected) {
   if (isSelected) {
     state.selectedTextId = null;
     state.selectedGraphicId = null;
-    state.selectedVideo = false;
+    state.selectedVideoId = null;
     state.selectedGlitchTriggerId = null;
     UI.textSettingsSection.style.display = 'none';
     UI.graphicSettingsSection.style.display = 'none';
@@ -435,26 +469,37 @@ export function selectAudio(isSelected) {
   updateTimelineTracks();
 }
 
-export function selectVideo(isSelected) {
-  state.selectedVideo = isSelected;
-  if (isSelected) {
-    state.selectedTextId = null;
-    state.selectedGraphicId = null;
-    state.selectedAudio = false;
-    state.selectedGlitchTriggerId = null;
-    UI.textSettingsSection.style.display = 'none';
-    UI.graphicSettingsSection.style.display = 'none';
-    UI.audioSettingsSection.style.display = 'none';
-    if (UI.glitchTriggerSettingsSection) UI.glitchTriggerSettingsSection.style.display = 'none';
-  }
-  
-  if (!isSelected || !state.videoTrack) {
+export function selectVideo(id) {
+  state.selectedVideoId = id;
+  state.selectedTextId = null;
+  state.selectedGraphicId = null;
+  state.selectedAudio = false;
+  state.selectedGlitchTriggerId = null;
+  UI.textSettingsSection.style.display = 'none';
+  UI.graphicSettingsSection.style.display = 'none';
+  UI.audioSettingsSection.style.display = 'none';
+  if (UI.glitchTriggerSettingsSection) UI.glitchTriggerSettingsSection.style.display = 'none';
+
+  if (id === null) {
     UI.videoSettingsSection.style.display = 'none';
   } else {
-    const track = state.videoTrack;
-    UI.videoSettingsSection.style.display = 'flex';
-    UI.videoSettingsSection.classList.remove('collapsed');
-    UI.videoFileName.innerText = track.fileName;
+    const block = state.videoBlocks.find(v => v.id === id);
+    if (block) {
+      UI.videoSettingsSection.style.display = 'flex';
+      UI.videoSettingsSection.classList.remove('collapsed');
+      UI.videoFileName.innerText = block.fileName;
+      if (UI.videoFileDuration) {
+        UI.videoFileDuration.innerText = `Length: ${block.duration.toFixed(1)}s`;
+      }
+      if (UI.videoTimelineStart) {
+        const dur = getTimelineDuration();
+        UI.videoTimelineStart.max = dur;
+        UI.videoTimelineStart.value = block.startTime;
+        if (UI.videoTimelineStartVal) {
+          UI.videoTimelineStartVal.innerText = `${block.startTime.toFixed(1)}s`;
+        }
+      }
+    }
   }
   updateTimelineTracks();
 }
@@ -462,7 +507,7 @@ export function selectVideo(isSelected) {
 export function selectGlitchTrigger(triggerId) {
   state.selectedTextId = null;
   state.selectedAudio = false;
-  state.selectedVideo = false;
+  state.selectedVideoId = null;
   state.selectedGraphicId = null;
   state.selectedGlitchTriggerId = triggerId;
 
@@ -509,7 +554,7 @@ export function selectGraphic(id) {
   state.selectedGraphicId = id;
   state.selectedTextId = null;
   state.selectedAudio = false;
-  state.selectedVideo = false;
+  state.selectedVideoId = null;
   state.selectedGlitchTriggerId = null;
   UI.textSettingsSection.style.display = 'none';
   UI.audioSettingsSection.style.display = 'none';
@@ -581,8 +626,8 @@ export function initTimelineEvents() {
       dragTextId = txtId;
       if (txtId === 'audio') {
         selectAudio(true);
-      } else if (txtId === 'video') {
-        selectVideo(true);
+      } else if (txtId.startsWith('vid_')) {
+        selectVideo(txtId);
       } else if (txtId.startsWith('grp_')) {
         selectGraphic(txtId);
       } else if (txtId.startsWith('gt_')) {
@@ -611,6 +656,13 @@ export function initTimelineEvents() {
           dragStartBlockStart = track.timelineStart;
           dragStartBlockEnd = track.timelineStart + track.duration;
           dragStartSourceOffset = track.sourceOffset;
+        }
+      } else if (dragTextId.startsWith('vid_')) {
+        const vid = state.videoBlocks.find(v => v.id === dragTextId);
+        if (vid) {
+          dragStartMouseX = e.clientX;
+          dragStartBlockStart = vid.startTime;
+          dragStartBlockEnd = vid.endTime;
         }
       } else if (dragTextId.startsWith('grp_')) {
         const grp = state.graphics.find(g => g.id === dragTextId);
@@ -683,6 +735,35 @@ export function initTimelineEvents() {
             syncAudioPlayback();
           }
           updateTimelineTracks();
+        }
+      } else if (dragTextId.startsWith('vid_')) {
+        const vid = state.videoBlocks.find(v => v.id === dragTextId);
+        if (vid) {
+          if (dragMode === 'move') {
+            let newStart = dragStartBlockStart + dxSec;
+            const blockLen = dragStartBlockEnd - dragStartBlockStart;
+            let newEnd = newStart + blockLen;
+            
+            if (newStart < 0) {
+              newStart = 0;
+              newEnd = blockLen;
+            }
+            if (newEnd > duration) {
+              newEnd = duration;
+              newStart = duration - blockLen;
+            }
+            
+            vid.startTime = newStart;
+            vid.endTime = newEnd;
+          }
+          
+          if (state.selectedVideoId === vid.id) {
+            UI.videoTimelineStart.value = vid.startTime;
+            UI.videoTimelineStartVal.innerText = `${vid.startTime.toFixed(1)}s`;
+          }
+          
+          updateTimelineTracks();
+          renderFrame(state.time);
         }
       } else if (dragTextId.startsWith('grp_')) {
         const grp = state.graphics.find(g => g.id === dragTextId);
