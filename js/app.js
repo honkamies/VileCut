@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ImageProcessor.reprocessAllImagesLayers();
       ImageProcessor.initializeRenderStack();
       updateImagesDeckUI();
+      autoExpandPanelsOnUpload();
     } else {
       state.imageLoaded = false;
     }
@@ -235,6 +236,18 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateGlitchTriggerButtonState() {
     if (UI.btnAddGlitchTrigger) {
       UI.btnAddGlitchTrigger.disabled = !state.glitchEnabled;
+    }
+  }
+
+  function autoExpandPanelsOnUpload() {
+    if (UI.layerIsolationSection) {
+      UI.layerIsolationSection.classList.remove('collapsed');
+    }
+    if (UI.extractedLayersSection) {
+      UI.extractedLayersSection.classList.remove('collapsed');
+    }
+    if (UI.infiniteMotionSection) {
+      UI.infiniteMotionSection.classList.remove('collapsed');
     }
   }
 

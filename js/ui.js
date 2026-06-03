@@ -200,5 +200,10 @@ export const UI = {
   glitchTriggerDurationVal: document.getElementById('glitch-trigger-duration-val'),
   glitchTriggerSeverity: document.getElementById('glitch-trigger-severity'),
   glitchTriggerSeverityVal: document.getElementById('glitch-trigger-severity-val'),
-  btnDeleteGlitchTrigger: document.getElementById('btn-delete-glitch-trigger')
+  btnDeleteGlitchTrigger: document.getElementById('btn-delete-glitch-trigger'),
+  
+  // Dynamic Auto-Expand Panel References
+  layerIsolationSection: document.getElementById('layer-isolation-section'),
+  extractedLayersSection: document.getElementById('extracted-layers-section'),
+  infiniteMotionSection: document.getElementById('infinite-motion-section')
 };
