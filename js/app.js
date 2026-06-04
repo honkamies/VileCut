@@ -1109,12 +1109,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     
-    let maxTrackIdx = -1;
-    state.texts.forEach(t => {
-      const idx = t.trackIndex !== undefined ? t.trackIndex : 0;
-      if (idx > maxTrackIdx) maxTrackIdx = idx;
-    });
+    let maxTrackIdx = 0;
+    const allIndices = [
+      ...state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0),
+      ...state.graphics.map(g => g.trackIndex !== undefined ? g.trackIndex : 0),
+      ...state.videoBlocks.map(v => v.trackIndex !== undefined ? v.trackIndex : 0)
+    ];
+    if (allIndices.length > 0) {
+      maxTrackIdx = Math.max(...allIndices);
+    }
     const targetTrackIdx = maxTrackIdx + 1;
+
     
     const duration = getTimelineDuration();
     const newText = {
@@ -1255,6 +1260,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const img = new Image();
       img.onload = () => {
         const duration = getTimelineDuration();
+        let maxTrackIdx = 0;
+        const allIndices = [
+          ...state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0),
+          ...state.graphics.map(g => g.trackIndex !== undefined ? g.trackIndex : 0),
+          ...state.videoBlocks.map(v => v.trackIndex !== undefined ? v.trackIndex : 0)
+        ];
+        if (allIndices.length > 0) {
+          maxTrackIdx = Math.max(...allIndices);
+        }
+        const targetTrackIdx = maxTrackIdx + 1;
+
         const newGraphic = {
           id: 'grp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
           img: img,
@@ -1266,8 +1282,12 @@ document.addEventListener('DOMContentLoaded', () => {
           scale: 100,
           glitchFrequency: 10,
           glitchAmplitude: 20,
-          flickerIntensity: 0
+          flickerIntensity: 0,
+          brightness: 100,
+          contrast: 100,
+          trackIndex: targetTrackIdx
         };
+
         state.graphics.push(newGraphic);
         selectGraphic(newGraphic.id);
         UI.canvasLoading.classList.add('hidden');
@@ -1378,6 +1398,35 @@ document.addEventListener('DOMContentLoaded', () => {
       renderFrame(state.time);
     }
   });
+
+  if (UI.graphicBrightness) {
+    UI.graphicBrightness.addEventListener('input', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.brightness = parseInt(e.target.value);
+        if (UI.graphicBrightnessVal) {
+          UI.graphicBrightnessVal.innerText = `${grp.brightness}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.graphicContrast) {
+    UI.graphicContrast.addEventListener('input', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.contrast = parseInt(e.target.value);
+        if (UI.graphicContrastVal) {
+          UI.graphicContrastVal.innerText = `${grp.contrast}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
 
   // Timeline Navigation Jump Bindings
   UI.btnTimelineStart.addEventListener('click', () => {
@@ -1529,8 +1578,15 @@ document.addEventListener('DOMContentLoaded', () => {
           element: video,
           duration: video.duration,
           startTime: startTime,
-          endTime: Math.min(dur, startTime + video.duration)
+          endTime: Math.min(dur, startTime + video.duration),
+          monochrome: false,
+          mirrorMode: 'none',
+          kaleidoscopeSlices: 8,
+          brightness: 100,
+          contrast: 100,
+          trackIndex: 0
         };
+
         state.videoBlocks.push(newBlock);
         selectVideo(newBlock.id);
         UI.canvasLoading.classList.add('hidden');
@@ -1624,6 +1680,74 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  if (UI.videoMonochrome) {
+    UI.videoMonochrome.addEventListener('change', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.monochrome = e.target.checked;
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoMirrorMode) {
+    UI.videoMirrorMode.addEventListener('change', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.mirrorMode = e.target.value;
+        if (UI.videoKaleidoscopeSlicesGroup) {
+          UI.videoKaleidoscopeSlicesGroup.style.display = (block.mirrorMode === 'kaleidoscope') ? 'flex' : 'none';
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoKSlices) {
+    UI.videoKSlices.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.kaleidoscopeSlices = parseInt(e.target.value);
+        if (UI.videoKSlicesVal) {
+          UI.videoKSlicesVal.innerText = block.kaleidoscopeSlices;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoBrightness) {
+    UI.videoBrightness.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.brightness = parseInt(e.target.value);
+        if (UI.videoBrightnessVal) {
+          UI.videoBrightnessVal.innerText = `${block.brightness}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoContrast) {
+    UI.videoContrast.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.contrast = parseInt(e.target.value);
+        if (UI.videoContrastVal) {
+          UI.videoContrastVal.innerText = `${block.contrast}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
 
 
   // Text Inputs updates

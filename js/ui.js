@@ -148,10 +148,20 @@ export const UI = {
   videoFileDuration: document.getElementById('video-file-duration'),
   videoTimelineStart: document.getElementById('video-timeline-start'),
   videoTimelineStartVal: document.getElementById('video-timeline-start-val'),
+  videoMonochrome: document.getElementById('video-monochrome'),
+  videoMirrorMode: document.getElementById('video-mirror-mode'),
+  videoKSlices: document.getElementById('video-k-slices'),
+  videoKSlicesVal: document.getElementById('video-k-slices-val'),
+  videoKaleidoscopeSlicesGroup: document.getElementById('video-kaleidoscope-slices-group'),
   btnDuplicateVideo: document.getElementById('btn-duplicate-video'),
   btnDeleteVideo: document.getElementById('btn-delete-video'),
   btnAddVideo: document.getElementById('btn-add-video'),
   videoFileInput: document.getElementById('video-file-input'),
+  videoBrightness: document.getElementById('video-brightness'),
+  videoBrightnessVal: document.getElementById('video-brightness-val'),
+  videoContrast: document.getElementById('video-contrast'),
+  videoContrastVal: document.getElementById('video-contrast-val'),
+
 
   // Graphic Settings Section References
   graphicSettingsSection: document.getElementById('graphic-settings-section'),
@@ -173,6 +183,11 @@ export const UI = {
   graphicFlickerIntensity: document.getElementById('graphic-flicker-intensity'),
   graphicFlickerIntensityVal: document.getElementById('graphic-flicker-intensity-val'),
   btnDeleteGraphic: document.getElementById('btn-delete-graphic'),
+  graphicBrightness: document.getElementById('graphic-brightness'),
+  graphicBrightnessVal: document.getElementById('graphic-brightness-val'),
+  graphicContrast: document.getElementById('graphic-contrast'),
+  graphicContrastVal: document.getElementById('graphic-contrast-val'),
+
 
   // Timeline Panel References
   btnAddTextNew: document.getElementById('btn-add-text-new'),

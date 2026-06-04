@@ -2,6 +2,14 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.4.0] - 2026-06-04
+
+### Added
+- **Unified Track Reordering**: Every visual element (background videos, graphic overlays, and text overlays) is now integrated into a single unified timeline track system. Dragging any visual block vertically reorders it dynamically, with empty tracks automatically compressed and normalized on drag end.
+- **Layer Drawing Z-Index Hierarchy**: Track indices dynamically determine the canvas rendering order. Elements on Track 0 render in the background behind the isolated depth zoom layers, while elements on Track 1+ render as foreground overlays on top of the depth stack in ascending order.
+- **Foreground Video Overlays**: Added support for drawing video background blocks as full-screen foreground overlays when dragged onto Track 1 or higher.
+- **Visual Indicator Icons**: Updated the timeline toolbar buttons for adding text, replacing plain plus signs with custom inline SVG icons showing a letter "T" and a small plus symbol (and an outer box layout for "New Track") to match the visual language of other tools.
+
 ## [1.3.0] - 2026-06-01
 
 ### Added

@@ -78,13 +78,30 @@ function clampVideoIntervals() {
   });
 }
 
-export function normalizeTextTracks() {
-  const uniqueIndices = [...new Set(state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0))].sort((a, b) => a - b);
+export function normalizeTracks() {
+  const indices = [];
+  state.texts.forEach(t => indices.push(t.trackIndex !== undefined ? t.trackIndex : 0));
+  state.graphics.forEach(g => indices.push(g.trackIndex !== undefined ? g.trackIndex : 0));
+  if (state.videoBlocks) {
+    state.videoBlocks.forEach(v => indices.push(v.trackIndex !== undefined ? v.trackIndex : 0));
+  }
+
+  const uniqueIndices = [...new Set(indices)].sort((a, b) => a - b);
+  
   state.texts.forEach(t => {
     const oldIdx = t.trackIndex !== undefined ? t.trackIndex : 0;
     t.trackIndex = uniqueIndices.indexOf(oldIdx);
   });
-  state.texts.sort((a, b) => (a.trackIndex || 0) - (b.trackIndex || 0));
+  state.graphics.forEach(g => {
+    const oldIdx = g.trackIndex !== undefined ? g.trackIndex : 0;
+    g.trackIndex = uniqueIndices.indexOf(oldIdx);
+  });
+  if (state.videoBlocks) {
+    state.videoBlocks.forEach(v => {
+      const oldIdx = v.trackIndex !== undefined ? v.trackIndex : 0;
+      v.trackIndex = uniqueIndices.indexOf(oldIdx);
+    });
+  }
 }
 
 export function updateTimelineTracks() {
@@ -94,21 +111,43 @@ export function updateTimelineTracks() {
   clampVideoIntervals();
   UI.timelineTracks.innerHTML = '';
   
-  if (state.texts.length === 0 && !state.audioTrack && state.graphics.length === 0 && (!state.videoBlocks || state.videoBlocks.length === 0) && state.glitchTriggers.length === 0) {
+  const totalVisuals = state.texts.length + state.graphics.length + (state.videoBlocks ? state.videoBlocks.length : 0);
+  if (totalVisuals === 0 && !state.audioTrack && state.glitchTriggers.length === 0) {
     UI.timelineTracks.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding-top: 15px; font-family: var(--font-display);">No overlays or soundtrack. Add Text, Graphic, Audio, Video, or Glitch Trigger to start.</div>';
     return;
   }
   
   const dur = getTimelineDuration();
 
-  // 1. Render Video Track (if active)
-  if (state.videoBlocks && state.videoBlocks.length > 0) {
+  // Find maximum track index
+  const indices = [0];
+  state.texts.forEach(t => indices.push(t.trackIndex !== undefined ? t.trackIndex : 0));
+  state.graphics.forEach(g => indices.push(g.trackIndex !== undefined ? g.trackIndex : 0));
+  if (state.videoBlocks) {
+    state.videoBlocks.forEach(v => indices.push(v.trackIndex !== undefined ? v.trackIndex : 0));
+  }
+  const maxTrackIdx = Math.max(...indices);
+
+  // 1. Render Visual Tracks (Highest index at top, lowest at bottom)
+  for (let trackIdx = maxTrackIdx; trackIdx >= 0; trackIdx--) {
+    // Find blocks on this track index
+    const trackTexts = state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === trackIdx);
+    const trackGraphics = state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === trackIdx);
+    const trackVideos = state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === trackIdx) : [];
+
+    if (trackTexts.length === 0 && trackGraphics.length === 0 && trackVideos.length === 0) {
+      // Skip empty tracks to keep timeline clean
+      continue;
+    }
+
     const row = document.createElement('div');
-    row.className = 'timeline-track-row video-track-row';
-    row.dataset.id = 'video_track';
-    row.dataset.type = 'video';
-    
-    state.videoBlocks.forEach((vidObj) => {
+    row.className = 'timeline-track-row unified-track-row';
+    row.dataset.trackIndex = trackIdx;
+    row.dataset.id = `track_${trackIdx}`;
+    row.dataset.type = 'unified';
+
+    // Render Video blocks on this track
+    trackVideos.forEach((vidObj) => {
       const block = document.createElement('div');
       block.className = 'timeline-block video-block' + (vidObj.id === state.selectedVideoId ? ' selected' : '');
       block.dataset.id = vidObj.id;
@@ -128,13 +167,93 @@ export function updateTimelineTracks() {
       cleanLabel.innerText = `🎥 ${truncName}`;
       block.appendChild(cleanLabel);
       
+      const leftHandle = document.createElement('div');
+      leftHandle.className = 'timeline-block-handle left';
+      leftHandle.dataset.handle = 'left';
+      leftHandle.dataset.id = vidObj.id;
+      
+      const rightHandle = document.createElement('div');
+      rightHandle.className = 'timeline-block-handle right';
+      rightHandle.dataset.handle = 'right';
+      rightHandle.dataset.id = vidObj.id;
+      
+      block.appendChild(leftHandle);
+      block.appendChild(rightHandle);
       row.appendChild(block);
     });
-    
+
+    // Render Graphic overlays on this track
+    trackGraphics.forEach((grpObj) => {
+      const block = document.createElement('div');
+      block.className = 'timeline-block graphic-block' + (grpObj.id === state.selectedGraphicId ? ' selected' : '');
+      block.dataset.id = grpObj.id;
+      
+      const startPct = (grpObj.startTime / dur) * 100;
+      const widthPct = ((grpObj.endTime - grpObj.startTime) / dur) * 100;
+      
+      block.style.left = `${startPct}%`;
+      block.style.width = `${widthPct}%`;
+      
+      const cleanLabel = document.createElement('span');
+      cleanLabel.style.pointerEvents = 'none';
+      
+      const truncName = grpObj.fileName && grpObj.fileName.length > 15 
+        ? grpObj.fileName.substring(0, 12) + '...'
+        : grpObj.fileName || 'Graphic';
+      cleanLabel.innerText = `🖼️ ${truncName} (${grpObj.scale}%)`;
+      block.appendChild(cleanLabel);
+      
+      const leftHandle = document.createElement('div');
+      leftHandle.className = 'timeline-block-handle left';
+      leftHandle.dataset.handle = 'left';
+      leftHandle.dataset.id = grpObj.id;
+      
+      const rightHandle = document.createElement('div');
+      rightHandle.className = 'timeline-block-handle right';
+      rightHandle.dataset.handle = 'right';
+      rightHandle.dataset.id = grpObj.id;
+      
+      block.appendChild(leftHandle);
+      block.appendChild(rightHandle);
+      row.appendChild(block);
+    });
+
+    // Render Text blocks on this track
+    trackTexts.forEach((txtObj) => {
+      const block = document.createElement('div');
+      block.className = 'timeline-block' + (txtObj.id === state.selectedTextId ? ' selected' : '');
+      block.dataset.id = txtObj.id;
+      
+      const startPct = (txtObj.startTime / dur) * 100;
+      const widthPct = ((txtObj.endTime - txtObj.startTime) / dur) * 100;
+      
+      block.style.left = `${startPct}%`;
+      block.style.width = `${widthPct}%`;
+      
+      const cleanLabel = document.createElement('span');
+      cleanLabel.style.pointerEvents = 'none';
+      cleanLabel.innerText = txtObj.text || '[Empty Text]';
+      block.appendChild(cleanLabel);
+      
+      const leftHandle = document.createElement('div');
+      leftHandle.className = 'timeline-block-handle left';
+      leftHandle.dataset.handle = 'left';
+      leftHandle.dataset.id = txtObj.id;
+      
+      const rightHandle = document.createElement('div');
+      rightHandle.className = 'timeline-block-handle right';
+      rightHandle.dataset.handle = 'right';
+      rightHandle.dataset.id = txtObj.id;
+      
+      block.appendChild(leftHandle);
+      block.appendChild(rightHandle);
+      row.appendChild(block);
+    });
+
     UI.timelineTracks.appendChild(row);
   }
 
-  // 1.5. Render Audio Track (if active)
+  // 2. Render Audio Track (if active)
   if (state.audioTrack) {
     const track = state.audioTrack;
     const row = document.createElement('div');
@@ -191,97 +310,8 @@ export function updateTimelineTracks() {
     row.appendChild(block);
     UI.timelineTracks.appendChild(row);
   }
-  
-  // 2. Render Text Tracks grouped by trackIndex
-  const uniqueTrackIndices = [...new Set(state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0))];
-  uniqueTrackIndices.sort((a, b) => a - b);
 
-  uniqueTrackIndices.forEach((trackIdx) => {
-    const row = document.createElement('div');
-    row.className = 'timeline-track-row';
-    row.dataset.id = `text_track_${trackIdx}`;
-    row.dataset.type = 'text';
-    row.dataset.trackIndex = trackIdx;
-    
-    const trackTexts = state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === trackIdx);
-    
-    trackTexts.forEach((txtObj) => {
-      const block = document.createElement('div');
-      block.className = 'timeline-block' + (txtObj.id === state.selectedTextId ? ' selected' : '');
-      block.dataset.id = txtObj.id;
-      
-      const startPct = (txtObj.startTime / dur) * 100;
-      const widthPct = ((txtObj.endTime - txtObj.startTime) / dur) * 100;
-      
-      block.style.left = `${startPct}%`;
-      block.style.width = `${widthPct}%`;
-      
-      const cleanLabel = document.createElement('span');
-      cleanLabel.style.pointerEvents = 'none';
-      cleanLabel.innerText = txtObj.text || '[Empty Text]';
-      block.appendChild(cleanLabel);
-      
-      const leftHandle = document.createElement('div');
-      leftHandle.className = 'timeline-block-handle left';
-      leftHandle.dataset.handle = 'left';
-      leftHandle.dataset.id = txtObj.id;
-      
-      const rightHandle = document.createElement('div');
-      rightHandle.className = 'timeline-block-handle right';
-      rightHandle.dataset.handle = 'right';
-      rightHandle.dataset.id = txtObj.id;
-      
-      block.appendChild(leftHandle);
-      block.appendChild(rightHandle);
-      row.appendChild(block);
-    });
-    
-    UI.timelineTracks.appendChild(row);
-  });
-
-  // 3. Render Graphic Tracks
-  state.graphics.forEach((grpObj) => {
-    const row = document.createElement('div');
-    row.className = 'timeline-track-row';
-    row.dataset.id = grpObj.id;
-    row.dataset.type = 'graphic';
-    
-    const block = document.createElement('div');
-    block.className = 'timeline-block graphic-block' + (grpObj.id === state.selectedGraphicId ? ' selected' : '');
-    block.dataset.id = grpObj.id;
-    
-    const startPct = (grpObj.startTime / dur) * 100;
-    const widthPct = ((grpObj.endTime - grpObj.startTime) / dur) * 100;
-    
-    block.style.left = `${startPct}%`;
-    block.style.width = `${widthPct}%`;
-    
-    const cleanLabel = document.createElement('span');
-    cleanLabel.style.pointerEvents = 'none';
-    
-    const truncName = grpObj.fileName && grpObj.fileName.length > 15 
-      ? grpObj.fileName.substring(0, 12) + '...'
-      : grpObj.fileName || 'Graphic';
-    cleanLabel.innerText = `🖼️ ${truncName} (${grpObj.scale}%)`;
-    block.appendChild(cleanLabel);
-    
-    const leftHandle = document.createElement('div');
-    leftHandle.className = 'timeline-block-handle left';
-    leftHandle.dataset.handle = 'left';
-    leftHandle.dataset.id = grpObj.id;
-    
-    const rightHandle = document.createElement('div');
-    rightHandle.className = 'timeline-block-handle right';
-    rightHandle.dataset.handle = 'right';
-    rightHandle.dataset.id = grpObj.id;
-    
-    block.appendChild(leftHandle);
-    block.appendChild(rightHandle);
-    row.appendChild(block);
-    UI.timelineTracks.appendChild(row);
-  });
-
-  // 4. Render Glitch Trigger Track (if any triggers exist)
+  // 3. Render Glitch Trigger Track (if any triggers exist)
   if (state.glitchTriggers && state.glitchTriggers.length > 0) {
     const row = document.createElement('div');
     row.className = 'timeline-track-row glitch-trigger-track-row';
@@ -755,11 +785,34 @@ export function initTimelineEvents() {
             
             vid.startTime = newStart;
             vid.endTime = newEnd;
+
+            // Vertical drag track re-ordering (unified)
+            const dy = e.clientY - lastDragTrackY;
+            if (Math.abs(dy) > 24) {
+              const currentTrackIdx = vid.trackIndex !== undefined ? vid.trackIndex : 0;
+              if (dy > 0 && currentTrackIdx > 0) {
+                vid.trackIndex = currentTrackIdx - 1;
+                lastDragTrackY = e.clientY;
+              } else if (dy < 0) {
+                vid.trackIndex = currentTrackIdx + 1;
+                lastDragTrackY = e.clientY;
+              }
+            }
+          } else if (dragMode === 'resize-left') {
+            let newStart = dragStartBlockStart + dxSec;
+            newStart = Math.max(0, Math.min(vid.endTime - 0.2, newStart));
+            vid.startTime = newStart;
+          } else if (dragMode === 'resize-right') {
+            let newEnd = dragStartBlockEnd + dxSec;
+            newEnd = Math.min(duration, Math.max(vid.startTime + 0.2, newEnd));
+            vid.endTime = newEnd;
           }
           
           if (state.selectedVideoId === vid.id) {
             UI.videoTimelineStart.value = vid.startTime;
-            UI.videoTimelineStartVal.innerText = `${vid.startTime.toFixed(1)}s`;
+            if (UI.videoTimelineStartVal) {
+              UI.videoTimelineStartVal.innerText = `${vid.startTime.toFixed(1)}s`;
+            }
           }
           
           updateTimelineTracks();
@@ -785,19 +838,15 @@ export function initTimelineEvents() {
             grp.startTime = newStart;
             grp.endTime = newEnd;
 
-            // Vertical drag layer re-ordering
+            // Vertical drag track re-ordering (unified)
             const dy = e.clientY - lastDragTrackY;
             if (Math.abs(dy) > 24) {
-              const idx = state.graphics.findIndex(g => g.id === dragTextId);
-              if (dy > 0 && idx < state.graphics.length - 1) {
-                const temp = state.graphics[idx];
-                state.graphics[idx] = state.graphics[idx + 1];
-                state.graphics[idx + 1] = temp;
+              const currentTrackIdx = grp.trackIndex !== undefined ? grp.trackIndex : 0;
+              if (dy > 0 && currentTrackIdx > 0) {
+                grp.trackIndex = currentTrackIdx - 1;
                 lastDragTrackY = e.clientY;
-              } else if (dy < 0 && idx > 0) {
-                const temp = state.graphics[idx];
-                state.graphics[idx] = state.graphics[idx - 1];
-                state.graphics[idx - 1] = temp;
+              } else if (dy < 0) {
+                grp.trackIndex = currentTrackIdx + 1;
                 lastDragTrackY = e.clientY;
               }
             }
@@ -855,15 +904,15 @@ export function initTimelineEvents() {
             txt.startTime = newStart;
             txt.endTime = newEnd;
 
-            // Vertical drag track re-ordering
+            // Vertical drag track re-ordering (unified)
             const dy = e.clientY - lastDragTrackY;
             if (Math.abs(dy) > 24) {
               const currentTrackIdx = txt.trackIndex !== undefined ? txt.trackIndex : 0;
-              if (dy > 0) {
-                txt.trackIndex = currentTrackIdx + 1;
-                lastDragTrackY = e.clientY;
-              } else if (dy < 0 && currentTrackIdx > 0) {
+              if (dy > 0 && currentTrackIdx > 0) {
                 txt.trackIndex = currentTrackIdx - 1;
+                lastDragTrackY = e.clientY;
+              } else if (dy < 0) {
+                txt.trackIndex = currentTrackIdx + 1;
                 lastDragTrackY = e.clientY;
               }
             }
@@ -890,7 +939,7 @@ export function initTimelineEvents() {
       document.body.style.cursor = '';
     }
     if (dragMode === 'move') {
-      normalizeTextTracks();
+      normalizeTracks();
       updateTimelineTracks();
       renderFrame(state.time);
     }

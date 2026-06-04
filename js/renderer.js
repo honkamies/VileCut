@@ -2,10 +2,14 @@ import { state } from './state.js';
 import { UI } from './ui.js';
 import { getTimelineDuration, getAdjustedZoomSpeed, getPseudoRandom } from './utils.js';
 import { GlitchManager } from './glitch.js';
-import { drawTextOverlays, drawGraphicOverlays } from './overlays.js';
+import { drawTextOverlays, drawGraphicOverlays, drawVideoOverlay } from './overlays.js';
 
 export const offscreenCanvas = document.createElement('canvas');
 export const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+export const videoBufferCanvas = document.createElement('canvas');
+export const videoBufferCtx = videoBufferCanvas.getContext('2d');
+export const videoMaskCanvas = document.createElement('canvas');
+export const videoMaskCtx = videoMaskCanvas.getContext('2d');
 export const ctx = UI.mainCanvas.getContext('2d');
 
 export function resizeMainCanvas() {
@@ -64,8 +68,19 @@ export function renderFrame(renderTime) {
   const bw = bufferCanvas.width;
   const bh = bufferCanvas.height;
   
-  const activeBlock = state.videoBlocks ? state.videoBlocks.find(b => renderTime >= b.startTime && renderTime < b.endTime) : null;
+  const activeBlock = state.videoBlocks ? state.videoBlocks.find(b => (b.trackIndex || 0) === 0 && renderTime >= b.startTime && renderTime < b.endTime) : null;
   if (activeBlock && activeBlock.element) {
+    if (videoBufferCanvas.width !== bw || videoBufferCanvas.height !== bh) {
+      videoBufferCanvas.width = bw;
+      videoBufferCanvas.height = bh;
+    }
+    const brightnessVal = activeBlock.brightness !== undefined ? activeBlock.brightness : 100;
+    const contrastVal = activeBlock.contrast !== undefined ? activeBlock.contrast : 100;
+    const monochromeStr = activeBlock.monochrome ? 'grayscale(100%)' : '';
+    videoBufferCtx.filter = `brightness(${brightnessVal}%) contrast(${contrastVal}%) ${monochromeStr}`.trim() || 'none';
+    videoBufferCtx.clearRect(0, 0, bw, bh);
+
+
     const video = activeBlock.element;
     const vw = video.videoWidth || video.width || bw;
     const vh = video.videoHeight || video.height || bh;
@@ -74,11 +89,103 @@ export function renderFrame(renderTime) {
     const drawH = vh * coverScale;
     const drawX = (bw - drawW) / 2;
     const drawY = (bh - drawH) / 2;
-    offscreenCtx.drawImage(video, drawX, drawY, drawW, drawH);
+    videoBufferCtx.drawImage(video, drawX, drawY, drawW, drawH);
+
+    const mode = activeBlock.mirrorMode || 'none';
+    
+    offscreenCtx.fillStyle = '#000000';
+    offscreenCtx.fillRect(0, 0, bw, bh);
+
+    if (mode === 'none') {
+      offscreenCtx.drawImage(videoBufferCanvas, 0, 0);
+    }
+    else if (mode === 'horizontal') {
+      offscreenCtx.drawImage(videoBufferCanvas, 0, 0, bw / 2, bh, 0, 0, bw / 2, bh);
+      offscreenCtx.save();
+      offscreenCtx.translate(bw, 0);
+      offscreenCtx.scale(-1, 1);
+      offscreenCtx.drawImage(videoBufferCanvas, 0, 0, bw / 2, bh, 0, 0, bw / 2, bh);
+      offscreenCtx.restore();
+    }
+    else if (mode === 'vertical') {
+      offscreenCtx.drawImage(videoBufferCanvas, 0, 0, bw, bh / 2, 0, 0, bw, bh / 2);
+      offscreenCtx.save();
+      offscreenCtx.translate(0, bh);
+      offscreenCtx.scale(1, -1);
+      offscreenCtx.drawImage(videoBufferCanvas, 0, 0, bw, bh / 2, 0, 0, bw, bh / 2);
+      offscreenCtx.restore();
+    }
+    else if (mode === 'quad') {
+      const qw = bw / 2;
+      const qh = bh / 2;
+      offscreenCtx.drawImage(videoBufferCanvas, 0, 0, bw / 2, bh / 2, 0, 0, qw, qh);
+      
+      offscreenCtx.save();
+      offscreenCtx.translate(bw, 0);
+      offscreenCtx.scale(-1, 1);
+      offscreenCtx.drawImage(videoBufferCanvas, 0, 0, bw / 2, bh / 2, 0, 0, qw, qh);
+      offscreenCtx.restore();
+
+      offscreenCtx.save();
+      offscreenCtx.translate(0, bh);
+      offscreenCtx.scale(1, -1);
+      offscreenCtx.drawImage(videoBufferCanvas, 0, 0, bw / 2, bh / 2, 0, 0, qw, qh);
+      offscreenCtx.restore();
+
+      offscreenCtx.save();
+      offscreenCtx.translate(bw, bh);
+      offscreenCtx.scale(-1, -1);
+      offscreenCtx.drawImage(videoBufferCanvas, 0, 0, bw / 2, bh / 2, 0, 0, qw, qh);
+      offscreenCtx.restore();
+    }
+    else if (mode === 'kaleidoscope') {
+      const cx = bw / 2;
+      const cy = bh / 2;
+      const radius = Math.sqrt(cx * cx + cy * cy);
+      const slices = activeBlock.kaleidoscopeSlices || 8;
+      const angle = (Math.PI * 2) / slices;
+
+      offscreenCtx.save();
+      offscreenCtx.translate(cx, cy);
+
+      if (videoMaskCanvas.width !== bw || videoMaskCanvas.height !== bh) {
+        videoMaskCanvas.width = bw;
+        videoMaskCanvas.height = bh;
+      }
+      videoMaskCtx.clearRect(0, 0, bw, bh);
+      
+      videoMaskCtx.save();
+      videoMaskCtx.translate(cx, cy);
+      videoMaskCtx.beginPath();
+      videoMaskCtx.moveTo(0, 0);
+      videoMaskCtx.arc(0, 0, radius, -angle / 2, angle / 2);
+      videoMaskCtx.closePath();
+      videoMaskCtx.clip();
+      videoMaskCtx.drawImage(videoBufferCanvas, -cx, -cy, bw, bh);
+      videoMaskCtx.restore();
+
+      for (let s = 0; s < slices; s++) {
+        offscreenCtx.save();
+        offscreenCtx.rotate(s * angle);
+        if (s % 2 === 1) {
+          offscreenCtx.scale(1, -1);
+        }
+        offscreenCtx.drawImage(videoMaskCanvas, -cx, -cy);
+        offscreenCtx.restore();
+      }
+      offscreenCtx.restore();
+    }
   } else {
     offscreenCtx.fillStyle = '#000000';
     offscreenCtx.fillRect(0, 0, bw, bh);
   }
+
+  // Draw Track 0 Graphic Overlays on offscreenCtx (behind zooming layers)
+  drawGraphicOverlays(offscreenCtx, bw, bh, renderTime, 0);
+
+  // Draw Track 0 Text Overlays on offscreenCtx (behind zooming layers)
+  drawTextOverlays(offscreenCtx, bw, bh, renderTime, 0);
+
 
   const dur = getTimelineDuration();
   const speed = getAdjustedZoomSpeed(dur);
@@ -272,11 +379,31 @@ export function renderFrame(renderTime) {
 
 
 
-  // Draw Text Overlays over the final output
-  drawTextOverlays(ctx, canvasW, canvasH, renderTime);
+  // Draw Foreground Tracks (Track 1 and above) sequentially
+  const trackIndices = [0];
+  state.texts.forEach(t => trackIndices.push(t.trackIndex !== undefined ? t.trackIndex : 0));
+  state.graphics.forEach(g => trackIndices.push(g.trackIndex !== undefined ? g.trackIndex : 0));
+  if (state.videoBlocks) {
+    state.videoBlocks.forEach(v => trackIndices.push(v.trackIndex !== undefined ? v.trackIndex : 0));
+  }
+  const maxTrackIdx = Math.max(...trackIndices);
 
-  // Draw Graphic Overlays
-  drawGraphicOverlays(ctx, canvasW, canvasH, renderTime);
+  for (let trackIdx = 1; trackIdx <= maxTrackIdx; trackIdx++) {
+    // 1. Draw video overlays on this track
+    if (state.videoBlocks) {
+      const trackVideos = state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === trackIdx);
+      trackVideos.forEach(vid => {
+        drawVideoOverlay(ctx, canvasW, canvasH, renderTime, vid);
+      });
+    }
+    
+    // 2. Draw graphic overlays on this track
+    drawGraphicOverlays(ctx, canvasW, canvasH, renderTime, trackIdx);
+
+    // 3. Draw text overlays on this track
+    drawTextOverlays(ctx, canvasW, canvasH, renderTime, trackIdx);
+  }
+
 
   // Draw Global Fade In/Out Overlay
   if (state.videoFadeActive) {

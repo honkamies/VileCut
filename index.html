@@ -350,7 +350,50 @@
             <input type="range" id="video-timeline-start" min="0.0" max="60.0" step="0.1" value="0.0">
           </div>
 
-          <div style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
+          <div class="control-group checkbox-group" style="margin-top: 10px;">
+            <label for="video-monochrome">Monochrome Background</label>
+            <input type="checkbox" id="video-monochrome">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <label for="video-mirror-mode">Video Mirror Symmetry</label>
+            <div class="select-wrapper">
+              <select id="video-mirror-mode">
+                <option value="none" selected>No Symmetries</option>
+                <option value="horizontal">Horizontal Mirror (Left ⇄ Right)</option>
+                <option value="vertical">Vertical Mirror (Top ⇄ Bottom)</option>
+                <option value="quad">Quad Mirror (4 Symmetrical Quadrants)</option>
+                <option value="kaleidoscope">Kaleidoscope (Radial Slices)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group" id="video-kaleidoscope-slices-group" style="display: none; margin-top: 10px;">
+            <div class="slider-header">
+              <label for="video-k-slices">Video Radial Slices</label>
+              <span id="video-k-slices-val" class="slider-val">8</span>
+            </div>
+            <input type="range" id="video-k-slices" min="3" max="24" step="1" value="8">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="video-brightness">Video Brightness</label>
+              <span id="video-brightness-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="video-brightness" min="50" max="150" step="1" value="100">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="video-contrast">Video Contrast</label>
+              <span id="video-contrast-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="video-contrast" min="50" max="150" step="1" value="100">
+          </div>
+
+
+          <div style="display: flex; gap: 8px; margin-top: 15px; width: 100%;">
             <button id="btn-duplicate-video" class="btn secondary" style="flex: 1; border-color: rgba(0, 242, 254, 0.25);">
               <i data-lucide="copy"></i> Duplicate
             </button>
@@ -441,6 +484,23 @@
             </div>
             <input type="range" id="graphic-scale" min="5" max="300" step="5" value="100">
           </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="graphic-brightness">Brightness</label>
+              <span id="graphic-brightness-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="graphic-brightness" min="50" max="150" step="1" value="100">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="graphic-contrast">Contrast</label>
+              <span id="graphic-contrast-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="graphic-contrast" min="50" max="150" step="1" value="100">
+          </div>
+
 
           <div class="control-group">
             <div class="slider-header">
@@ -543,10 +603,17 @@
             </div>
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <button id="btn-add-text-new" class="btn secondary small-btn" title="Add Text (New Track)">
-                <i data-lucide="plus-square"></i>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-custom" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">
+                  <path d="M4 8V6h8v2M8 6v9" />
+                  <rect x="2" y="2" width="20" height="20" rx="4" opacity="0.35" />
+                  <path d="M19 13v6M16 16h6" />
+                </svg>
               </button>
               <button id="btn-add-text-same" class="btn secondary small-btn" title="Add Text (Same Track)">
-                <i data-lucide="plus"></i>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-custom" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">
+                  <path d="M5 8V5h10v3M10 5v12M8 17h4" />
+                  <path d="M19 11v6M16 14h6" />
+                </svg>
               </button>
               <button id="btn-add-graphic" class="btn secondary small-btn" title="Add Graphic">
                 <i data-lucide="image"></i>
