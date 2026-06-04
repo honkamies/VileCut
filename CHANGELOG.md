@@ -8,6 +8,9 @@ All notable changes to the Videomaddness application will be documented in this 
 - **Graphic Overlay Glow FX**: Implemented high-performance outer glow styling for timeline graphic overlays using HTML5 Canvas shadow parameters (`shadowColor` and `shadowBlur`).
 - **Glow Parameter Configuration**: Added interactive toggle switch, strength/radius slider (0px to 100px), native color picker, and quick-click neon swatch buttons inside the Graphic Settings panel.
 
+### Fixed
+- **Foreground Overlay Track Normalization**: Resolved a layout bug where the track compressor collapsed all track rows down to Track 0 when there was no background video block present. This forced the lowest foreground overlay onto Track 0, causing it to slip behind the zooming image layers. Normalization now collapses foreground tracks independently starting at Track 1, preserving Track 0 exclusively for background items.
+
 ## [1.4.1] - 2026-06-04
 
 ### Fixed
