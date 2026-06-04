@@ -2,6 +2,11 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.4.1] - 2026-06-04
+
+### Fixed
+- **Independent Overlay Randomness Seeds**: Replaced the previous index-based character seed logic with a unique 16-bit polynomial hash generator derived from each block's unique `id`. Each text overlay layer and graphic overlay layer now animates (jitter, wobble, skew, block glitch offsets, and color splits) completely asynchronously and independently from other layers, while preserving deterministic perfect loops.
+
 ## [1.4.0] - 2026-06-04
 
 ### Added
