@@ -621,6 +621,11 @@ export function selectGraphic(id) {
       
       UI.graphicFlickerIntensity.value = grp.flickerIntensity !== undefined ? grp.flickerIntensity : 0;
       UI.graphicFlickerIntensityVal.innerText = `${grp.flickerIntensity !== undefined ? grp.flickerIntensity : 0}%`;
+      
+      UI.graphicGlowActive.checked = grp.glowActive || false;
+      UI.graphicGlowRadius.value = grp.glowRadius !== undefined ? grp.glowRadius : 20;
+      UI.graphicGlowRadiusVal.innerText = `${grp.glowRadius !== undefined ? grp.glowRadius : 20}px`;
+      UI.graphicGlowColor.value = grp.glowColor || '#ff007f';
     }
   }
   updateTimelineTracks();

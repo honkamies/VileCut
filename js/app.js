@@ -1285,6 +1285,9 @@ document.addEventListener('DOMContentLoaded', () => {
           flickerIntensity: 0,
           brightness: 100,
           contrast: 100,
+          glowActive: false,
+          glowRadius: 20,
+          glowColor: '#ff007f',
           trackIndex: targetTrackIdx
         };
 
@@ -1426,6 +1429,57 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  if (UI.graphicGlowActive) {
+    UI.graphicGlowActive.addEventListener('change', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.glowActive = e.target.checked;
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.graphicGlowRadius) {
+    UI.graphicGlowRadius.addEventListener('input', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.glowRadius = parseInt(e.target.value);
+        if (UI.graphicGlowRadiusVal) {
+          UI.graphicGlowRadiusVal.innerText = `${grp.glowRadius}px`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.graphicGlowColor) {
+    UI.graphicGlowColor.addEventListener('input', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.glowColor = e.target.value;
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  document.querySelectorAll('.graphic-glow-swatch-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        const color = e.currentTarget.getAttribute('data-color');
+        grp.glowColor = color;
+        UI.graphicGlowColor.value = color;
+        renderFrame(state.time);
+      }
+    });
+  });
+
 
 
   // Timeline Navigation Jump Bindings

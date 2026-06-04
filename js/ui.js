@@ -187,6 +187,11 @@ export const UI = {
   graphicBrightnessVal: document.getElementById('graphic-brightness-val'),
   graphicContrast: document.getElementById('graphic-contrast'),
   graphicContrastVal: document.getElementById('graphic-contrast-val'),
+  graphicGlowActive: document.getElementById('graphic-glow-active'),
+  graphicGlowRadius: document.getElementById('graphic-glow-radius'),
+  graphicGlowRadiusVal: document.getElementById('graphic-glow-radius-val'),
+  graphicGlowColor: document.getElementById('graphic-glow-color'),
+
 
 
   // Timeline Panel References

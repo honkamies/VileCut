@@ -2,6 +2,12 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.5.0] - 2026-06-04
+
+### Added
+- **Graphic Overlay Glow FX**: Implemented high-performance outer glow styling for timeline graphic overlays using HTML5 Canvas shadow parameters (`shadowColor` and `shadowBlur`).
+- **Glow Parameter Configuration**: Added interactive toggle switch, strength/radius slider (0px to 100px), native color picker, and quick-click neon swatch buttons inside the Graphic Settings panel.
+
 ## [1.4.1] - 2026-06-04
 
 ### Fixed

@@ -501,6 +501,33 @@
             <input type="range" id="graphic-contrast" min="50" max="150" step="1" value="100">
           </div>
 
+          <div class="control-group-switch" style="margin-top: 10px;">
+            <label class="switch-label" for="graphic-glow-active">Glow Effect</label>
+            <input type="checkbox" id="graphic-glow-active">
+          </div>
+
+          <div class="grid-2-col" style="margin-top: 10px; margin-bottom: 5px;">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="graphic-glow-radius">Glow Strength</label>
+                <span id="graphic-glow-radius-val" class="slider-val">20px</span>
+              </div>
+              <input type="range" id="graphic-glow-radius" min="0" max="100" step="1" value="20">
+            </div>
+
+            <div class="control-group">
+              <label for="graphic-glow-color">Glow Color</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="color" id="graphic-glow-color" value="#ff007f" style="width: 40px; height: 38px; border: 1px solid var(--border-subtle); border-radius: 6px; cursor: pointer; padding: 0; background: none; box-sizing: border-box;">
+                <div class="palette-swatches" style="display: flex; gap: 4px;">
+                  <button class="graphic-glow-swatch-btn" data-color="#ff007f" style="background:#ff007f; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Pink"></button>
+                  <button class="graphic-glow-swatch-btn" data-color="#00f2fe" style="background:#00f2fe; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Cyan"></button>
+                  <button class="graphic-glow-swatch-btn" data-color="#39ff14" style="background:#39ff14; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Neon Green"></button>
+                  <button class="graphic-glow-swatch-btn" data-color="#ffffff" style="background:#ffffff; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="White"></button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div class="control-group">
             <div class="slider-header">

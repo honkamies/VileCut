@@ -489,6 +489,13 @@ export function drawGraphicOverlays(renderCtx, w, h, time, trackIdx) {
       
       renderCtx.translate(dx, dy);
       
+      if (grp.glowActive && grp.glowRadius > 0) {
+        renderCtx.shadowColor = grp.glowColor || '#ff007f';
+        renderCtx.shadowBlur = grp.glowRadius * scaleMultiplier;
+        renderCtx.shadowOffsetX = 0;
+        renderCtx.shadowOffsetY = 0;
+      }
+      
       if ('filter' in renderCtx) {
         const brightnessVal = grp.brightness !== undefined ? grp.brightness : 100;
         const contrastVal = grp.contrast !== undefined ? grp.contrast : 100;
