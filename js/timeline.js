@@ -86,20 +86,34 @@ export function normalizeTracks() {
     state.videoBlocks.forEach(v => indices.push(v.trackIndex !== undefined ? v.trackIndex : 0));
   }
 
-  const uniqueIndices = [...new Set(indices)].sort((a, b) => a - b);
+  // Separate Track 0 (Background) from Track 1+ (Foreground) to prevent foreground elements from slipping behind looping depth layers
+  const foregroundIndices = indices.filter(idx => idx >= 1);
+  const uniqueForeground = [...new Set(foregroundIndices)].sort((a, b) => a - b);
   
   state.texts.forEach(t => {
     const oldIdx = t.trackIndex !== undefined ? t.trackIndex : 0;
-    t.trackIndex = uniqueIndices.indexOf(oldIdx);
+    if (oldIdx === 0) {
+      t.trackIndex = 0;
+    } else {
+      t.trackIndex = uniqueForeground.indexOf(oldIdx) + 1;
+    }
   });
   state.graphics.forEach(g => {
     const oldIdx = g.trackIndex !== undefined ? g.trackIndex : 0;
-    g.trackIndex = uniqueIndices.indexOf(oldIdx);
+    if (oldIdx === 0) {
+      g.trackIndex = 0;
+    } else {
+      g.trackIndex = uniqueForeground.indexOf(oldIdx) + 1;
+    }
   });
   if (state.videoBlocks) {
     state.videoBlocks.forEach(v => {
       const oldIdx = v.trackIndex !== undefined ? v.trackIndex : 0;
-      v.trackIndex = uniqueIndices.indexOf(oldIdx);
+      if (oldIdx === 0) {
+        v.trackIndex = 0;
+      } else {
+        v.trackIndex = uniqueForeground.indexOf(oldIdx) + 1;
+      }
     });
   }
 }
