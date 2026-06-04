@@ -136,9 +136,14 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
     renderCtx.save();
     
     const scaleMultiplier = w / 1024;
-    const seed = textObj.id.charCodeAt(5) || 12;
     
-    // 1. Idle Jitter: Rapid hand-drawn/CRT style coordinate displacement offsets
+    // Generate a unique 16-bit hash seed from the text block's ID
+    let seed = 0;
+    for (let i = 0; i < textObj.id.length; i++) {
+      seed = (seed * 31 + textObj.id.charCodeAt(i)) & 0xffff;
+    }
+    
+    // 1. Idle Jitter: Rapid CRT style coordinate displacement offsets
     const jitterMax = textObj.idleWobble !== undefined ? textObj.idleWobble : 5.0;
     let jitterX = 0;
     let jitterY = 0;
@@ -240,7 +245,7 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
       }
       renderCtx.scale(scaleVal, scaleVal);
       
-      const wobbleAngle = (1 - f) * 20 * (Math.PI / 180) * (textObj.id.charCodeAt(5) % 2 === 0 ? 1 : -1);
+      const wobbleAngle = (1 - f) * 20 * (Math.PI / 180) * (seed % 2 === 0 ? 1 : -1);
       renderCtx.rotate(wobbleAngle);
     }
     
@@ -273,13 +278,13 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
         renderCtx.clip();
         
         const baseSlideX = slideDirection * Math.pow(sliceProgress, 1.2) * (w * 0.65);
-        const seed = textObj.id.charCodeAt(0) + i * 23;
-        const sliceNoiseX = (getPseudoRandom(seed + time * 20) - 0.5) * 120 * sliceProgress;
-        const sliceNoiseY = (getPseudoRandom(seed + time * 25 + 7) - 0.5) * 20 * sliceProgress;
+        const sliceSeed = seed + i * 23;
+        const sliceNoiseX = (getPseudoRandom(sliceSeed + time * 20) - 0.5) * 120 * sliceProgress;
+        const sliceNoiseY = (getPseudoRandom(sliceSeed + time * 25 + 7) - 0.5) * 20 * sliceProgress;
         
         let extraShift = 0;
-        if (sliceProgress > 0.05 && getPseudoRandom(seed + time * 37) < sliceProgress * 0.45) {
-          extraShift = (getPseudoRandom(seed + time * 47) - 0.5) * 180 * sliceProgress;
+        if (sliceProgress > 0.05 && getPseudoRandom(sliceSeed + time * 37) < sliceProgress * 0.45) {
+          extraShift = (getPseudoRandom(sliceSeed + time * 47) - 0.5) * 180 * sliceProgress;
         }
         
         renderCtx.translate(baseSlideX + sliceNoiseX + extraShift, sliceNoiseY);
@@ -290,7 +295,7 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
       if (sliceProgress > 0.05) {
         const numBlocks = Math.floor(sliceProgress * 5);
         for (let b = 0; b < numBlocks; b++) {
-          const bSeed = textObj.id.charCodeAt(1) + b * 41 + time * 15;
+          const bSeed = seed + b * 41 + time * 15;
           if (getPseudoRandom(bSeed) < 0.4) {
             const blockW = textWidth * (0.15 + getPseudoRandom(bSeed + 1) * 0.45);
             const blockH = textHeight * (0.08 + getPseudoRandom(bSeed + 2) * 0.22);
@@ -325,13 +330,13 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
         renderCtx.rect(-textWidth * 2, y1, textWidth * 4, H_slice);
         renderCtx.clip();
         
-        const seed = textObj.id.charCodeAt(0) + i * 31;
-        const sliceNoiseX = (getPseudoRandom(seed + time * 30) - 0.5) * 45 * sliceProgress;
-        const sliceNoiseY = (getPseudoRandom(seed + time * 35 + 3) - 0.5) * 8 * sliceProgress;
+        const sliceSeed = seed + i * 31;
+        const sliceNoiseX = (getPseudoRandom(sliceSeed + time * 30) - 0.5) * 45 * sliceProgress;
+        const sliceNoiseY = (getPseudoRandom(sliceSeed + time * 35 + 3) - 0.5) * 8 * sliceProgress;
         
         let extraShift = 0;
-        if (sliceProgress > 0.05 && getPseudoRandom(seed + time * 43) < sliceProgress * 0.5) {
-          extraShift = (getPseudoRandom(seed + time * 53) - 0.5) * 75 * sliceProgress;
+        if (sliceProgress > 0.05 && getPseudoRandom(sliceSeed + time * 43) < sliceProgress * 0.5) {
+          extraShift = (getPseudoRandom(sliceSeed + time * 53) - 0.5) * 75 * sliceProgress;
         }
         
         renderCtx.translate(sliceNoiseX + extraShift, sliceNoiseY);
@@ -342,7 +347,7 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
       if (sliceProgress > 0.05) {
         const numBlocks = Math.floor(sliceProgress * 6);
         for (let b = 0; b < numBlocks; b++) {
-          const bSeed = textObj.id.charCodeAt(1) + b * 53 + time * 18;
+          const bSeed = seed + b * 53 + time * 18;
           if (getPseudoRandom(bSeed) < 0.45) {
             const blockW = textWidth * (0.1 + getPseudoRandom(bSeed + 1) * 0.5);
             const blockH = textHeight * (0.05 + getPseudoRandom(bSeed + 2) * 0.25);
@@ -386,9 +391,9 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
         
         const scatterProgress = 1 - fChar;
         
-        const seedX = idx * 17.1 + 1.3;
-        const seedY = idx * 29.3 + 4.7;
-        const seedR = idx * 41.5 + 8.1;
+        const seedX = seed + idx * 17.1 + 1.3;
+        const seedY = seed + idx * 29.3 + 4.7;
+        const seedR = seed + idx * 41.5 + 8.1;
         
         const randX = getPseudoRandom(seedX) * 2 - 1;
         const randY = getPseudoRandom(seedY) * 2 - 1;
@@ -443,13 +448,19 @@ export function drawGraphicOverlays(renderCtx, w, h, time, trackIdx) {
 
       renderCtx.save();
       
+      // Generate a unique 16-bit hash seed from the graphic block's ID
+      let grpSeed = 0;
+      for (let i = 0; i < grp.id.length; i++) {
+        grpSeed = (grpSeed * 31 + grp.id.charCodeAt(i)) & 0xffff;
+      }
+      
       const cx = w / 2;
       const cy = h / 2;
       let dx = cx + grp.x * w;
       let dy = cy + grp.y * h;
       
       const frameIdx = Math.floor(loopTime * 30);
-      const randGlitch = getPseudoRandom(frameIdx + 201.55);
+      const randGlitch = getPseudoRandom(frameIdx + grpSeed + 201.55);
       const shouldGlitch = randGlitch < (grp.glitchFrequency / 100);
       
       // Scale proportionally relative to canvas width (base width = 1024)
@@ -457,14 +468,14 @@ export function drawGraphicOverlays(renderCtx, w, h, time, trackIdx) {
       
       if (shouldGlitch) {
         const maxDisplace = (grp.glitchAmplitude / 100) * 80 * scaleMultiplier;
-        dx += (getPseudoRandom(frameIdx + 301.11) - 0.5) * 2 * maxDisplace;
-        dy += (getPseudoRandom(frameIdx + 401.22) - 0.5) * 2 * maxDisplace;
+        dx += (getPseudoRandom(frameIdx + grpSeed + 301.11) - 0.5) * 2 * maxDisplace;
+        dy += (getPseudoRandom(frameIdx + grpSeed + 401.22) - 0.5) * 2 * maxDisplace;
       }
       
       let alpha = 1.0;
       if (grp.flickerIntensity > 0) {
         const flickerSpeed = 20.0;
-        const noiseVal = getPseudoRandom(Math.floor(loopTime * flickerSpeed) + 707.07);
+        const noiseVal = getPseudoRandom(Math.floor(loopTime * flickerSpeed) + grpSeed + 707.07);
         alpha = 1.0 - (noiseVal * (grp.flickerIntensity / 100));
       }
       
@@ -504,12 +515,12 @@ export function drawGraphicOverlays(renderCtx, w, h, time, trackIdx) {
       if (shouldGlitch && grp.glitchAmplitude > 0) {
         const blockCount = Math.floor(1 + (grp.glitchAmplitude / 100) * 5);
         for (let b = 0; b < blockCount; b++) {
-          const bw = (getPseudoRandom(frameIdx + b * 2) * 0.3 + 0.05) * finalW;
-          const bh = (getPseudoRandom(frameIdx + b * 3) * 0.15 + 0.03) * finalH;
-          const bx = (getPseudoRandom(frameIdx + b * 4) - 0.5) * finalW;
-          const by = (getPseudoRandom(frameIdx + b * 5) - 0.5) * finalH;
+          const bw = (getPseudoRandom(frameIdx + grpSeed + b * 2) * 0.3 + 0.05) * finalW;
+          const bh = (getPseudoRandom(frameIdx + grpSeed + b * 3) * 0.15 + 0.03) * finalH;
+          const bx = (getPseudoRandom(frameIdx + grpSeed + b * 4) - 0.5) * finalW;
+          const by = (getPseudoRandom(frameIdx + grpSeed + b * 5) - 0.5) * finalH;
           
-          const isWhite = getPseudoRandom(frameIdx + b * 6) < 0.7;
+          const isWhite = getPseudoRandom(frameIdx + grpSeed + b * 6) < 0.7;
           renderCtx.fillStyle = isWhite ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.4)';
           renderCtx.fillRect(bx, by, bw, bh);
         }
