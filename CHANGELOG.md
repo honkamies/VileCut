@@ -2,6 +2,11 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.5.2] - 2026-06-05
+
+### Fixed
+- **Robust Video Seek Waiting**: Increased the offline rendering seek safety timeout from 500ms to 3000ms and implemented `clearTimeout` cleanups in the event listeners. High-bitrate or long-keyframe-interval background videos undergo heavy CPU load during exports, occasionally requiring more than 500ms to seek. If the safety timeout fires prematurely, the exporter renders stale frames, producing laggy playback in the finalized exports. Raising this safety margin to 3 seconds gives slower seeks ample time to complete, eliminating export lag completely without slowing down normal fast seeks.
+
 ## [1.5.1] - 2026-06-05
 
 ### Fixed
