@@ -2,6 +2,12 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.5.1] - 2026-06-05
+
+### Fixed
+- **Video Settings UI Desynchronization**: Resolved a bug where selecting or duplicating a video timeline block failed to update the sidebar's monochrome, mirror symmetry, kaleidoscope slices, brightness, and contrast settings, causing parameters to show out-of-sync values from previously active blocks.
+- **Background Video Export Stutter/Lag**: Increased the offline rendering seek safety timeout from 100ms to 500ms. High-bitrate color background videos undergoing CPU-heavy encoding seeks often exceeded 100ms, causing the exporter to capture stale frames prematurely and leading to stuttering/lagging playback in the finalized MP4/WebM files.
+
 ## [1.5.0] - 2026-06-04
 
 ### Added

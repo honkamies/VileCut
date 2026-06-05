@@ -543,6 +543,33 @@ export function selectVideo(id) {
           UI.videoTimelineStartVal.innerText = `${block.startTime.toFixed(1)}s`;
         }
       }
+      if (UI.videoMonochrome) {
+        UI.videoMonochrome.checked = block.monochrome || false;
+      }
+      if (UI.videoMirrorMode) {
+        UI.videoMirrorMode.value = block.mirrorMode || 'none';
+        if (UI.videoKaleidoscopeSlicesGroup) {
+          UI.videoKaleidoscopeSlicesGroup.style.display = (block.mirrorMode === 'kaleidoscope') ? 'flex' : 'none';
+        }
+      }
+      if (UI.videoKSlices) {
+        UI.videoKSlices.value = block.kaleidoscopeSlices || 8;
+        if (UI.videoKSlicesVal) {
+          UI.videoKSlicesVal.innerText = block.kaleidoscopeSlices || 8;
+        }
+      }
+      if (UI.videoBrightness) {
+        UI.videoBrightness.value = block.brightness !== undefined ? block.brightness : 100;
+        if (UI.videoBrightnessVal) {
+          UI.videoBrightnessVal.innerText = `${UI.videoBrightness.value}%`;
+        }
+      }
+      if (UI.videoContrast) {
+        UI.videoContrast.value = block.contrast !== undefined ? block.contrast : 100;
+        if (UI.videoContrastVal) {
+          UI.videoContrastVal.innerText = `${UI.videoContrast.value}%`;
+        }
+      }
     }
   }
   updateTimelineTracks();

@@ -286,7 +286,7 @@ export class VideoExporter {
             };
             video.addEventListener('seeked', onSeeked);
             video.currentTime = relativeTime;
-            setTimeout(onSeeked, 100);
+            setTimeout(onSeeked, 500);
           });
         }
         
@@ -492,7 +492,7 @@ export class VideoExporter {
           };
           video.addEventListener('seeked', onSeeked);
           video.currentTime = relativeTime;
-          setTimeout(onSeeked, 100);
+          setTimeout(onSeeked, 500);
         });
       }
 
