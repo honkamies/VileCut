@@ -278,15 +278,17 @@ export class VideoExporter {
           const relativeTime = loopTime - activeBlock.startTime;
           await new Promise(resolve => {
             let resolved = false;
+            let timeoutId = null;
             const onSeeked = () => {
               if (resolved) return;
               resolved = true;
+              if (timeoutId) clearTimeout(timeoutId);
               video.removeEventListener('seeked', onSeeked);
               resolve();
             };
             video.addEventListener('seeked', onSeeked);
             video.currentTime = relativeTime;
-            setTimeout(onSeeked, 500);
+            timeoutId = setTimeout(onSeeked, 3000);
           });
         }
         
@@ -484,15 +486,17 @@ export class VideoExporter {
         const relativeTime = loopTime - activeBlock.startTime;
         await new Promise(resolve => {
           let resolved = false;
+          let timeoutId = null;
           const onSeeked = () => {
             if (resolved) return;
             resolved = true;
+            if (timeoutId) clearTimeout(timeoutId);
             video.removeEventListener('seeked', onSeeked);
             resolve();
           };
           video.addEventListener('seeked', onSeeked);
           video.currentTime = relativeTime;
-          setTimeout(onSeeked, 500);
+          timeoutId = setTimeout(onSeeked, 3000);
         });
       }
 
