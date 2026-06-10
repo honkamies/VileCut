@@ -22,7 +22,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VIDEOMADDNESS</h1>
-        <span class="version-tag">v1.5.2</span>
+        <span class="version-tag">v1.6.0</span>
       </div>
       <div class="header-actions">
         <div id="fps-monitor" class="monitor-badge">
@@ -328,7 +328,24 @@
             <input type="range" id="audio-volume" min="0" max="100" step="5" value="80">
           </div>
 
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="audio-fade-in">Fade In Duration</label>
+              <span id="audio-fade-in-val" class="slider-val">0.0s</span>
+            </div>
+            <input type="range" id="audio-fade-in" min="0.0" max="5.0" step="0.1" value="0.0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="audio-fade-out">Fade Out Duration</label>
+              <span id="audio-fade-out-val" class="slider-val">0.0s</span>
+            </div>
+            <input type="range" id="audio-fade-out" min="0.0" max="5.0" step="0.1" value="0.0">
+          </div>
+
           <button id="btn-delete-audio" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
+
             <i data-lucide="trash-2"></i> Delete Soundtrack
           </button>
         </div>

@@ -1544,6 +1544,8 @@ document.addEventListener('DOMContentLoaded', () => {
           sourceOffset: 0.0,
           duration: audioBuffer.duration,
           volume: 0.8,
+          fadeInDuration: 0.0,
+          fadeOutDuration: 0.0,
           peaks: peaks
         };
         
@@ -1578,6 +1580,36 @@ document.addEventListener('DOMContentLoaded', () => {
     UI.audioVolumeVal.innerText = `${e.target.value}%`;
     if (activeAudioGain) {
       activeAudioGain.gain.value = vol;
+    }
+  });
+
+  UI.audioVolume.addEventListener('change', () => {
+    if (state.isPlaying) {
+      syncAudioPlayback();
+    }
+  });
+
+  UI.audioFadeIn.addEventListener('input', (e) => {
+    if (!state.audioTrack) return;
+    state.audioTrack.fadeInDuration = parseFloat(e.target.value);
+    UI.audioFadeInVal.innerText = `${state.audioTrack.fadeInDuration.toFixed(1)}s`;
+  });
+
+  UI.audioFadeIn.addEventListener('change', () => {
+    if (state.isPlaying) {
+      syncAudioPlayback();
+    }
+  });
+
+  UI.audioFadeOut.addEventListener('input', (e) => {
+    if (!state.audioTrack) return;
+    state.audioTrack.fadeOutDuration = parseFloat(e.target.value);
+    UI.audioFadeOutVal.innerText = `${state.audioTrack.fadeOutDuration.toFixed(1)}s`;
+  });
+
+  UI.audioFadeOut.addEventListener('change', () => {
+    if (state.isPlaying) {
+      syncAudioPlayback();
     }
   });
 

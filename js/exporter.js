@@ -166,15 +166,14 @@ export class VideoExporter {
 
         // Schedule soundtrack instances
         for (let loopStartTime = 0; loopStartTime < duration; loopStartTime += dur) {
-          const playStart = loopStartTime + track.timelineStart;
-          const playEnd = playStart + track.duration;
-          const loopEnd = loopStartTime + dur;
+          const loopPlayStart = loopStartTime + Math.max(track.timelineStart, 0.0);
+          const loopPlayEnd = loopStartTime + Math.min(track.timelineStart + track.duration, dur);
           
-          const actualStart = Math.max(playStart, 0);
-          const actualEnd = Math.min(playEnd, loopEnd, duration);
+          const actualStart = loopPlayStart;
+          const actualEnd = Math.min(loopPlayEnd, duration);
           
           if (actualStart < actualEnd) {
-            const relativeOffset = actualStart - playStart;
+            const relativeOffset = Math.max(track.timelineStart, 0.0) - track.timelineStart;
             const filePlayStart = track.sourceOffset + relativeOffset;
             const playDuration = actualEnd - actualStart;
             
@@ -183,7 +182,43 @@ export class VideoExporter {
               source.buffer = track.buffer;
               
               const gainNode = offlineCtx.createGain();
-              gainNode.gain.value = track.volume !== undefined ? track.volume : 0.8;
+              const targetVol = track.volume !== undefined ? track.volume : 0.8;
+              const fadeInDur = track.fadeInDuration || 0;
+              const fadeOutDur = track.fadeOutDuration || 0;
+
+              gainNode.gain.setValueAtTime(0, actualStart);
+
+              const fadeInEnd = loopPlayStart + fadeInDur;
+              const fadeOutStart = Math.max(fadeInEnd, loopPlayEnd - fadeOutDur);
+              const actualFadeOutDur = loopPlayEnd - fadeOutStart;
+
+              if (fadeInDur > 0) {
+                if (actualStart < fadeInEnd) {
+                  const elapsed = actualStart - loopPlayStart;
+                  const startVol = targetVol * Math.max(0, Math.min(1, elapsed / fadeInDur));
+                  gainNode.gain.setValueAtTime(startVol, actualStart);
+                  gainNode.gain.linearRampToValueAtTime(targetVol, Math.min(fadeInEnd, actualEnd));
+                } else {
+                  gainNode.gain.setValueAtTime(targetVol, actualStart);
+                }
+              } else {
+                gainNode.gain.setValueAtTime(targetVol, actualStart);
+              }
+
+              if (actualFadeOutDur > 0) {
+                if (actualStart < fadeOutStart) {
+                  const safeFadeOutStart = Math.min(fadeOutStart, actualEnd);
+                  if (safeFadeOutStart > actualStart) {
+                    gainNode.gain.setValueAtTime(targetVol, safeFadeOutStart);
+                  }
+                  gainNode.gain.linearRampToValueAtTime(0, Math.min(loopPlayEnd, actualEnd));
+                } else {
+                  const remaining = loopPlayEnd - actualStart;
+                  const startVol = targetVol * Math.max(0, Math.min(1, remaining / actualFadeOutDur));
+                  gainNode.gain.setValueAtTime(startVol, actualStart);
+                  gainNode.gain.linearRampToValueAtTime(0, Math.min(loopPlayEnd, actualEnd));
+                }
+              }
               
               source.connect(gainNode);
               gainNode.connect(offlineCtx.destination);

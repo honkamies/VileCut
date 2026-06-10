@@ -509,6 +509,14 @@ export function selectAudio(isSelected) {
     
     UI.audioVolume.value = Math.round(track.volume * 100);
     UI.audioVolumeVal.innerText = `${Math.round(track.volume * 100)}%`;
+    
+    const fadeInDur = track.fadeInDuration !== undefined ? track.fadeInDuration : 0.0;
+    UI.audioFadeIn.value = fadeInDur;
+    UI.audioFadeInVal.innerText = `${fadeInDur.toFixed(1)}s`;
+
+    const fadeOutDur = track.fadeOutDuration !== undefined ? track.fadeOutDuration : 0.0;
+    UI.audioFadeOut.value = fadeOutDur;
+    UI.audioFadeOutVal.innerText = `${fadeOutDur.toFixed(1)}s`;
   }
   updateTimelineTracks();
 }

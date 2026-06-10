@@ -27,6 +27,55 @@ export function stopAudioSource() {
   activeAudioGain = null;
 }
 
+function scheduleVolumeEnvelope(gainNode, ctx, track, loopTime, dur) {
+  const targetVol = track.volume !== undefined ? track.volume : 0.8;
+  const fadeInDur = track.fadeInDuration || 0;
+  const fadeOutDur = track.fadeOutDuration || 0;
+
+  const audibleStart = Math.max(track.timelineStart, 0.0);
+  const audibleEnd = Math.min(track.timelineStart + track.duration, dur);
+
+  const tAudibleStart = ctx.currentTime - (loopTime - audibleStart);
+  const tAudibleEnd = ctx.currentTime + (audibleEnd - loopTime);
+
+  const actualStart = ctx.currentTime;
+  const actualEnd = tAudibleEnd;
+
+  gainNode.gain.setValueAtTime(0, actualStart);
+
+  const fadeInEnd = tAudibleStart + fadeInDur;
+  const fadeOutStart = Math.max(fadeInEnd, tAudibleEnd - fadeOutDur);
+  const actualFadeOutDur = tAudibleEnd - fadeOutStart;
+
+  if (fadeInDur > 0) {
+    if (actualStart < fadeInEnd) {
+      const elapsed = actualStart - tAudibleStart;
+      const startVol = targetVol * Math.max(0, Math.min(1, elapsed / fadeInDur));
+      gainNode.gain.setValueAtTime(startVol, actualStart);
+      gainNode.gain.linearRampToValueAtTime(targetVol, Math.min(fadeInEnd, actualEnd));
+    } else {
+      gainNode.gain.setValueAtTime(targetVol, actualStart);
+    }
+  } else {
+    gainNode.gain.setValueAtTime(targetVol, actualStart);
+  }
+
+  if (actualFadeOutDur > 0) {
+    if (actualStart < fadeOutStart) {
+      const safeFadeOutStart = Math.min(fadeOutStart, actualEnd);
+      if (safeFadeOutStart > actualStart) {
+        gainNode.gain.setValueAtTime(targetVol, safeFadeOutStart);
+      }
+      gainNode.gain.linearRampToValueAtTime(0, Math.min(tAudibleEnd, actualEnd));
+    } else {
+      const remaining = tAudibleEnd - actualStart;
+      const startVol = targetVol * Math.max(0, Math.min(1, remaining / actualFadeOutDur));
+      gainNode.gain.setValueAtTime(startVol, actualStart);
+      gainNode.gain.linearRampToValueAtTime(0, Math.min(tAudibleEnd, actualEnd));
+    }
+  }
+}
+
 export function syncAudioPlayback() {
   stopAudioSource();
 
@@ -60,7 +109,7 @@ export function syncAudioPlayback() {
         source.buffer = track.buffer;
 
         const gainNode = ctx.createGain();
-        gainNode.gain.value = track.volume !== undefined ? track.volume : 0.8;
+        scheduleVolumeEnvelope(gainNode, ctx, track, loopTime, dur);
 
         source.connect(gainNode);
         gainNode.connect(ctx.destination);
@@ -103,7 +152,7 @@ export function syncExportAudio(renderTime, lastLoopIndex) {
         source.buffer = track.buffer;
         
         const gainNode = ctx.createGain();
-        gainNode.gain.value = track.volume !== undefined ? track.volume : 0.8;
+        scheduleVolumeEnvelope(gainNode, ctx, track, loopTime, dur);
         
         source.connect(gainNode);
         gainNode.connect(exportAudioNode);

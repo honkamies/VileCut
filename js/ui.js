@@ -140,6 +140,10 @@ export const UI = {
   audioTimelineStartVal: document.getElementById('audio-timeline-start-val'),
   audioVolume: document.getElementById('audio-volume'),
   audioVolumeVal: document.getElementById('audio-volume-val'),
+  audioFadeIn: document.getElementById('audio-fade-in'),
+  audioFadeInVal: document.getElementById('audio-fade-in-val'),
+  audioFadeOut: document.getElementById('audio-fade-out'),
+  audioFadeOutVal: document.getElementById('audio-fade-out-val'),
   btnDeleteAudio: document.getElementById('btn-delete-audio'),
 
   // Video Settings Section References
