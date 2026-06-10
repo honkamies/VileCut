@@ -946,17 +946,27 @@
           </div>
 
           <div class="control-group-switch" style="margin-top: 10px;">
-            <label class="switch-label" for="video-fade-active">Global Fade In/Out</label>
-            <input type="checkbox" id="video-fade-active">
+            <label class="switch-label" for="video-fade-in-active">Global Fade In</label>
+            <input type="checkbox" id="video-fade-in-active">
           </div>
-          <div class="divider" id="video-fade-divider" style="display: none;"></div>
-
-          <div class="control-group" id="video-fade-duration-group" style="display: none;">
+          <div class="control-group" id="video-fade-in-duration-group" style="display: none; margin-top: 5px; margin-bottom: 10px;">
             <div class="slider-header">
-              <label for="video-fade-duration">Fade Duration (s)</label>
-              <span id="video-fade-duration-val" class="slider-val">0.5s</span>
+              <label for="video-fade-in-duration">Fade In Duration (s)</label>
+              <span id="video-fade-in-duration-val" class="slider-val">0.5s</span>
             </div>
-            <input type="range" id="video-fade-duration" min="0.1" max="2.0" step="0.1" value="0.5">
+            <input type="range" id="video-fade-in-duration" min="0.1" max="2.0" step="0.1" value="0.5">
+          </div>
+
+          <div class="control-group-switch" style="margin-top: 5px;">
+            <label class="switch-label" for="video-fade-out-active">Global Fade Out</label>
+            <input type="checkbox" id="video-fade-out-active">
+          </div>
+          <div class="control-group" id="video-fade-out-duration-group" style="display: none; margin-top: 5px; margin-bottom: 10px;">
+            <div class="slider-header">
+              <label for="video-fade-out-duration">Fade Out Duration (s)</label>
+              <span id="video-fade-out-duration-val" class="slider-val">0.5s</span>
+            </div>
+            <input type="range" id="video-fade-out-duration" min="0.1" max="2.0" step="0.1" value="0.5">
           </div>
 
           <button id="btn-export-video" class="btn primary btn-full">

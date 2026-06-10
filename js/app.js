@@ -650,13 +650,19 @@ document.addEventListener('DOMContentLoaded', () => {
     state.glitchStyleRandom = false;
     state.activeSpikeStyle = null;
 
-    UI.videoFadeActive.checked = false;
-    state.videoFadeActive = false;
-    UI.videoFadeDivider.style.display = 'none';
-    UI.videoFadeDurationGroup.style.display = 'none';
-    UI.videoFadeDuration.value = 0.5;
-    state.videoFadeDuration = 0.5;
-    UI.videoFadeDurationVal.innerText = '0.5s';
+    UI.videoFadeInActive.checked = false;
+    state.videoFadeInActive = false;
+    UI.videoFadeInDurationGroup.style.display = 'none';
+    UI.videoFadeInDuration.value = 0.5;
+    state.videoFadeInDuration = 0.5;
+    UI.videoFadeInDurationVal.innerText = '0.5s';
+
+    UI.videoFadeOutActive.checked = false;
+    state.videoFadeOutActive = false;
+    UI.videoFadeOutDurationGroup.style.display = 'none';
+    UI.videoFadeOutDuration.value = 0.5;
+    state.videoFadeOutDuration = 0.5;
+    UI.videoFadeOutDurationVal.innerText = '0.5s';
 
     state.selectedTextId = null;
     selectText(null);
@@ -827,14 +833,19 @@ document.addEventListener('DOMContentLoaded', () => {
       UI.exportDurationGroup.style.display = 'flex';
       UI.exportLoopsGroup.style.display = 'none';
 
-      state.videoFadeActive = false;
-      UI.videoFadeActive.checked = false;
-      UI.videoFadeDivider.style.display = 'none';
-      UI.videoFadeDurationGroup.style.display = 'none';
+      state.videoFadeInActive = false;
+      UI.videoFadeInActive.checked = false;
+      UI.videoFadeInDurationGroup.style.display = 'none';
+      state.videoFadeInDuration = 0.5;
+      UI.videoFadeInDuration.value = 0.5;
+      UI.videoFadeInDurationVal.innerText = '0.5s';
 
-      state.videoFadeDuration = 0.5;
-      UI.videoFadeDuration.value = 0.5;
-      UI.videoFadeDurationVal.innerText = '0.5s';
+      state.videoFadeOutActive = false;
+      UI.videoFadeOutActive.checked = false;
+      UI.videoFadeOutDurationGroup.style.display = 'none';
+      state.videoFadeOutDuration = 0.5;
+      UI.videoFadeOutDuration.value = 0.5;
+      UI.videoFadeOutDurationVal.innerText = '0.5s';
 
       // 6. Overlays (Texts, Graphics, Audio)
       state.texts = [];
@@ -1074,21 +1085,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  UI.videoFadeActive.addEventListener('change', (e) => {
-    state.videoFadeActive = e.target.checked;
-    if (state.videoFadeActive) {
-      UI.videoFadeDivider.style.display = 'block';
-      UI.videoFadeDurationGroup.style.display = 'flex';
+  UI.videoFadeInActive.addEventListener('change', (e) => {
+    state.videoFadeInActive = e.target.checked;
+    if (state.videoFadeInActive) {
+      UI.videoFadeInDurationGroup.style.display = 'flex';
     } else {
-      UI.videoFadeDivider.style.display = 'none';
-      UI.videoFadeDurationGroup.style.display = 'none';
+      UI.videoFadeInDurationGroup.style.display = 'none';
     }
     renderFrame(state.time);
   });
 
-  UI.videoFadeDuration.addEventListener('input', (e) => {
-    state.videoFadeDuration = parseFloat(e.target.value);
-    UI.videoFadeDurationVal.innerText = `${state.videoFadeDuration.toFixed(1)}s`;
+  UI.videoFadeInDuration.addEventListener('input', (e) => {
+    state.videoFadeInDuration = parseFloat(e.target.value);
+    UI.videoFadeInDurationVal.innerText = `${state.videoFadeInDuration.toFixed(1)}s`;
+    renderFrame(state.time);
+  });
+
+  UI.videoFadeOutActive.addEventListener('change', (e) => {
+    state.videoFadeOutActive = e.target.checked;
+    if (state.videoFadeOutActive) {
+      UI.videoFadeOutDurationGroup.style.display = 'flex';
+    } else {
+      UI.videoFadeOutDurationGroup.style.display = 'none';
+    }
+    renderFrame(state.time);
+  });
+
+  UI.videoFadeOutDuration.addEventListener('input', (e) => {
+    state.videoFadeOutDuration = parseFloat(e.target.value);
+    UI.videoFadeOutDurationVal.innerText = `${state.videoFadeOutDuration.toFixed(1)}s`;
     renderFrame(state.time);
   });
 

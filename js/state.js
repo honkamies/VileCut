@@ -89,8 +89,10 @@ export const state = {
   exportDuration: 5,
   exportLoops: 1,
   exportMode: 'duration',
-  videoFadeActive: false,
-  videoFadeDuration: 0.5,
+  videoFadeInActive: false,
+  videoFadeInDuration: 0.5,
+  videoFadeOutActive: false,
+  videoFadeOutDuration: 0.5,
   exportResolution: '1080',
   exportCancel: false
 };

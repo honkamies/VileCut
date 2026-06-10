@@ -406,22 +406,27 @@ export function renderFrame(renderTime) {
 
 
   // Draw Global Fade In/Out Overlay
-  if (state.videoFadeActive) {
-    const fadeDur = Math.min(state.videoFadeDuration || 0.5, dur / 2);
-    
-    let overlayAlpha = 0;
-    if (renderTime < fadeDur) {
-      overlayAlpha = 1.0 - (renderTime / fadeDur);
-    } else if (renderTime > dur - fadeDur) {
-      overlayAlpha = (renderTime - (dur - fadeDur)) / fadeDur;
+  let overlayAlpha = 0;
+  
+  if (state.videoFadeInActive) {
+    const fadeInDur = Math.min(state.videoFadeInDuration || 0.5, dur / 2);
+    if (renderTime < fadeInDur) {
+      overlayAlpha = Math.max(overlayAlpha, 1.0 - (renderTime / fadeInDur));
     }
-    
-    if (overlayAlpha > 0) {
-      ctx.save();
-      ctx.fillStyle = '#000000';
-      ctx.globalAlpha = Math.max(0, Math.min(1, overlayAlpha));
-      ctx.fillRect(0, 0, canvasW, canvasH);
-      ctx.restore();
+  }
+  
+  if (state.videoFadeOutActive) {
+    const fadeOutDur = Math.min(state.videoFadeOutDuration || 0.5, dur / 2);
+    if (renderTime > dur - fadeOutDur) {
+      overlayAlpha = Math.max(overlayAlpha, (renderTime - (dur - fadeOutDur)) / fadeOutDur);
     }
+  }
+  
+  if (overlayAlpha > 0) {
+    ctx.save();
+    ctx.fillStyle = '#000000';
+    ctx.globalAlpha = Math.max(0, Math.min(1, overlayAlpha));
+    ctx.fillRect(0, 0, canvasW, canvasH);
+    ctx.restore();
   }
 }
