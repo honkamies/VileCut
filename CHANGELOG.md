@@ -8,6 +8,7 @@ All notable changes to the Videomaddness application will be documented in this 
 - **Audio Track Fade In and Fade Out Controls**: Added Fade In and Fade Out duration controls for the active audio track (0.0s to 5.0s, in 0.1s increments) inside the Audio Settings panel.
 - **Linear Volume Gain Ramping**: Implemented smooth Web Audio API volume gain ramping (using `.setValueAtTime` and `.linearRampToValueAtTime`) for real-time playback loops, playhead seeking, WebM recording, and OfflineAudioContext MP4 renders.
 - **Overlap Protection**: Integrated automatic boundary protection that clamps and adjusts the fade durations if the combined duration of the fade-in and fade-out zones exceeds the actual playback length of the audio block.
+- **Timeline Keystroke Deletion**: Added keyboard shortcuts (`Delete` and `Backspace`) to instantly delete the selected timeline element (text layers, graphic overlays, video blocks, glitch triggers, or soundtracks) from the editor, automatically bypassing when typing in text fields or sliders.
 
 ## [1.5.2] - 2026-06-05
 

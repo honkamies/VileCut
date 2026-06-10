@@ -2123,7 +2123,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadConfiguredFonts();
   updateGlitchTriggerButtonState();
 
-  // Handle keyboard shortcuts (Spacebar for play/pause)
+  // Handle keyboard shortcuts (Spacebar for play/pause, Delete/Backspace for timeline item deletion)
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
       const activeEl = document.activeElement;
@@ -2132,6 +2132,37 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       e.preventDefault();
       UI.btnPlayPause.click();
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.isContentEditable
+      )) {
+        return;
+      }
+      
+      let deleted = false;
+      if (state.selectedTextId && UI.btnDeleteText) {
+        UI.btnDeleteText.click();
+        deleted = true;
+      } else if (state.selectedGraphicId && UI.btnDeleteGraphic) {
+        UI.btnDeleteGraphic.click();
+        deleted = true;
+      } else if (state.selectedVideoId && UI.btnDeleteVideo) {
+        UI.btnDeleteVideo.click();
+        deleted = true;
+      } else if (state.selectedGlitchTriggerId && UI.btnDeleteGlitchTrigger) {
+        UI.btnDeleteGlitchTrigger.click();
+        deleted = true;
+      } else if (state.selectedAudio && UI.btnDeleteAudio) {
+        UI.btnDeleteAudio.click();
+        deleted = true;
+      }
+      
+      if (deleted) {
+        e.preventDefault();
+      }
     }
   });
 
