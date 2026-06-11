@@ -87,8 +87,8 @@ export function renderFrame(renderTime) {
     const coverScale = Math.max(bw / vw, bh / vh);
     const drawW = vw * coverScale;
     const drawH = vh * coverScale;
-    const drawX = (bw - drawW) / 2;
-    const drawY = (bh - drawH) / 2;
+    const drawX = (bw - drawW) / 2 + (activeBlock.x !== undefined ? activeBlock.x : 0.0) * bw;
+    const drawY = (bh - drawH) / 2 + (activeBlock.y !== undefined ? activeBlock.y : 0.0) * bh;
     videoBufferCtx.drawImage(video, drawX, drawY, drawW, drawH);
 
     const mode = activeBlock.mirrorMode || 'none';
