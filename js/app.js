@@ -1699,6 +1699,7 @@ document.addEventListener('DOMContentLoaded', () => {
           contrast: 100,
           x: 0.0,
           y: 0.0,
+          edgeFade: 0,
           trackIndex: 0
         };
 
@@ -1885,6 +1886,20 @@ document.addEventListener('DOMContentLoaded', () => {
         block.y = parseFloat(e.target.value);
         if (UI.videoPosYVal) {
           UI.videoPosYVal.innerText = `${Math.round(block.y * 100)}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoEdgeFade) {
+    UI.videoEdgeFade.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.edgeFade = parseInt(e.target.value);
+        if (UI.videoEdgeFadeVal) {
+          UI.videoEdgeFadeVal.innerText = `${block.edgeFade}%`;
         }
         renderFrame(state.time);
       }

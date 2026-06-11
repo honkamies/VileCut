@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { UI } from './ui.js';
-import { getTimelineDuration, getAdjustedZoomSpeed, getPseudoRandom } from './utils.js';
+import { getTimelineDuration, getAdjustedZoomSpeed, getPseudoRandom, applyEdgeFade } from './utils.js';
 import { GlitchManager } from './glitch.js';
 import { drawTextOverlays, drawGraphicOverlays, drawVideoOverlay } from './overlays.js';
 
@@ -90,6 +90,9 @@ export function renderFrame(renderTime) {
     const drawX = (bw - drawW) / 2 + (activeBlock.x !== undefined ? activeBlock.x : 0.0) * bw;
     const drawY = (bh - drawH) / 2 + (activeBlock.y !== undefined ? activeBlock.y : 0.0) * bh;
     videoBufferCtx.drawImage(video, drawX, drawY, drawW, drawH);
+    if (activeBlock.edgeFade > 0) {
+      applyEdgeFade(videoBufferCtx, drawX, drawY, drawW, drawH, activeBlock.edgeFade);
+    }
 
     const mode = activeBlock.mirrorMode || 'none';
     

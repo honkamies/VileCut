@@ -78,3 +78,51 @@ export function getAdjustedZoomSpeed(dur) {
   const direction = rawSpeed >= 0 ? 1 : -1;
   return direction * (cycles / dur);
 }
+
+export function applyEdgeFade(ctx, x, y, w, h, fadePercent) {
+  if (fadePercent <= 0) return;
+  
+  const fadeX = w * (fadePercent / 100);
+  const fadeY = h * (fadePercent / 100);
+  
+  const maskCanvas = document.createElement('canvas');
+  maskCanvas.width = ctx.canvas.width;
+  maskCanvas.height = ctx.canvas.height;
+  const mCtx = maskCanvas.getContext('2d');
+  
+  mCtx.fillStyle = '#ffffff';
+  mCtx.fillRect(x + fadeX, y + fadeY, w - 2 * fadeX, h - 2 * fadeY);
+  
+  if (fadeY > 0) {
+    const gradTop = mCtx.createLinearGradient(0, y, 0, y + fadeY);
+    gradTop.addColorStop(0, 'rgba(255,255,255,0)');
+    gradTop.addColorStop(1, 'rgba(255,255,255,1)');
+    mCtx.fillStyle = gradTop;
+    mCtx.fillRect(x, y, w, fadeY);
+    
+    const gradBottom = mCtx.createLinearGradient(0, y + h, 0, y + h - fadeY);
+    gradBottom.addColorStop(0, 'rgba(255,255,255,0)');
+    gradBottom.addColorStop(1, 'rgba(255,255,255,1)');
+    mCtx.fillStyle = gradBottom;
+    mCtx.fillRect(x, y + h - fadeY, w, fadeY);
+  }
+  
+  if (fadeX > 0) {
+    const gradLeft = mCtx.createLinearGradient(x, 0, x + fadeX, 0);
+    gradLeft.addColorStop(0, 'rgba(255,255,255,0)');
+    gradLeft.addColorStop(1, 'rgba(255,255,255,1)');
+    mCtx.fillStyle = gradLeft;
+    mCtx.fillRect(x, y, fadeX, h);
+    
+    const gradRight = mCtx.createLinearGradient(x + w, 0, x + w - fadeX, 0);
+    gradRight.addColorStop(0, 'rgba(255,255,255,0)');
+    gradRight.addColorStop(1, 'rgba(255,255,255,1)');
+    mCtx.fillStyle = gradRight;
+    mCtx.fillRect(x + w - fadeX, y, fadeX, h);
+  }
+  
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.drawImage(maskCanvas, 0, 0);
+  ctx.restore();
+}

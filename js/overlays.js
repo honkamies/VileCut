@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { getTimelineDuration, getPseudoRandom } from './utils.js';
+import { getTimelineDuration, getPseudoRandom, applyEdgeFade } from './utils.js';
 
 const overlayVideoCanvas = document.createElement('canvas');
 const overlayVideoCtx = overlayVideoCanvas.getContext('2d');
@@ -619,6 +619,9 @@ export function drawVideoOverlay(renderCtx, w, h, time, vid) {
   const drawX = (w - drawW) / 2 + (vid.x !== undefined ? vid.x : 0.0) * w;
   const drawY = (h - drawH) / 2 + (vid.y !== undefined ? vid.y : 0.0) * h;
   overlayVideoCtx.drawImage(video, drawX, drawY, drawW, drawH);
+  if (vid.edgeFade > 0) {
+    applyEdgeFade(overlayVideoCtx, drawX, drawY, drawW, drawH, vid.edgeFade);
+  }
 
   // Apply mirroring/kaleidoscope to overlayVideoCanvas drawing on renderCtx
   const mode = vid.mirrorMode || 'none';

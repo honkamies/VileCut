@@ -174,6 +174,8 @@ export const UI = {
   videoPosXVal: document.getElementById('video-pos-x-val'),
   videoPosY: document.getElementById('video-pos-y'),
   videoPosYVal: document.getElementById('video-pos-y-val'),
+  videoEdgeFade: document.getElementById('video-edge-fade'),
+  videoEdgeFadeVal: document.getElementById('video-edge-fade-val'),
 
 
   // Graphic Settings Section References

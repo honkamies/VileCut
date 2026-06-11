@@ -592,6 +592,12 @@ export function selectVideo(id) {
           UI.videoPosYVal.innerText = `${Math.round((block.y !== undefined ? block.y : 0.0) * 100)}%`;
         }
       }
+      if (UI.videoEdgeFade) {
+        UI.videoEdgeFade.value = block.edgeFade !== undefined ? block.edgeFade : 0;
+        if (UI.videoEdgeFadeVal) {
+          UI.videoEdgeFadeVal.innerText = `${block.edgeFade !== undefined ? block.edgeFade : 0}%`;
+        }
+      }
     }
   }
   updateTimelineTracks();
