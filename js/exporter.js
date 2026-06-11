@@ -307,24 +307,27 @@ export class VideoExporter {
 
         const dur = getTimelineDuration();
         const loopTime = state.time % dur;
-        const activeBlock = state.videoBlocks ? state.videoBlocks.find(b => loopTime >= b.startTime && loopTime < b.endTime) : null;
-        if (activeBlock && activeBlock.element) {
-          const video = activeBlock.element;
-          const relativeTime = loopTime - activeBlock.startTime;
-          await new Promise(resolve => {
-            let resolved = false;
-            let timeoutId = null;
-            const onSeeked = () => {
-              if (resolved) return;
-              resolved = true;
-              if (timeoutId) clearTimeout(timeoutId);
-              video.removeEventListener('seeked', onSeeked);
-              resolve();
-            };
-            video.addEventListener('seeked', onSeeked);
-            video.currentTime = relativeTime;
-            timeoutId = setTimeout(onSeeked, 3000);
-          });
+        const activeBlocks = state.videoBlocks ? state.videoBlocks.filter(b => loopTime >= b.startTime && loopTime < b.endTime) : [];
+        if (activeBlocks.length > 0) {
+          await Promise.all(activeBlocks.map(block => {
+            if (!block.element) return Promise.resolve();
+            const video = block.element;
+            const relativeTime = loopTime - block.startTime;
+            return new Promise(resolve => {
+              let resolved = false;
+              let timeoutId = null;
+              const onSeeked = () => {
+                if (resolved) return;
+                resolved = true;
+                if (timeoutId) clearTimeout(timeoutId);
+                video.removeEventListener('seeked', onSeeked);
+                resolve();
+              };
+              video.addEventListener('seeked', onSeeked);
+              video.currentTime = relativeTime;
+              timeoutId = setTimeout(onSeeked, 3000);
+            });
+          }));
         }
         
         if (state.glitchEnabled) {
@@ -515,24 +518,27 @@ export class VideoExporter {
 
       const dur = getTimelineDuration();
       const loopTime = state.time % dur;
-      const activeBlock = state.videoBlocks ? state.videoBlocks.find(b => loopTime >= b.startTime && loopTime < b.endTime) : null;
-      if (activeBlock && activeBlock.element) {
-        const video = activeBlock.element;
-        const relativeTime = loopTime - activeBlock.startTime;
-        await new Promise(resolve => {
-          let resolved = false;
-          let timeoutId = null;
-          const onSeeked = () => {
-            if (resolved) return;
-            resolved = true;
-            if (timeoutId) clearTimeout(timeoutId);
-            video.removeEventListener('seeked', onSeeked);
-            resolve();
-          };
-          video.addEventListener('seeked', onSeeked);
-          video.currentTime = relativeTime;
-          timeoutId = setTimeout(onSeeked, 3000);
-        });
+      const activeBlocks = state.videoBlocks ? state.videoBlocks.filter(b => loopTime >= b.startTime && loopTime < b.endTime) : [];
+      if (activeBlocks.length > 0) {
+        await Promise.all(activeBlocks.map(block => {
+          if (!block.element) return Promise.resolve();
+          const video = block.element;
+          const relativeTime = loopTime - block.startTime;
+          return new Promise(resolve => {
+            let resolved = false;
+            let timeoutId = null;
+            const onSeeked = () => {
+              if (resolved) return;
+              resolved = true;
+              if (timeoutId) clearTimeout(timeoutId);
+              video.removeEventListener('seeked', onSeeked);
+              resolve();
+            };
+            video.addEventListener('seeked', onSeeked);
+            video.currentTime = relativeTime;
+            timeoutId = setTimeout(onSeeked, 3000);
+          });
+        }));
       }
 
       // Audio sync during export (calls isolated logic inside audio.js)

@@ -598,6 +598,18 @@ export function selectVideo(id) {
           UI.videoEdgeFadeVal.innerText = `${block.edgeFade !== undefined ? block.edgeFade : 0}%`;
         }
       }
+      if (UI.videoFadeIn) {
+        UI.videoFadeIn.value = block.fadeInDuration !== undefined ? block.fadeInDuration : 0.0;
+        if (UI.videoFadeInVal) {
+          UI.videoFadeInVal.innerText = `${(block.fadeInDuration !== undefined ? block.fadeInDuration : 0.0).toFixed(1)}s`;
+        }
+      }
+      if (UI.videoFadeOut) {
+        UI.videoFadeOut.value = block.fadeOutDuration !== undefined ? block.fadeOutDuration : 0.0;
+        if (UI.videoFadeOutVal) {
+          UI.videoFadeOutVal.innerText = `${(block.fadeOutDuration !== undefined ? block.fadeOutDuration : 0.0).toFixed(1)}s`;
+        }
+      }
     }
   }
   updateTimelineTracks();

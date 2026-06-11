@@ -1700,6 +1700,8 @@ document.addEventListener('DOMContentLoaded', () => {
           x: 0.0,
           y: 0.0,
           edgeFade: 0,
+          fadeInDuration: 0.0,
+          fadeOutDuration: 0.0,
           trackIndex: 0
         };
 
@@ -1900,6 +1902,34 @@ document.addEventListener('DOMContentLoaded', () => {
         block.edgeFade = parseInt(e.target.value);
         if (UI.videoEdgeFadeVal) {
           UI.videoEdgeFadeVal.innerText = `${block.edgeFade}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoFadeIn) {
+    UI.videoFadeIn.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.fadeInDuration = parseFloat(e.target.value);
+        if (UI.videoFadeInVal) {
+          UI.videoFadeInVal.innerText = `${block.fadeInDuration.toFixed(1)}s`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoFadeOut) {
+    UI.videoFadeOut.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.fadeOutDuration = parseFloat(e.target.value);
+        if (UI.videoFadeOutVal) {
+          UI.videoFadeOutVal.innerText = `${block.fadeOutDuration.toFixed(1)}s`;
         }
         renderFrame(state.time);
       }

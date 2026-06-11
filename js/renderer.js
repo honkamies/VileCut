@@ -99,6 +99,21 @@ export function renderFrame(renderTime) {
     offscreenCtx.fillStyle = '#000000';
     offscreenCtx.fillRect(0, 0, bw, bh);
 
+    let opacity = 1.0;
+    const elapsed = renderTime - activeBlock.startTime;
+    const remaining = activeBlock.endTime - renderTime;
+    const fadeInDur = activeBlock.fadeInDuration || 0.0;
+    const fadeOutDur = activeBlock.fadeOutDuration || 0.0;
+    
+    if (fadeInDur > 0 && elapsed < fadeInDur) {
+      opacity = Math.max(0, Math.min(1, elapsed / fadeInDur));
+    } else if (fadeOutDur > 0 && remaining < fadeOutDur) {
+      opacity = Math.max(0, Math.min(1, remaining / fadeOutDur));
+    }
+    
+    const prevAlpha = offscreenCtx.globalAlpha;
+    offscreenCtx.globalAlpha = prevAlpha * opacity;
+
     if (mode === 'none') {
       offscreenCtx.drawImage(videoBufferCanvas, 0, 0);
     }
@@ -178,6 +193,7 @@ export function renderFrame(renderTime) {
       }
       offscreenCtx.restore();
     }
+    offscreenCtx.globalAlpha = prevAlpha;
   } else {
     offscreenCtx.fillStyle = '#000000';
     offscreenCtx.fillRect(0, 0, bw, bh);

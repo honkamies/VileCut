@@ -627,6 +627,21 @@ export function drawVideoOverlay(renderCtx, w, h, time, vid) {
   const mode = vid.mirrorMode || 'none';
   renderCtx.save();
 
+  let opacity = 1.0;
+  const elapsed = loopTime - vid.startTime;
+  const remaining = vid.endTime - loopTime;
+  const fadeInDur = vid.fadeInDuration || 0.0;
+  const fadeOutDur = vid.fadeOutDuration || 0.0;
+  
+  if (fadeInDur > 0 && elapsed < fadeInDur) {
+    opacity = Math.max(0, Math.min(1, elapsed / fadeInDur));
+  } else if (fadeOutDur > 0 && remaining < fadeOutDur) {
+    opacity = Math.max(0, Math.min(1, remaining / fadeOutDur));
+  }
+  
+  const prevAlpha = renderCtx.globalAlpha;
+  renderCtx.globalAlpha = prevAlpha * opacity;
+
   if (mode === 'none') {
     renderCtx.drawImage(overlayVideoCanvas, 0, 0);
   }

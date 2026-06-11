@@ -2,6 +2,20 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.10.0] - 2026-06-11
+
+### Added
+- **Video Clip Fade In and Fade Out Controls**: Added individual **Fade In** and **Fade Out** duration controls (ranging from 0.0s to 5.0s) inside the Video Settings sidebar panel for active video blocks.
+- **Opacity Envelope Modulation**: Smoothly fades background video blocks from/to black and foreground overlay video blocks from/to transparency (revealing underlying layers) at loop boundaries.
+- **Exporter & Symmetries Compatibility**: Integrated transitions smoothly into the video processing pipeline, preserving fades across mirror/kaleidoscope modes and ensuring identical, stutter-free fade rendering in MP4/WebM exports.
+- **Concurrent Video Seeking**: Enhanced the exporter seek routine to process multiple overlapping active video tracks in parallel, preventing stutters on overlaid tracks.
+
+## [1.9.0] - 2026-06-11
+
+### Added
+- **Video Edge Fade / Border Feathering**: Added an **Edge Fade (Feather)** control slider (ranging from 0% to 50%) in the Video Settings section.
+- **Feathered Canvas Masks**: Dynamically applies a transparent soft roll-off gradient along video block borders, avoiding harsh bounding box edges when scaled down or panned inside the canvas workspace.
+
 ## [1.8.0] - 2026-06-11
 
 ### Added
