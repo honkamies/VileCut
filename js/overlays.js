@@ -28,42 +28,52 @@ function getTransitionProgress(textObj, loopTime) {
   return 1.0;
 }
 
-function renderGlitchText(renderCtx, textVal, textObj, time, overrideGlitchMode, overrideGlitchIntensity, drawSize) {
+function getMaxLineWidth(ctx, textVal) {
+  const lines = textVal.split('\n');
+  let maxWidth = 0;
+  for (const line of lines) {
+    const w = ctx.measureText(line).width;
+    if (w > maxWidth) maxWidth = w;
+  }
+  return maxWidth || 100;
+}
+
+function renderGlitchTextLine(renderCtx, lineText, textObj, time, overrideGlitchMode, overrideGlitchIntensity, drawSize, xOffset, yOffset) {
   const intensity = overrideGlitchIntensity !== undefined ? overrideGlitchIntensity : (textObj.glitchIntensity / 100);
   const mode = overrideGlitchMode !== undefined ? overrideGlitchMode : textObj.glitchMode;
   const isMono = !!textObj.glitchMono;
   
   if (mode === 'none') {
     renderCtx.fillStyle = textObj.color;
-    renderCtx.fillText(textVal, 0, 0);
+    renderCtx.fillText(lineText, xOffset, yOffset);
   } 
   else if (mode === 'rgb-split') {
     const shift = drawSize * intensity * 0.12 * (0.5 + 0.5 * Math.sin(time * 30));
     
     renderCtx.fillStyle = isMono ? 'rgba(255, 255, 255, 0.75)' : 'rgba(255, 0, 80, 0.85)';
-    renderCtx.fillText(textVal, -shift, 0);
+    renderCtx.fillText(lineText, xOffset - shift, yOffset);
     
     renderCtx.fillStyle = isMono ? 'rgba(80, 80, 80, 0.75)' : 'rgba(0, 242, 254, 0.85)';
-    renderCtx.fillText(textVal, shift, 0);
+    renderCtx.fillText(lineText, xOffset + shift, yOffset);
     
     renderCtx.fillStyle = textObj.color;
-    renderCtx.fillText(textVal, 0, 0);
+    renderCtx.fillText(lineText, xOffset, yOffset);
   } 
   else if (mode === 'scramble') {
     const scrambleChance = intensity * 0.35;
     const glyphs = '10#$@%&X[]{}<>_\\/█▓▒░';
     let scrambledText = '';
     
-    for (let i = 0; i < textVal.length; i++) {
-      if (textVal[i] !== ' ' && Math.random() < scrambleChance) {
+    for (let i = 0; i < lineText.length; i++) {
+      if (lineText[i] !== ' ' && Math.random() < scrambleChance) {
         scrambledText += glyphs[Math.floor(Math.random() * glyphs.length)];
       } else {
-        scrambledText += textVal[i];
+        scrambledText += lineText[i];
       }
     }
     
     renderCtx.fillStyle = textObj.color;
-    renderCtx.fillText(scrambledText, 0, 0);
+    renderCtx.fillText(scrambledText, xOffset, yOffset);
   } 
   else if (mode === 'flicker') {
     let opacity = 1.0;
@@ -78,7 +88,7 @@ function renderGlitchText(renderCtx, textVal, textObj, time, overrideGlitchMode,
     const shiftX = (Math.random() - 0.5) * drawSize * intensity * 0.08;
     const shiftY = (Math.random() - 0.5) * drawSize * intensity * 0.08;
     
-    renderCtx.fillText(textVal, shiftX, shiftY);
+    renderCtx.fillText(lineText, xOffset + shiftX, yOffset + shiftY);
     renderCtx.globalAlpha = prevAlpha;
   }
   else if (mode === 'chaos') {
@@ -92,11 +102,11 @@ function renderGlitchText(renderCtx, textVal, textObj, time, overrideGlitchMode,
     const scrambleChance = intensity * 0.4;
     const glyphs = '10#$@%&X[]{}<>_\\/█▓▒░';
     let scrambledText = '';
-    for (let i = 0; i < textVal.length; i++) {
-      if (textVal[i] !== ' ' && Math.random() < scrambleChance) {
+    for (let i = 0; i < lineText.length; i++) {
+      if (lineText[i] !== ' ' && Math.random() < scrambleChance) {
         scrambledText += glyphs[Math.floor(Math.random() * glyphs.length)];
       } else {
-        scrambledText += textVal[i];
+        scrambledText += lineText[i];
       }
     }
     
@@ -105,16 +115,29 @@ function renderGlitchText(renderCtx, textVal, textObj, time, overrideGlitchMode,
     const isMono = !!textObj.glitchMono;
     
     renderCtx.fillStyle = isMono ? 'rgba(255, 255, 255, 0.75)' : 'rgba(255, 0, 80, 0.8)';
-    renderCtx.fillText(scrambledText, -shift + (Math.random() - 0.5)*2, shiftY);
+    renderCtx.fillText(scrambledText, xOffset - shift + (Math.random() - 0.5)*2, yOffset + shiftY);
     
     renderCtx.fillStyle = isMono ? 'rgba(80, 80, 80, 0.75)' : 'rgba(0, 242, 254, 0.8)';
-    renderCtx.fillText(scrambledText, shift + (Math.random() - 0.5)*2, -shiftY);
+    renderCtx.fillText(scrambledText, xOffset + shift + (Math.random() - 0.5)*2, yOffset - shiftY);
     
     renderCtx.fillStyle = textObj.color;
-    renderCtx.fillText(scrambledText, 0, 0);
+    renderCtx.fillText(scrambledText, xOffset, yOffset);
     renderCtx.globalAlpha = prevAlpha;
   }
 }
+
+function renderGlitchText(renderCtx, textVal, textObj, time, overrideGlitchMode, overrideGlitchIntensity, drawSize) {
+  const lines = textVal.split('\n');
+  const lineCount = lines.length;
+  const lineHeight = drawSize * 1.2;
+  const totalHeight = lineHeight * (lineCount - 1);
+  
+  for (let i = 0; i < lineCount; i++) {
+    const yOffset = -totalHeight / 2 + i * lineHeight;
+    renderGlitchTextLine(renderCtx, lines[i], textObj, time, overrideGlitchMode, overrideGlitchIntensity, drawSize, 0, yOffset);
+  }
+}
+
 
 export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
   if (state.texts.length === 0) return;
@@ -193,8 +216,15 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
     const textVal = textObj.text || '';
     const mode = textObj.transitionMode || 'fade-blur';
     
+    let flickerAlpha = 1.0;
+    if (textObj.flickerIntensity > 0) {
+      const flickerSpeed = 20.0;
+      const noiseVal = getPseudoRandom(Math.floor(loopTime * flickerSpeed) + seed + 909.09);
+      flickerAlpha = 1.0 - (noiseVal * (textObj.flickerIntensity / 100));
+    }
+    
     const oldAlpha = renderCtx.globalAlpha;
-    renderCtx.globalAlpha = oldAlpha * f;
+    renderCtx.globalAlpha = oldAlpha * f * flickerAlpha;
     
     let activeGlitchMode = textObj.glitchMode;
     let activeGlitchIntensity = textObj.glitchIntensity / 100;
@@ -261,10 +291,13 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
       const slideDirection = isIntro ? -1 : 1;
       const sliceProgress = 1 - f;
       
-      const textWidth = renderCtx.measureText(textVal).width || 100;
-      const textHeight = drawSize;
-      const yStart = -textHeight * 1.2;
-      const yEnd = textHeight * 1.2;
+      const lines = textVal.split('\n');
+      const lineCount = lines.length;
+      const lineHeight = drawSize * 1.2;
+      const textWidth = getMaxLineWidth(renderCtx, textVal);
+      const textHeight = lineHeight * lineCount;
+      const yStart = -textHeight * 0.7;
+      const yEnd = textHeight * 0.7;
       const totalH = yEnd - yStart;
       
       for (let i = 0; i < 5; i++) {
@@ -301,7 +334,7 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
             const blockH = textHeight * (0.08 + getPseudoRandom(bSeed + 2) * 0.22);
             const baseSlideX = slideDirection * Math.pow(sliceProgress, 1.2) * (w * 0.65);
             const blockX = (getPseudoRandom(bSeed + 3) - 0.5) * textWidth * 1.5 + baseSlideX;
-            const blockY = (getPseudoRandom(bSeed + 4) - 0.5) * textHeight * 1.3;
+            const blockY = (getPseudoRandom(bSeed + 4) - 0.5) * textHeight * 1.0;
             
             const colors = textObj.glitchMono ? 
               ['rgba(255, 255, 255, 0.85)', 'rgba(120, 120, 120, 0.75)', 'rgba(0, 0, 0, 0.8)'] : 
@@ -314,10 +347,13 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
     } else if (mode === 'glitch-reveal') {
       const sliceProgress = 1 - f;
       
-      const textWidth = renderCtx.measureText(textVal).width || 100;
-      const textHeight = drawSize;
-      const yStart = -textHeight * 1.2;
-      const yEnd = textHeight * 1.2;
+      const lines = textVal.split('\n');
+      const lineCount = lines.length;
+      const lineHeight = drawSize * 1.2;
+      const textWidth = getMaxLineWidth(renderCtx, textVal);
+      const textHeight = lineHeight * lineCount;
+      const yStart = -textHeight * 0.7;
+      const yEnd = textHeight * 0.7;
       const totalH = yEnd - yStart;
       
       for (let i = 0; i < 5; i++) {
@@ -352,7 +388,7 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
             const blockW = textWidth * (0.1 + getPseudoRandom(bSeed + 1) * 0.5);
             const blockH = textHeight * (0.05 + getPseudoRandom(bSeed + 2) * 0.25);
             const blockX = (getPseudoRandom(bSeed + 3) - 0.5) * textWidth * 1.6;
-            const blockY = (getPseudoRandom(bSeed + 4) - 0.5) * textHeight * 1.4;
+            const blockY = (getPseudoRandom(bSeed + 4) - 0.5) * textHeight * 1.0;
             
             const colors = textObj.glitchMono ? 
               ['rgba(255, 255, 255, 0.9)', 'rgba(120, 120, 120, 0.8)', 'rgba(0, 0, 0, 0.85)'] : 
@@ -366,60 +402,72 @@ export function drawTextOverlays(renderCtx, w, h, time, trackIdx) {
       const transDuration = Math.min(textObj.transitionDuration !== undefined ? textObj.transitionDuration : 0.4, (textObj.endTime - textObj.startTime) / 2);
       const isIntro = (loopTime < textObj.startTime + transDuration);
       
-      const chars = textVal.split('');
-      const charWidths = chars.map(c => renderCtx.measureText(c).width);
-      const totalWidth = charWidths.reduce((sum, w) => sum + w, 0);
+      const lines = textVal.split('\n');
+      const lineCount = lines.length;
+      const lineHeight = drawSize * 1.2;
+      const totalHeight = lineHeight * (lineCount - 1);
       
-      let startX = -totalWidth / 2;
-      let currentX = startX;
+      let globalCharIdx = 0;
+      const totalChars = lines.reduce((sum, line) => sum + line.length, 0);
       
-      chars.forEach((c, idx) => {
-        const charW = charWidths[idx];
-        const charCenterX = currentX + charW / 2;
+      lines.forEach((line, lineIdx) => {
+        const chars = line.split('');
+        const charWidths = chars.map(c => renderCtx.measureText(c).width);
+        const totalLineWidth = charWidths.reduce((sum, w) => sum + w, 0);
         
-        renderCtx.save();
+        const startX = -totalLineWidth / 2;
+        const lineY = -totalHeight / 2 + lineIdx * lineHeight;
+        let currentX = startX;
         
-        const staggerStrength = 0.5;
-        const charWindow = 1.0 - staggerStrength;
-        const orderIdx = isIntro ? idx : (chars.length - 1 - idx);
-        const startRatio = (orderIdx / Math.max(1, chars.length - 1)) * staggerStrength;
-        
-        let fChar = 1.0;
-        if (f <= startRatio) fChar = 0.0;
-        else if (f >= startRatio + charWindow) fChar = 1.0;
-        else fChar = (f - startRatio) / charWindow;
-        
-        const scatterProgress = 1 - fChar;
-        
-        const seedX = seed + idx * 17.1 + 1.3;
-        const seedY = seed + idx * 29.3 + 4.7;
-        const seedR = seed + idx * 41.5 + 8.1;
-        
-        const randX = getPseudoRandom(seedX) * 2 - 1;
-        const randY = getPseudoRandom(seedY) * 2 - 1;
-        const randR = getPseudoRandom(seedR) * 2 - 1;
-        
-        const scatterDist = Math.pow(scatterProgress, 1.8) * 350;
-        const charDx = randX * scatterDist;
-        const charDy = randY * scatterDist;
-        const charAngle = randR * Math.PI * 1.5 * scatterProgress;
-        const charScale = 0.0 + 1.0 * fChar;
-        
-        renderCtx.translate(charCenterX + charDx, charDy);
-        renderCtx.rotate(charAngle);
-        renderCtx.scale(charScale, charScale);
-        
-        let charGlitchMode = textObj.glitchMode;
-        let charGlitchIntensity = textObj.glitchIntensity / 100;
-        if (scatterProgress > 0.05) {
-          charGlitchMode = 'rgb-split';
-          charGlitchIntensity = Math.max(charGlitchIntensity, scatterProgress * 0.9);
-        }
-        
-        renderGlitchText(renderCtx, c, textObj, time, charGlitchMode, charGlitchIntensity, drawSize);
-        
-        renderCtx.restore();
-        currentX += charW;
+        chars.forEach((c, idx) => {
+          const charW = charWidths[idx];
+          const charCenterX = currentX + charW / 2;
+          
+          renderCtx.save();
+          
+          const staggerStrength = 0.5;
+          const charWindow = 1.0 - staggerStrength;
+          const orderIdx = isIntro ? globalCharIdx : (totalChars - 1 - globalCharIdx);
+          const startRatio = (orderIdx / Math.max(1, totalChars - 1)) * staggerStrength;
+          
+          let fChar = 1.0;
+          if (f <= startRatio) fChar = 0.0;
+          else if (f >= startRatio + charWindow) fChar = 1.0;
+          else fChar = (f - startRatio) / charWindow;
+          
+          const scatterProgress = 1 - fChar;
+          
+          const seedX = seed + globalCharIdx * 17.1 + 1.3;
+          const seedY = seed + globalCharIdx * 29.3 + 4.7;
+          const seedR = seed + globalCharIdx * 41.5 + 8.1;
+          
+          const randX = getPseudoRandom(seedX) * 2 - 1;
+          const randY = getPseudoRandom(seedY) * 2 - 1;
+          const randR = getPseudoRandom(seedR) * 2 - 1;
+          
+          const scatterDist = Math.pow(scatterProgress, 1.8) * 350;
+          const charDx = randX * scatterDist;
+          const charDy = randY * scatterDist;
+          const charAngle = randR * Math.PI * 1.5 * scatterProgress;
+          const charScale = 0.0 + 1.0 * fChar;
+          
+          renderCtx.translate(charCenterX + charDx, lineY + charDy);
+          renderCtx.rotate(charAngle);
+          renderCtx.scale(charScale, charScale);
+          
+          let charGlitchMode = textObj.glitchMode;
+          let charGlitchIntensity = textObj.glitchIntensity / 100;
+          if (scatterProgress > 0.05) {
+            charGlitchMode = 'rgb-split';
+            charGlitchIntensity = Math.max(charGlitchIntensity, scatterProgress * 0.9);
+          }
+          
+          renderGlitchTextLine(renderCtx, c, textObj, time, charGlitchMode, charGlitchIntensity, drawSize, 0, 0);
+          
+          renderCtx.restore();
+          currentX += charW;
+          globalCharIdx++;
+        });
       });
     } else {
       renderGlitchText(renderCtx, textVal, textObj, time, activeGlitchMode, activeGlitchIntensity, drawSize);

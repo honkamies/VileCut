@@ -128,6 +128,8 @@ export const UI = {
   textGlitchMode: document.getElementById('text-glitch-mode'),
   textGlitchIntensity: document.getElementById('text-glitch-intensity'),
   textGlitchIntensityVal: document.getElementById('text-glitch-intensity-val'),
+  textFlickerIntensity: document.getElementById('text-flicker-intensity'),
+  textFlickerIntensityVal: document.getElementById('text-flicker-intensity-val'),
   textGlitchMono: document.getElementById('text-glitch-mono'),
   textTransition: document.getElementById('text-transition'),
   textTransitionDuration: document.getElementById('text-transition-duration'),

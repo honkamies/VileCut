@@ -22,7 +22,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VIDEOMADDNESS</h1>
-        <span class="version-tag">v1.6.0</span>
+        <span class="version-tag">v1.7.0</span>
       </div>
       <div class="header-actions">
         <div id="fps-monitor" class="monitor-badge">
@@ -159,7 +159,7 @@
           
           <div class="control-group">
             <label for="text-content">Overlay Text</label>
-            <input type="text" id="text-content" placeholder="SYSTEM FAILURE..." class="text-input-field">
+            <textarea id="text-content" placeholder="SYSTEM FAILURE..." class="text-input-field" rows="3" style="resize: vertical; min-height: 60px;"></textarea>
           </div>
 
           <div class="control-group">
@@ -262,6 +262,14 @@
               <span id="text-glitch-intensity-val" class="slider-val">50%</span>
             </div>
             <input type="range" id="text-glitch-intensity" min="0" max="100" step="5" value="50">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="text-flicker-intensity">Flicker Intensity</label>
+              <span id="text-flicker-intensity-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="text-flicker-intensity" min="0" max="100" step="5" value="0">
           </div>
 
           <div class="control-group-switch" style="margin-top: 10px; margin-bottom: 15px;">

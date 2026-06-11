@@ -1161,6 +1161,7 @@ document.addEventListener('DOMContentLoaded', () => {
       glitchMode: 'none',
       glitchMono: false,
       glitchIntensity: 50,
+      flickerIntensity: 0,
       transitionMode: 'fade-blur',
       transitionDuration: 0.4,
       startTime: 0,
@@ -1210,6 +1211,7 @@ document.addEventListener('DOMContentLoaded', () => {
       glitchMode: selectedTxt.glitchMode,
       glitchMono: selectedTxt.glitchMono,
       glitchIntensity: selectedTxt.glitchIntensity,
+      flickerIntensity: selectedTxt.flickerIntensity !== undefined ? selectedTxt.flickerIntensity : 0,
       transitionMode: selectedTxt.transitionMode,
       transitionDuration: selectedTxt.transitionDuration,
       startTime: startTime,
@@ -1979,6 +1981,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (txt) {
       txt.glitchIntensity = parseInt(e.target.value);
       UI.textGlitchIntensityVal.innerText = `${txt.glitchIntensity}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textFlickerIntensity.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.flickerIntensity = parseInt(e.target.value);
+      UI.textFlickerIntensityVal.innerText = `${txt.flickerIntensity}%`;
       renderFrame(state.time);
     }
   });

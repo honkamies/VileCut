@@ -469,6 +469,8 @@ export function selectText(id) {
       UI.textGlitchMode.value = txt.glitchMode;
       UI.textGlitchIntensity.value = txt.glitchIntensity;
       UI.textGlitchIntensityVal.innerText = `${txt.glitchIntensity}%`;
+      UI.textFlickerIntensity.value = txt.flickerIntensity !== undefined ? txt.flickerIntensity : 0;
+      UI.textFlickerIntensityVal.innerText = `${txt.flickerIntensity !== undefined ? txt.flickerIntensity : 0}%`;
       UI.textGlitchMono.checked = !!txt.glitchMono;
       UI.textTransition.value = txt.transitionMode || 'fade-blur';
       UI.textTransitionDuration.value = txt.transitionDuration !== undefined ? txt.transitionDuration : 0.4;

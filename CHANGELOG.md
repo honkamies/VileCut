@@ -2,6 +2,14 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.7.0] - 2026-06-11
+
+### Added
+- **Text Layer Multiline Support (Multiple Rows)**: Replaced single-line overlay text input with a multiline `<textarea>` inside the Text Settings inspector. Text layers now natively parse and render multiple rows separated by newlines (`\n`).
+- **Centered Multiline Text Layout**: Implemented vertical offset calculations (line height spacing of `1.2x`) to keep multiline text blocks centered at the layer's origin coordinates.
+- **Transition Adapters for Multiline Text**: Upgraded text transition effects (`slide-glitch`, `glitch-reveal`, and `character-scatter`) to handle multiline blocks organically. Character scatter splits and scatters characters in 2D space relative to their correct line offsets, and slide/reveal clips the entire height of the block.
+- **Text Layer Flicker Effect**: Added a **Flicker Intensity** slider (0% to 100%) inside the Text Settings panel. Dynamically fluctuates the text layer's opacity at 20Hz based on a pseudo-random noise sequence bound to the loop time and a block-specific seed, ensuring deterministic flicker loops during exports.
+
 ## [1.6.0] - 2026-06-10
 
 ### Added
