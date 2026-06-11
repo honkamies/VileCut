@@ -2,6 +2,13 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.8.0] - 2026-06-11
+
+### Added
+- **Background Video Positioning (Pan Controls)**: Added **X Position (Pan)** and **Y Position (Pan)** slider controls inside the Video Settings sidebar panel (ranging from -100% to +100%).
+- **Framing & Aspect Ratio Adjustments**: Allows panning widescreen background videos horizontally and vertically, making it easy to frame focus areas when cropping to high/narrow templates (like Instagram Story 9:16 ratio) or wide formats.
+- **Unified Video Effects Integration**: Panned positions apply seamlessly across video mirroring, kaleidoscope symmetries, and color/brightness filters during both live rendering loops and offline high-definition video exports.
+
 ## [1.7.0] - 2026-06-11
 
 ### Added

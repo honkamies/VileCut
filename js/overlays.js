@@ -616,8 +616,8 @@ export function drawVideoOverlay(renderCtx, w, h, time, vid) {
   const coverScale = Math.max(w / vw, h / vh);
   const drawW = vw * coverScale;
   const drawH = vh * coverScale;
-  const drawX = (w - drawW) / 2;
-  const drawY = (h - drawH) / 2;
+  const drawX = (w - drawW) / 2 + (vid.x !== undefined ? vid.x : 0.0) * w;
+  const drawY = (h - drawH) / 2 + (vid.y !== undefined ? vid.y : 0.0) * h;
   overlayVideoCtx.drawImage(video, drawX, drawY, drawW, drawH);
 
   // Apply mirroring/kaleidoscope to overlayVideoCanvas drawing on renderCtx

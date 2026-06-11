@@ -580,6 +580,18 @@ export function selectVideo(id) {
           UI.videoContrastVal.innerText = `${UI.videoContrast.value}%`;
         }
       }
+      if (UI.videoPosX) {
+        UI.videoPosX.value = block.x !== undefined ? block.x : 0.0;
+        if (UI.videoPosXVal) {
+          UI.videoPosXVal.innerText = `${Math.round((block.x !== undefined ? block.x : 0.0) * 100)}%`;
+        }
+      }
+      if (UI.videoPosY) {
+        UI.videoPosY.value = block.y !== undefined ? block.y : 0.0;
+        if (UI.videoPosYVal) {
+          UI.videoPosYVal.innerText = `${Math.round((block.y !== undefined ? block.y : 0.0) * 100)}%`;
+        }
+      }
     }
   }
   updateTimelineTracks();

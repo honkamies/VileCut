@@ -170,6 +170,10 @@ export const UI = {
   videoBrightnessVal: document.getElementById('video-brightness-val'),
   videoContrast: document.getElementById('video-contrast'),
   videoContrastVal: document.getElementById('video-contrast-val'),
+  videoPosX: document.getElementById('video-pos-x'),
+  videoPosXVal: document.getElementById('video-pos-x-val'),
+  videoPosY: document.getElementById('video-pos-y'),
+  videoPosYVal: document.getElementById('video-pos-y-val'),
 
 
   // Graphic Settings Section References

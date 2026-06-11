@@ -1697,6 +1697,8 @@ document.addEventListener('DOMContentLoaded', () => {
           kaleidoscopeSlices: 8,
           brightness: 100,
           contrast: 100,
+          x: 0.0,
+          y: 0.0,
           trackIndex: 0
         };
 
@@ -1855,6 +1857,34 @@ document.addEventListener('DOMContentLoaded', () => {
         block.contrast = parseInt(e.target.value);
         if (UI.videoContrastVal) {
           UI.videoContrastVal.innerText = `${block.contrast}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoPosX) {
+    UI.videoPosX.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.x = parseFloat(e.target.value);
+        if (UI.videoPosXVal) {
+          UI.videoPosXVal.innerText = `${Math.round(block.x * 100)}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoPosY) {
+    UI.videoPosY.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.y = parseFloat(e.target.value);
+        if (UI.videoPosYVal) {
+          UI.videoPosYVal.innerText = `${Math.round(block.y * 100)}%`;
         }
         renderFrame(state.time);
       }

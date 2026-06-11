@@ -22,7 +22,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VIDEOMADDNESS</h1>
-        <span class="version-tag">v1.7.0</span>
+        <span class="version-tag">v1.8.0</span>
       </div>
       <div class="header-actions">
         <div id="fps-monitor" class="monitor-badge">
@@ -415,6 +415,24 @@
               <span id="video-contrast-val" class="slider-val">100%</span>
             </div>
             <input type="range" id="video-contrast" min="50" max="150" step="1" value="100">
+          </div>
+
+          <div class="grid-2-col" style="margin-top: 10px;">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="video-pos-x">X Position (Pan)</label>
+                <span id="video-pos-x-val" class="slider-val">0%</span>
+              </div>
+              <input type="range" id="video-pos-x" min="-1.0" max="1.0" step="0.01" value="0.0">
+            </div>
+
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="video-pos-y">Y Position (Pan)</label>
+                <span id="video-pos-y-val" class="slider-val">0%</span>
+              </div>
+              <input type="range" id="video-pos-y" min="-1.0" max="1.0" step="0.01" value="0.0">
+            </div>
           </div>
 
 
