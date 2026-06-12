@@ -10,12 +10,17 @@ I asked AGY to create this as I needed something like this to my underground met
 
 ## Features
 - **Adaptive Luminosity Slicing**: Automatically splits images into distinct, detail-balanced depth bands using pixel-count histograms.
-- **Layer Edge Fade (Vignette)**: Adjustable blending slider (0% to 50%) to smoothly fade out layer borders and blend different images seamlessly.
-- **Layer Inspector Preview**: Live visual card with custom backgrounds (Checkerboard, Black, White, Magenta) to examine isolated mask details.
-- **Infinite Diving Engine**: Exponential zoom camera tunnel ($S(z) = d^{(z - 0.5) \cdot 2.0}$) creating true depth perspective.
-- **Aspect Ratio Selector**: Instantly crop and scale frames for social media ratios (**9:16 Portrait**, **1:1 Square**, **4:5 Feed**, **16:9 Landscape**, **21:9 Cinema**).
-- **Cybernetic Glitch FX**: Post-process RGB channel splitting, horizontal pixel-sorting, and screen shaking (switched off by default).
-- **Exporting Engine**: Client-side H.264/MP4 video generation via the browser's WebCodecs API and `mp4-muxer.js` (including offline timeline rendering and encoding of audio soundtracks), ensuring high compatibility with Instagram, TikTok, and media players. Automatically falls back to WebM (MediaRecorder) on browsers where WebCodecs H.264 encoding is unsupported.
+- **Layer Edge Fade (Vignette)**: Soften harsh layer borders and blend contrasting images seamlessly using an adjustable vignette slider (0% to 50%).
+- **Layer Inspector Preview**: Inspect isolated mask layer details in real-time over customizable background swatches (Checkerboard, Black, White, Magenta).
+- **Infinite Diving Engine**: Exponential zoom camera tunnel ($S(z) = d^{(z - 0.5) \cdot 2.0}$) with auto-wrapping to create deep, hypnotic perspective loops.
+- **Unified Multi-Track Timeline**: Arrange video clips, graphic overlays, text blocks, and soundtracks across separate tracks. Move blocks freely or drag-reorder tracks vertically with automatic gap compression.
+- **Multi-Track Video Integration**: Load local video files as Track 0 background video or layered Track 1+ foreground overlays. Independently control brightness, contrast, monochrome filters, panning (X/Y), mirror symmetries (horizontal, vertical, quad, and kaleidoscope), and edge feathering for each block.
+- **Smooth Audio & Video Fades**: Add customizable **Fade In** and **Fade Out** linear curves (0.0s to 5.0s) to video blocks (fading to black/transparency) and audio tracks to prevent visual or volume popping at loop boundaries.
+- **Timeline Glitch Triggers (⚡)**: Map deterministic glitch spikes directly onto specific timeline playhead coordinates, controlling custom durations and severity overrides.
+- **Stackable Cybernetic Glitch FX**: Toggle and combine multiple post-processing styles including RGB Channel Displacements, Pixel-Sorting, VHS Scanline Sag, Digital Block Tear, and GPU Liquid Warp in color or monochrome/gray palettes.
+- **Aspect Ratio Selector**: Instantly scale and crop the canvas view to fit target platforms (**9:16 Portrait** for Instagram/TikTok, **1:1 Square**, **4:5 Feed**, **16:9 Landscape**, **21:9 Cinema**).
+- **Custom Fonts Preloading System**: Automatically preloads custom TTF/OTF fonts placed in the `/fonts` directory using a simple JSON configuration.
+- **Exporting Engine**: Render high-fidelity client-side H.264/MP4 video files via the WebCodecs API and `mp4-muxer.js` (including audio offline rendering). Automatically falls back to WebM (MediaRecorder) if H.264 encoding is unsupported.
 
 ---
 
@@ -73,11 +78,13 @@ The application will be available at `http://localhost:8080`.
   - `ui.js` - DOM element selection mapping.
   - `utils.js` - General helper functions (fonts, math, color convert).
   - `masking.js` - ImageProcessor (layer extraction, edge vignette, histogram quantiles).
-  - `glitch.js` - GlitchManager (pixel sorting, shakes, splits).
+  - `glitch.js` - GlitchManager (pixel sorting, VHS sag, block tear, liquid warp).
   - `audio.js` - Audio synchronization and timeline playback nodes.
-  - `overlays.js` - Text and Graphic canvas overlays drawers.
-  - `timeline.js` - Timeline tracks renderer and mouse drag/resize handlers.
-  - `exporter.js` - VideoExporter WebM recorder.
+  - `renderer.js` - Core Canvas Render Engine and camera motion loop.
+  - `overlays.js` - Text, Graphic, and Video canvas overlays drawers.
+  - `timeline.js` - Timeline tracks renderer and mouse drag/resize/zoom handlers.
+  - `exporter.js` - VideoExporter WebCodecs MP4 & MediaRecorder WebM exporter.
+  - `mp4-muxer.js` - MP4 multiplexing helper.
   - `app.js` - Main entry module, binding sidebars and event listeners.
 - `fonts/` - Directory for pre-loading custom fonts (configured in `fonts/fonts.json`).
 - `run_Windows.bat` - One-click Windows server launcher (with winget installer check).
