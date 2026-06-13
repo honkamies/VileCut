@@ -684,6 +684,26 @@ document.addEventListener('DOMContentLoaded', () => {
     updateGlitchTriggerButtonState();
   });
 
+  if (UI.btnInfoModal) {
+    UI.btnInfoModal.addEventListener('click', () => {
+      UI.infoOverlay.classList.remove('hidden');
+    });
+  }
+
+  if (UI.btnCloseInfo) {
+    UI.btnCloseInfo.addEventListener('click', () => {
+      UI.infoOverlay.classList.add('hidden');
+    });
+  }
+
+  if (UI.infoOverlay) {
+    UI.infoOverlay.addEventListener('click', (e) => {
+      if (e.target === UI.infoOverlay) {
+        UI.infoOverlay.classList.add('hidden');
+      }
+    });
+  }
+
   if (UI.btnReloadApp) {
     UI.btnReloadApp.addEventListener('click', () => {
       location.reload();

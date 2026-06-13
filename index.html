@@ -39,6 +39,9 @@
             <option value="frozen">Frozen Odyssey (Icy Blue)</option>
           </select>
         </div>
+        <button id="btn-info-modal" class="btn-header" title="About & Feedback">
+          <i data-lucide="info" class="theme-select-icon"></i> Info
+        </button>
         <button id="btn-reset-settings-only" class="btn-header" title="Reset All Settings (Keep Images)">
           <i data-lucide="sliders" class="theme-select-icon"></i> Reset Settings
         </button>
@@ -1037,6 +1040,22 @@
     </div>
 
     <!-- Export Overlay Status -->
+    <!-- Info Modal -->
+    <div id="info-overlay" class="modal-overlay hidden" style="z-index: 3000;">
+      <div class="modal-content" style="text-align: center; max-width: 400px; padding: 30px;">
+        <h2 style="color: var(--cyan); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+          <i data-lucide="mail"></i> Videomaddness
+        </h2>
+        <p style="margin-bottom: 25px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
+          Thanks for using this chaotic motion machine!<br><br>
+          <strong>Got feedback, feature ideas, or found a bug?</strong><br>
+          I'd love to hear how you use it. Shoot me an email:<br><br>
+          <a href="mailto:gncd123@gmail.com" style="color: var(--cyan); text-decoration: none; font-weight: bold; font-size: 1.1rem; background: rgba(0, 242, 254, 0.1); padding: 8px 16px; border-radius: 6px; display: inline-block;">gncd123@gmail.com</a>
+        </p>
+        <button id="btn-close-info" class="btn-primary" style="width: 100%;">Close</button>
+      </div>
+    </div>
+
     <div id="export-overlay" class="modal-overlay hidden">
       <div class="modal-card">
         <i data-lucide="loader" class="modal-icon spinner text-purple"></i>

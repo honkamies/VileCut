@@ -33,6 +33,9 @@ export const UI = {
   glitchFlash: document.getElementById('glitch-flash'),
   fpsValue: document.getElementById('fps-value'),
   themeSelect: document.getElementById('theme-select'),
+  btnInfoModal: document.getElementById('btn-info-modal'),
+  infoOverlay: document.getElementById('info-overlay'),
+  btnCloseInfo: document.getElementById('btn-close-info'),
   btnResetSettingsOnly: document.getElementById('btn-reset-settings-only'),
   btnReloadApp: document.getElementById('btn-reload-app'),
 
