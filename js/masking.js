@@ -87,114 +87,160 @@ export class ImageProcessor {
       imgObj.adaptiveBoundaries = boundaries;
     }
 
+    // PRE-RENDER VIGNETTE MASK
+    let vignetteMaskCanvas = null;
+    if (state.layerEdgeFade > 0) {
+      const fadeX = w * (state.layerEdgeFade / 100);
+      const fadeY = h * (state.layerEdgeFade / 100);
+
+      vignetteMaskCanvas = document.createElement('canvas');
+      vignetteMaskCanvas.width = w;
+      vignetteMaskCanvas.height = h;
+      const mCtx = vignetteMaskCanvas.getContext('2d');
+
+      mCtx.fillStyle = '#ffffff';
+      mCtx.fillRect(fadeX, fadeY, w - 2 * fadeX, h - 2 * fadeY);
+
+      if (fadeY > 0) {
+        const gradTop = mCtx.createLinearGradient(0, 0, 0, fadeY);
+        gradTop.addColorStop(0, 'rgba(255,255,255,0)');
+        gradTop.addColorStop(1, 'rgba(255,255,255,1)');
+        mCtx.fillStyle = gradTop;
+        mCtx.fillRect(0, 0, w, fadeY);
+
+        const gradBottom = mCtx.createLinearGradient(0, h, 0, h - fadeY);
+        gradBottom.addColorStop(0, 'rgba(255,255,255,0)');
+        gradBottom.addColorStop(1, 'rgba(255,255,255,1)');
+        mCtx.fillStyle = gradBottom;
+        mCtx.fillRect(0, h - fadeY, w, fadeY);
+      }
+      if (fadeX > 0) {
+        const gradLeft = mCtx.createLinearGradient(0, 0, fadeX, 0);
+        gradLeft.addColorStop(0, 'rgba(255,255,255,0)');
+        gradLeft.addColorStop(1, 'rgba(255,255,255,1)');
+        mCtx.fillStyle = gradLeft;
+        mCtx.fillRect(0, 0, fadeX, h);
+
+        const gradRight = mCtx.createLinearGradient(w, 0, w - fadeX, 0);
+        gradRight.addColorStop(0, 'rgba(255,255,255,0)');
+        gradRight.addColorStop(1, 'rgba(255,255,255,1)');
+        mCtx.fillStyle = gradRight;
+        mCtx.fillRect(w - fadeX, 0, fadeX, h);
+      }
+    }
+
+    // PREPARE ALL LAYERS
+    const layerCanvases = [];
+    const layerCtxs = [];
+    const layerImgDatas = [];
+    const layerPixels = [];
+
     for (let i = 0; i < N; i++) {
       const layerCanvas = document.createElement('canvas');
       layerCanvas.width = w;
       layerCanvas.height = h;
       const layerCtx = layerCanvas.getContext('2d');
       const layerImgData = layerCtx.createImageData(w, h);
-      const destPixels = layerImgData.data;
+      
+      layerCanvases.push(layerCanvas);
+      layerCtxs.push(layerCtx);
+      layerImgDatas.push(layerImgData);
+      layerPixels.push(layerImgData.data);
+    }
 
-      if (state.maskType === 'luminosity') {
-        const B = 255 / N;
-        const Si = B * i;
-        const Ei = B * (i + 1);
-        const f = Math.max(0.1, B * state.maskFeather);
+    // O(1) PASS OVER PIXELS
+    if (state.maskType === 'luminosity') {
+      const B = 255 / N;
+      const f = Math.max(0.1, B * state.maskFeather);
+      for (let p = 0; p < srcPixels.length; p += 4) {
+        const r = srcPixels[p];
+        const g = srcPixels[p + 1];
+        const b = srcPixels[p + 2];
+        const a = srcPixels[p + 3];
 
-        for (let p = 0; p < srcPixels.length; p += 4) {
-          const r = srcPixels[p];
-          const g = srcPixels[p + 1];
-          const b = srcPixels[p + 2];
-          const a = srcPixels[p + 3];
+        if (a <= 10) continue;
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
 
-          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        for (let i = 0; i < N; i++) {
+          const Si = B * i;
+          const Ei = B * (i + 1);
+          let weight = 0;
+          if (lum >= Si + f && lum <= Ei - f) {
+            weight = 1.0;
+          } else if (lum < Si + f) {
+            if (i === 0) weight = 1.0;
+            else if (lum >= Si - f) {
+              let wVal = (lum - (Si - f)) / (2 * f);
+              weight = 3 * wVal * wVal - 2 * wVal * wVal * wVal;
+            }
+          } else if (lum > Ei - f) {
+            if (i === N - 1) weight = 1.0;
+            else if (lum <= Ei + f) {
+              let wVal = 1.0 - (lum - (Ei - f)) / (2 * f);
+              weight = 3 * wVal * wVal - 2 * wVal * wVal * wVal;
+            }
+          }
+          if (weight > 0.02) {
+            const dest = layerPixels[i];
+            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = a * weight;
+          }
+        }
+      }
+    } else if (state.maskType === 'adaptive-luminosity' && imgObj.adaptiveBoundaries) {
+      for (let p = 0; p < srcPixels.length; p += 4) {
+        const r = srcPixels[p];
+        const g = srcPixels[p + 1];
+        const b = srcPixels[p + 2];
+        const a = srcPixels[p + 3];
+
+        if (a <= 10) continue;
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+        for (let i = 0; i < N; i++) {
+          const Si = imgObj.adaptiveBoundaries[i];
+          const Ei = imgObj.adaptiveBoundaries[i + 1];
+          const Wi = Ei - Si;
+          const f = Math.max(0.1, Wi * state.maskFeather);
           
           let weight = 0;
           if (lum >= Si + f && lum <= Ei - f) {
             weight = 1.0;
           } else if (lum < Si + f) {
-            if (i === 0) {
-              weight = 1.0; // keep blacks in first layer
-            } else if (lum >= Si - f) {
-              let wVal = (lum - (Si - f)) / (2 * f);
-              weight = 3 * wVal * wVal - 2 * wVal * wVal * wVal; // Hermite interpolation
-            }
-          } else if (lum > Ei - f) {
-            if (i === N - 1) {
-              weight = 1.0; // keep highlights in last layer
-            } else if (lum <= Ei + f) {
-              let wVal = 1.0 - (lum - (Ei - f)) / (2 * f);
-              weight = 3 * wVal * wVal - 2 * wVal * wVal * wVal;
-            }
-          }
-
-          if (weight > 0.02) {
-            destPixels[p] = r;
-            destPixels[p + 1] = g;
-            destPixels[p + 2] = b;
-            destPixels[p + 3] = a * weight;
-          } else {
-            destPixels[p + 3] = 0;
-          }
-        }
-      }
-      else if (state.maskType === 'adaptive-luminosity' && imgObj.adaptiveBoundaries) {
-        const Si = imgObj.adaptiveBoundaries[i];
-        const Ei = imgObj.adaptiveBoundaries[i + 1];
-        const Wi = Ei - Si;
-        const f = Math.max(0.1, Wi * state.maskFeather);
-
-        for (let p = 0; p < srcPixels.length; p += 4) {
-          const r = srcPixels[p];
-          const g = srcPixels[p + 1];
-          const b = srcPixels[p + 2];
-          const a = srcPixels[p + 3];
-
-          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-          
-          let weight = 0;
-          if (lum >= Si + f && lum <= Ei - f) {
-            weight = 1.0;
-          } else if (lum < Si + f) {
-            if (i === 0) {
-              weight = 1.0; // keep blacks in first layer
-            } else if (lum >= Si - f) {
+            if (i === 0) weight = 1.0;
+            else if (lum >= Si - f) {
               let wVal = (lum - (Si - f)) / (2 * f);
               weight = 3 * wVal * wVal - 2 * wVal * wVal * wVal;
             }
           } else if (lum > Ei - f) {
-            if (i === N - 1) {
-              weight = 1.0; // keep highlights in last layer
-            } else if (lum <= Ei + f) {
+            if (i === N - 1) weight = 1.0;
+            else if (lum <= Ei + f) {
               let wVal = 1.0 - (lum - (Ei - f)) / (2 * f);
               weight = 3 * wVal * wVal - 2 * wVal * wVal * wVal;
             }
           }
-
           if (weight > 0.02) {
-            destPixels[p] = r;
-            destPixels[p + 1] = g;
-            destPixels[p + 2] = b;
-            destPixels[p + 3] = a * weight;
-          } else {
-            destPixels[p + 3] = 0;
+            const dest = layerPixels[i];
+            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = a * weight;
           }
         }
       }
-      else if (state.maskType === 'color-range') {
-        const B = 360 / N;
-        const Ci = B * (i + 0.5);
-        const halfB = B / 2;
-        const f = Math.max(0.1, halfB * state.maskFeather);
+    } else if (state.maskType === 'color-range') {
+      const B = 360 / N;
+      const halfB = B / 2;
+      const f = Math.max(0.1, halfB * state.maskFeather);
+      for (let p = 0; p < srcPixels.length; p += 4) {
+        const r = srcPixels[p];
+        const g = srcPixels[p + 1];
+        const b = srcPixels[p + 2];
+        const a = srcPixels[p + 3];
 
-        for (let p = 0; p < srcPixels.length; p += 4) {
-          const r = srcPixels[p];
-          const g = srcPixels[p + 1];
-          const b = srcPixels[p + 2];
-          const a = srcPixels[p + 3];
+        if (a <= 10) continue;
+        const hsl = rgbToHsl(r, g, b);
+        const pixelHue = hsl.h;
+        const sat = hsl.s;
 
-          const { h: pixelHue, s: sat } = rgbToHsl(r, g, b);
-          
+        for (let i = 0; i < N; i++) {
+          const Ci = B * (i + 0.5);
           let weight = 0;
           if (sat < 0.12) {
             weight = i === Math.floor(N / 2) ? 0.4 : 0.0;
@@ -202,123 +248,70 @@ export class ImageProcessor {
             let dH = Math.abs(pixelHue - Ci);
             if (dH > 180) dH = 360 - dH;
 
-            if (dH <= halfB - f) {
-              weight = 1.0;
-            } else if (dH < halfB + f) {
+            if (dH <= halfB - f) weight = 1.0;
+            else if (dH < halfB + f) {
               let wVal = 1.0 - (dH - (halfB - f)) / (2 * f);
               weight = 3 * wVal * wVal - 2 * wVal * wVal * wVal;
             }
           }
-
           if (weight > 0.02) {
-            destPixels[p] = r;
-            destPixels[p + 1] = g;
-            destPixels[p + 2] = b;
-            destPixels[p + 3] = a * weight;
-          } else {
-            destPixels[p + 3] = 0;
+            const dest = layerPixels[i];
+            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = a * weight;
           }
         }
       }
-      else if (state.maskType === 'random' && state.randomBoundaries && state.randomBoundaries.length === N + 1) {
-        const Si = state.randomBoundaries[i];
-        const Ei = state.randomBoundaries[i + 1];
-        const Wi = Ei - Si;
-        const f = Math.max(0.1, Wi * state.maskFeather);
-        
-        for (let p = 0; p < srcPixels.length; p += 4) {
-          const r = srcPixels[p];
-          const g = srcPixels[p + 1];
-          const b = srcPixels[p + 2];
-          const a = srcPixels[p + 3];
+    } else if (state.maskType === 'random' && state.randomBoundaries && state.randomBoundaries.length === N + 1) {
+      for (let p = 0; p < srcPixels.length; p += 4) {
+        const r = srcPixels[p];
+        const g = srcPixels[p + 1];
+        const b = srcPixels[p + 2];
+        const a = srcPixels[p + 3];
 
-          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        if (a <= 10) continue;
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+        for (let i = 0; i < N; i++) {
+          const Si = state.randomBoundaries[i];
+          const Ei = state.randomBoundaries[i + 1];
+          const Wi = Ei - Si;
+          const f = Math.max(0.1, Wi * state.maskFeather);
           
           let weight = 0;
           if (lum >= Si + f && lum <= Ei - f) {
             weight = 1.0;
           } else if (lum < Si + f) {
-            if (i === 0) {
-              weight = 1.0;
-            } else if (lum >= Si - f) {
+            if (i === 0) weight = 1.0;
+            else if (lum >= Si - f) {
               let wVal = (lum - (Si - f)) / (2 * f);
               weight = 3 * wVal * wVal - 2 * wVal * wVal * wVal;
             }
           } else if (lum > Ei - f) {
-            if (i === N - 1) {
-              weight = 1.0;
-            } else if (lum <= Ei + f) {
+            if (i === N - 1) weight = 1.0;
+            else if (lum <= Ei + f) {
               let wVal = 1.0 - (lum - (Ei - f)) / (2 * f);
               weight = 3 * wVal * wVal - 2 * wVal * wVal * wVal;
             }
           }
-
           if (weight > 0.02) {
-            destPixels[p] = r;
-            destPixels[p + 1] = g;
-            destPixels[p + 2] = b;
-            destPixels[p + 3] = a * weight;
-          } else {
-            destPixels[p + 3] = 0;
+            const dest = layerPixels[i];
+            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = a * weight;
           }
         }
       }
+    }
 
-      layerCtx.putImageData(layerImgData, 0, 0);
+    // WRITE AND APPLY MASK
+    for (let i = 0; i < N; i++) {
+      layerCtxs[i].putImageData(layerImgDatas[i], 0, 0);
 
-      // Apply Layer Edge Fade (Vignette) if enabled
-      if (state.layerEdgeFade > 0) {
-        const fadeX = w * (state.layerEdgeFade / 100);
-        const fadeY = h * (state.layerEdgeFade / 100);
-
-        const maskCanvas = document.createElement('canvas');
-        maskCanvas.width = w;
-        maskCanvas.height = h;
-        const mCtx = maskCanvas.getContext('2d');
-
-        // Draw solid white center rectangle (the area that remains 100% opaque)
-        mCtx.fillStyle = '#ffffff';
-        mCtx.fillRect(fadeX, fadeY, w - 2 * fadeX, h - 2 * fadeY);
-
-        if (fadeY > 0) {
-          // Top edge gradient (transparent at y=0, white at y=fadeY)
-          const gradTop = mCtx.createLinearGradient(0, 0, 0, fadeY);
-          gradTop.addColorStop(0, 'rgba(255,255,255,0)');
-          gradTop.addColorStop(1, 'rgba(255,255,255,1)');
-          mCtx.fillStyle = gradTop;
-          mCtx.fillRect(0, 0, w, fadeY);
-
-          // Bottom edge gradient (transparent at y=h, white at y=h-fadeY)
-          const gradBottom = mCtx.createLinearGradient(0, h, 0, h - fadeY);
-          gradBottom.addColorStop(0, 'rgba(255,255,255,0)');
-          gradBottom.addColorStop(1, 'rgba(255,255,255,1)');
-          mCtx.fillStyle = gradBottom;
-          mCtx.fillRect(0, h - fadeY, w, fadeY);
-        }
-
-        if (fadeX > 0) {
-          // Left edge gradient (transparent at x=0, white at x=fadeX)
-          const gradLeft = mCtx.createLinearGradient(0, 0, fadeX, 0);
-          gradLeft.addColorStop(0, 'rgba(255,255,255,0)');
-          gradLeft.addColorStop(1, 'rgba(255,255,255,1)');
-          mCtx.fillStyle = gradLeft;
-          mCtx.fillRect(0, 0, fadeX, h);
-
-          // Right edge gradient (transparent at x=w, white at x=w-fadeX)
-          const gradRight = mCtx.createLinearGradient(w, 0, w - fadeX, 0);
-          gradRight.addColorStop(0, 'rgba(255,255,255,0)');
-          gradRight.addColorStop(1, 'rgba(255,255,255,1)');
-          mCtx.fillStyle = gradRight;
-          mCtx.fillRect(w - fadeX, 0, fadeX, h);
-        }
-
-        layerCtx.save();
-        layerCtx.globalCompositeOperation = 'destination-in';
-        layerCtx.drawImage(maskCanvas, 0, 0);
-        layerCtx.restore();
+      if (vignetteMaskCanvas) {
+        layerCtxs[i].save();
+        layerCtxs[i].globalCompositeOperation = 'destination-in';
+        layerCtxs[i].drawImage(vignetteMaskCanvas, 0, 0);
+        layerCtxs[i].restore();
       }
-
-      imgObj.layers.push(layerCanvas);
+      
+      imgObj.layers.push(layerCanvases[i]);
     }
   }
 

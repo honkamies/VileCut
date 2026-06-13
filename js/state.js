@@ -65,6 +65,8 @@ export const state = {
   glitchStyleBlock: false,
   glitchStyleLiquid: false,
   glitchStyleRandom: false,
+  glitchStyleFlicker: false,
+  glitchFlickerHighlightsOnly: false,
   activeSpikeStyle: null,
   rgbSplit: 0,
   pixelSort: 0,

@@ -2,6 +2,15 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.11.0] - 2026-06-13
+
+### Added
+- **Flicker & Strobe Glitch Effect**: Added a new glitch style that causes erratic brightness flashing (strobing) when triggered.
+- **Highlights Only Flicker**: Added an option to the Flicker effect to exclusively isolate and strobe the brightest pixels (luminance > 150), leaving shadows stable.
+
+### Optimized
+- **Rendering & Masking Performance**: Refactored the core renderer and masking engines to eliminate frame-by-frame canvas allocations, reuse cached globals, and implement O(1) single-pass pixel loops. This substantially reduces memory usage and garbage collection stutter.
+
 ## [1.10.0] - 2026-06-11
 
 ### Added

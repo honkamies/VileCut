@@ -87,6 +87,7 @@ export class GlitchManager {
       if (state.glitchStyleVhs) pool.push('vhs-sync-sag');
       if (state.glitchStyleBlock) pool.push('digital-block-tear');
       if (state.glitchStyleLiquid) pool.push('liquid-warp');
+      if (state.glitchStyleFlicker) pool.push('flicker-strobe');
 
       if (pool.length > 0) {
         state.activeSpikeStyle = pool[Math.floor(Math.random() * pool.length)];
@@ -364,7 +365,41 @@ export class GlitchManager {
       }
     }
 
-    // 5. Monochrome Conversion (Applies to all styles)
+    // 5. FLICKER & STROBE
+    if (state.glitchStyleFlicker) {
+      const isSpiking = checkSpike('flicker-strobe');
+      if (isSpiking) {
+        const imgData = renderCtx.getImageData(0, 0, w, h);
+        const data = imgData.data;
+        const len = data.length;
+        
+        const rFactor = (Math.random() > 0.5) ? 2.5 + Math.random() * 2.0 : 0.1 + Math.random() * 0.4;
+        const gFactor = state.glitchMonochrome ? rFactor : ((Math.random() > 0.5) ? 2.5 + Math.random() * 2.0 : 0.1 + Math.random() * 0.4);
+        const bFactor = state.glitchMonochrome ? rFactor : ((Math.random() > 0.5) ? 2.5 + Math.random() * 2.0 : 0.1 + Math.random() * 0.4);
+
+        for (let i = 0; i < len; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          
+          if (state.glitchFlickerHighlightsOnly) {
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (lum > 150) {
+              data[i] = Math.min(255, r * rFactor);
+              data[i + 1] = Math.min(255, g * gFactor);
+              data[i + 2] = Math.min(255, b * bFactor);
+            }
+          } else {
+            data[i] = Math.min(255, r * rFactor);
+            data[i + 1] = Math.min(255, g * gFactor);
+            data[i + 2] = Math.min(255, b * bFactor);
+          }
+        }
+        renderCtx.putImageData(imgData, 0, 0);
+      }
+    }
+
+    // 6. Monochrome Conversion (Applies to all styles)
     if (state.glitchMonochrome) {
       const imgData = renderCtx.getImageData(0, 0, w, h);
       const data = imgData.data;

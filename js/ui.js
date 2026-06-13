@@ -67,6 +67,8 @@ export const UI = {
   glitchStyleBlock: document.getElementById('glitch-style-block'),
   glitchStyleLiquid: document.getElementById('glitch-style-liquid'),
   glitchStyleRandom: document.getElementById('glitch-style-random'),
+  glitchStyleFlicker: document.getElementById('glitch-style-flicker'),
+  glitchFlickerHighlights: document.getElementById('glitch-flicker-highlights'),
   rgbSplit: document.getElementById('rgb-split'),
   rgbSplitVal: document.getElementById('rgb-split-val'),
   glitchMonochrome: document.getElementById('glitch-monochrome'),

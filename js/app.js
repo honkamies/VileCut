@@ -413,6 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
   bindGlitchCheckbox(UI.glitchStyleBlock, 'glitchStyleBlock');
   bindGlitchCheckbox(UI.glitchStyleLiquid, 'glitchStyleLiquid');
   bindGlitchCheckbox(UI.glitchStyleRandom, 'glitchStyleRandom');
+  bindGlitchCheckbox(UI.glitchStyleFlicker, 'glitchStyleFlicker');
+  bindGlitchCheckbox(UI.glitchFlickerHighlights, 'glitchFlickerHighlightsOnly');
 
   // Inspector Background Switcher Bindings
   UI.inspectorBgSelectors.forEach(btn => {
@@ -643,11 +645,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (UI.glitchStyleBlock) UI.glitchStyleBlock.checked = false;
     if (UI.glitchStyleLiquid) UI.glitchStyleLiquid.checked = false;
     if (UI.glitchStyleRandom) UI.glitchStyleRandom.checked = false;
+    if (UI.glitchStyleFlicker) UI.glitchStyleFlicker.checked = false;
+    if (UI.glitchFlickerHighlights) UI.glitchFlickerHighlights.checked = false;
     state.glitchStyleRgbSort = true;
     state.glitchStyleVhs = false;
     state.glitchStyleBlock = false;
     state.glitchStyleLiquid = false;
     state.glitchStyleRandom = false;
+    state.glitchStyleFlicker = false;
+    state.glitchFlickerHighlightsOnly = false;
     state.activeSpikeStyle = null;
 
     UI.videoFadeInActive.checked = false;
@@ -794,6 +800,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (UI.glitchStyleLiquid) UI.glitchStyleLiquid.checked = false;
       state.glitchStyleRandom = false;
       if (UI.glitchStyleRandom) UI.glitchStyleRandom.checked = false;
+      state.glitchStyleFlicker = false;
+      if (UI.glitchStyleFlicker) UI.glitchStyleFlicker.checked = false;
+      state.glitchFlickerHighlightsOnly = false;
+      if (UI.glitchFlickerHighlights) UI.glitchFlickerHighlights.checked = false;
       state.activeSpikeStyle = null;
 
       // 5. Exporter Settings
@@ -2151,6 +2161,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (UI.glitchStyleBlock) state.glitchStyleBlock = UI.glitchStyleBlock.checked;
   if (UI.glitchStyleLiquid) state.glitchStyleLiquid = UI.glitchStyleLiquid.checked;
   if (UI.glitchStyleRandom) state.glitchStyleRandom = UI.glitchStyleRandom.checked;
+  if (UI.glitchStyleFlicker) state.glitchStyleFlicker = UI.glitchStyleFlicker.checked;
+  if (UI.glitchFlickerHighlights) state.glitchFlickerHighlightsOnly = UI.glitchFlickerHighlights.checked;
   // Glitch Trigger bindings
   if (UI.btnAddGlitchTrigger) {
     UI.btnAddGlitchTrigger.addEventListener('click', () => {

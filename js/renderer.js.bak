@@ -10,8 +10,6 @@ export const videoBufferCanvas = document.createElement('canvas');
 export const videoBufferCtx = videoBufferCanvas.getContext('2d');
 export const videoMaskCanvas = document.createElement('canvas');
 export const videoMaskCtx = videoMaskCanvas.getContext('2d');
-export const kaleidoscopeMaskCanvas = document.createElement('canvas');
-export const kaleidoscopeMaskCtx = kaleidoscopeMaskCanvas.getContext('2d');
 export const ctx = UI.mainCanvas.getContext('2d');
 
 export function resizeMainCanvas() {
@@ -371,12 +369,10 @@ export function renderFrame(renderTime) {
     ctx.save();
     ctx.translate(cx, cy);
 
-    if (kaleidoscopeMaskCanvas.width !== canvasW || kaleidoscopeMaskCanvas.height !== canvasH) {
-      kaleidoscopeMaskCanvas.width = canvasW;
-      kaleidoscopeMaskCanvas.height = canvasH;
-    }
-    const mCtx = kaleidoscopeMaskCtx;
-    mCtx.clearRect(0, 0, canvasW, canvasH);
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = canvasW;
+    maskCanvas.height = canvasH;
+    const mCtx = maskCanvas.getContext('2d');
     
     mCtx.save();
     mCtx.translate(cx, cy);
@@ -394,7 +390,7 @@ export function renderFrame(renderTime) {
       if (s % 2 === 1) {
         ctx.scale(1, -1);
       }
-      ctx.drawImage(kaleidoscopeMaskCanvas, -cx, -cy);
+      ctx.drawImage(maskCanvas, -cx, -cy);
       ctx.restore();
     }
     ctx.restore();
