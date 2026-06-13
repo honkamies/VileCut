@@ -12,15 +12,32 @@ I asked AGY to create this as I needed something like this to my underground met
 - **Adaptive Luminosity Slicing**: Automatically splits images into distinct, detail-balanced depth bands using pixel-count histograms.
 - **Layer Edge Fade (Vignette)**: Soften harsh layer borders and blend contrasting images seamlessly using an adjustable vignette slider (0% to 50%).
 - **Layer Inspector Preview**: Inspect isolated mask layer details in real-time over customizable background swatches (Checkerboard, Black, White, Magenta).
+  ![Layer Inspector Preview](screenshots/Layerisolation.png)
+
 - **Infinite Diving Engine**: Exponential zoom camera tunnel ($S(z) = d^{(z - 0.5) \cdot 2.0}$) with auto-wrapping to create deep, hypnotic perspective loops.
+  ![Infinite Diving Engine](screenshots/infinitemotion.png)
+
 - **Unified Multi-Track Timeline**: Arrange video clips, graphic overlays (with full support for transparent PNGs), text blocks, and soundtracks across separate tracks. Move blocks freely or drag-reorder tracks vertically with automatic gap compression.
+  <br>![Unified Multi-Track Timeline](screenshots/timeline.png)
+  <br>![Graphic Settings](screenshots/graphicsetting.png)
+
 - **Multi-Track Video Integration**: Load local video files as Track 0 background video or layered Track 1+ foreground overlays. Independently control brightness, contrast, monochrome filters, panning (X/Y), mirror symmetries (horizontal, vertical, quad, and kaleidoscope), and edge feathering for each block.
+  ![Symmetrical Matrix](screenshots/symmetricalkmatrix.png)
+
 - **Smooth Audio & Video Fades**: Add customizable **Fade In** and **Fade Out** linear curves (0.0s to 5.0s) to video blocks (fading to black/transparency) and audio tracks to prevent visual or volume popping at loop boundaries.
 - **Timeline Glitch Triggers (⚡)**: Map deterministic glitch spikes directly onto specific timeline playhead coordinates, controlling custom durations and severity overrides.
 - **Stackable Cybernetic Glitch FX**: Toggle and combine multiple post-processing styles including RGB Channel Displacements, Pixel-Sorting, VHS Scanline Sag, Digital Block Tear, GPU Liquid Warp, and Flicker & Strobe (with Highlights Only mode) in color or monochrome/gray palettes.
+  ![Cybernetic Glitch FX](screenshots/cyberneticglitchfx.png)
+
 - **Aspect Ratio Selector**: Instantly scale and crop the canvas view to fit target platforms (**9:16 Portrait** for Instagram/TikTok, **1:1 Square**, **4:5 Feed**, **16:9 Landscape**, **21:9 Cinema**).
 - **Custom Fonts Support**: Automatically preloads custom TTF/OTF fonts placed in the `/fonts` directory. You can also load your own custom fonts on-the-fly directly from the UI while editing.
+  ![Text Settings](screenshots/textsettings.png)
+
 - **Exporting Engine**: Render high-fidelity client-side H.264/MP4 video files via the WebCodecs API and `mp4-muxer.js` (including audio offline rendering). Automatically falls back to WebM (MediaRecorder) if H.264 encoding is unsupported.
+  ![Exporting Engine](screenshots/exportinmachine.png)
+- **UI Themes & Resets**: Toggle between styling themes and reset granular configurations without losing loaded media.
+  ![Themes and Resets](screenshots/themeandresetbuttons.png)
+
 
 ---
 
