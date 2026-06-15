@@ -1108,6 +1108,14 @@ select:focus, select:hover {
   font-weight: 500;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
+
+.time-sig {
+  opacity: 0.6;
+  font-size: 0.85em;
+  font-weight: 400;
+  margin: 0 4px;
+  pointer-events: none;
+}
 .timeline-block:active {
   cursor: grabbing;
 }
