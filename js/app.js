@@ -1194,8 +1194,8 @@ document.addEventListener('DOMContentLoaded', () => {
       flickerIntensity: 0,
       transitionMode: 'fade-blur',
       transitionDuration: 0.4,
-      startTime: 0,
-      endTime: Math.min(duration, 3.0),
+      startTime: state.time,
+      endTime: Math.min(duration, state.time + 3.0),
       trackIndex: targetTrackIdx
     };
     
@@ -1219,9 +1219,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     const duration = getTimelineDuration();
-    let startTime = selectedTxt.endTime;
+    let startTime = state.time;
     if (startTime >= duration - 0.2) {
-      startTime = 0.0;
+      startTime = Math.max(0, duration - 3.0);
     }
     const endTime = Math.min(duration, startTime + 3.0);
     
@@ -1332,7 +1332,7 @@ document.addEventListener('DOMContentLoaded', () => {
           id: 'grp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
           img: img,
           fileName: file.name,
-          startTime: 0,
+          startTime: state.time,
           endTime: duration,
           x: 0.0,
           y: 0.0,
@@ -1701,16 +1701,9 @@ document.addEventListener('DOMContentLoaded', () => {
       video.addEventListener('loadedmetadata', () => {
         const dur = getTimelineDuration();
         
-        let startTime = 0;
-        if (state.videoBlocks && state.videoBlocks.length > 0) {
-          state.videoBlocks.forEach(b => {
-            if (b.endTime > startTime) {
-              startTime = b.endTime;
-            }
-          });
-        }
+        let startTime = state.time;
         if (startTime >= dur - 0.2) {
-          startTime = 0;
+          startTime = Math.max(0, dur - video.duration);
         }
         
         const newBlock = {
@@ -1780,9 +1773,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!selectedBlock) return;
       
       const dur = getTimelineDuration();
-      let startTime = selectedBlock.endTime;
-      if (startTime >= dur - 0.2) startTime = 0.0;
+      let startTime = state.time;
       const blockDuration = selectedBlock.endTime - selectedBlock.startTime;
+      if (startTime >= dur - 0.2) startTime = Math.max(0, dur - blockDuration);
       const endTime = Math.min(dur, startTime + blockDuration);
       
       const clonedVideo = document.createElement('video');
