@@ -1,4 +1,34 @@
-export const state = {
+class Store {
+  constructor(initialState) {
+    this.listeners = new Map();
+    this.state = new Proxy(initialState, {
+      set: (target, property, value) => {
+        if (target[property] === value) return true;
+        target[property] = value;
+        this.notify(property, value);
+        return true;
+      }
+    });
+  }
+
+  subscribe(property, callback) {
+    if (!this.listeners.has(property)) {
+      this.listeners.set(property, new Set());
+    }
+    this.listeners.get(property).add(callback);
+    return () => this.listeners.get(property).delete(callback);
+  }
+
+  notify(property, value) {
+    if (this.listeners.has(property)) {
+      for (const callback of this.listeners.get(property)) {
+        callback(value, this.state);
+      }
+    }
+  }
+}
+
+export const storeInstance = new Store({
   // Media & Image Elements
   uploadedImages: [], // Array of { id, name, img, layers: [] }
   activeImageIndex: -1,
@@ -97,4 +127,7 @@ export const state = {
   videoFadeOutDuration: 0.5,
   exportResolution: '1080',
   exportCancel: false
-};
+});
+
+export const state = storeInstance.state;
+export const subscribe = storeInstance.subscribe.bind(storeInstance);

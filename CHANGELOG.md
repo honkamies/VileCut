@@ -2,6 +2,19 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.12.0] - 2026-06-27
+
+### Security
+- **Content-Security-Policy (CSP)**: Added strict CSP meta tag in `index.html`.
+- **XSS Mitigation**: Replaced `innerHTML` interpolations with safe DOM nodes or escaped text in `app.js` and `timeline.js` to mitigate cross-site scripting vulnerabilities.
+
+### Optimized
+- **Rendering Performance**: Cached filter strings in `renderer.js` and `overlays.js` to avoid redundant and expensive canvas context allocations on every frame.
+
+### Refactored
+- **Reactive State Architecture**: Transformed the monolithic mutable state (`state.js`) into a Proxy-based reactive `Store`, automatically notifying subsystems on state changes.
+- **Decoupled Engine**: Extracted the core `requestAnimationFrame` render loop from `app.js` into an isolated, event-driven `Engine` (`engine.js`).
+
 ## [1.11.0] - 2026-06-13
 
 ### Added

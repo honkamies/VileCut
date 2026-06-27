@@ -5,6 +5,7 @@ import { ImageProcessor, drawInspectorPreview, drawMaskGraph } from './masking.j
 import { GlitchManager } from './glitch.js';
 import { stopAudioSource, syncAudioPlayback, getAudioContext, activeAudioGain, activeAudioSource } from './audio.js';
 import { resizeMainCanvas, renderFrame, ctx } from './renderer.js';
+import { engine } from './engine.js';
 import {
   updateTimelineTracks,
   updateTimelineRuler,
@@ -107,8 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     await addImages(files);
     
     if (state.uploadedImages.length > 0) {
-      state.lastFrameTime = performance.now();
-      requestAnimationFrame(animationLoop);
+      engine.start();
     }
   }
 
@@ -150,7 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const btnRemove = document.createElement('button');
       btnRemove.className = 'btn-remove-deck-item';
       btnRemove.title = 'Remove this image';
-      btnRemove.innerHTML = '<i data-lucide="x"></i>';
+      const icon = document.createElement('i');
+      icon.setAttribute('data-lucide', 'x');
+      btnRemove.appendChild(icon);
 
       btnRemove.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -288,19 +290,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- ANIMATION LOOP ---
-  function animationLoop(timestamp) {
-    // If exporting, let the exporter handle render steps.
-    // We keep scheduling the loop so it automatically resumes once isExporting changes to false.
-    if (state.isExporting) {
-      requestAnimationFrame(animationLoop);
-      return;
-    }
-
-    if (!state.lastFrameTime) state.lastFrameTime = timestamp;
-    const dt = (timestamp - state.lastFrameTime) / 1000;
-    state.lastFrameTime = timestamp;
-
+  // --- ANIMATION LOOP DECOUPLED VIA ENGINE ---
+  engine.subscribe((dt, timestamp) => {
     if (dt > 0) {
       state.fps = Math.round(1 / dt);
       UI.fpsValue.innerText = state.fps;
@@ -341,9 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.videoBlocks && state.videoBlocks.length > 0) {
       syncVideoPlayback();
     }
-
-    requestAnimationFrame(animationLoop);
-  }
+  });
 
   // --- DRAG AND DROP / FILE INPUTS ---
   window.addEventListener('dragover', (e) => {

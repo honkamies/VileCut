@@ -5,6 +5,10 @@ const overlayVideoCanvas = document.createElement('canvas');
 const overlayVideoCtx = overlayVideoCanvas.getContext('2d');
 const overlayVideoMaskCanvas = document.createElement('canvas');
 const overlayVideoMaskCtx = overlayVideoMaskCanvas.getContext('2d');
+const textCanvas = document.createElement('canvas');
+const textCtx = textCanvas.getContext('2d');
+
+let lastOverlayVideoFilter = '';
 
 
 function getTransitionProgress(textObj, loopTime) {
@@ -607,7 +611,11 @@ export function drawVideoOverlay(renderCtx, w, h, time, vid) {
   const brightnessVal = vid.brightness !== undefined ? vid.brightness : 100;
   const contrastVal = vid.contrast !== undefined ? vid.contrast : 100;
   const monochromeStr = vid.monochrome ? 'grayscale(100%)' : '';
-  overlayVideoCtx.filter = `brightness(${brightnessVal}%) contrast(${contrastVal}%) ${monochromeStr}`.trim() || 'none';
+  const newFilter = `brightness(${brightnessVal}%) contrast(${contrastVal}%) ${monochromeStr}`.trim() || 'none';
+  if (lastOverlayVideoFilter !== newFilter) {
+    overlayVideoCtx.filter = newFilter;
+    lastOverlayVideoFilter = newFilter;
+  }
   overlayVideoCtx.clearRect(0, 0, w, h);
 
   const video = vid.element;

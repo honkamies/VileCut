@@ -14,6 +14,8 @@ export const kaleidoscopeMaskCanvas = document.createElement('canvas');
 export const kaleidoscopeMaskCtx = kaleidoscopeMaskCanvas.getContext('2d');
 export const ctx = UI.mainCanvas.getContext('2d');
 
+let lastVideoBufferFilter = '';
+
 export function resizeMainCanvas() {
   if (state.uploadedImages.length === 0 || state.activeImageIndex === -1) return;
   const activeImgObj = state.uploadedImages[state.activeImageIndex];
@@ -79,7 +81,11 @@ export function renderFrame(renderTime) {
     const brightnessVal = activeBlock.brightness !== undefined ? activeBlock.brightness : 100;
     const contrastVal = activeBlock.contrast !== undefined ? activeBlock.contrast : 100;
     const monochromeStr = activeBlock.monochrome ? 'grayscale(100%)' : '';
-    videoBufferCtx.filter = `brightness(${brightnessVal}%) contrast(${contrastVal}%) ${monochromeStr}`.trim() || 'none';
+    const newFilter = `brightness(${brightnessVal}%) contrast(${contrastVal}%) ${monochromeStr}`.trim() || 'none';
+    if (lastVideoBufferFilter !== newFilter) {
+      videoBufferCtx.filter = newFilter;
+      lastVideoBufferFilter = newFilter;
+    }
     videoBufferCtx.clearRect(0, 0, bw, bh);
 
 
