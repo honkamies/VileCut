@@ -15,6 +15,9 @@ export const kaleidoscopeMaskCtx = kaleidoscopeMaskCanvas.getContext('2d');
 export const ctx = UI.mainCanvas.getContext('2d');
 
 let lastVideoBufferFilter = '';
+let localCameraAngle = 0;
+
+
 
 export function resizeMainCanvas() {
   if (state.uploadedImages.length === 0 || state.activeImageIndex === -1) return;
@@ -22,8 +25,6 @@ export function resizeMainCanvas() {
   const activeImg = activeImgObj.img;
 
   const container = UI.mainCanvas.parentElement;
-  const cw = container.clientWidth;
-  const ch = container.clientHeight;
 
   const imgW = activeImg.naturalWidth;
   const imgH = activeImg.naturalHeight;
@@ -37,6 +38,12 @@ export function resizeMainCanvas() {
   else if (arMode === '4-5') ratio = 4 / 5;
   else if (arMode === '21-9') ratio = 21 / 9;
 
+  // Resize viewport container to preserve aspect ratio framing in CSS
+  container.style.aspectRatio = ratio;
+
+  const cw = container.clientWidth;
+  const ch = container.clientHeight;
+
   let canvasW = cw;
   let canvasH = cw / ratio;
 
@@ -47,9 +54,6 @@ export function resizeMainCanvas() {
 
   UI.mainCanvas.width = canvasW;
   UI.mainCanvas.height = canvasH;
-
-  // Resize viewport container to preserve aspect ratio framing in CSS
-  container.style.aspectRatio = ratio;
 
   // Size offscreen canvas buffer to match the active ratio with 1024px bounds
   const maxDim = 1024;
@@ -292,7 +296,7 @@ export function renderFrame(renderTime) {
     offscreenCtx.translate(driftX, driftY);
   }
 
-  state.cameraAngle += (state.cameraRotation * (1/60)) * (Math.PI / 180);
+  localCameraAngle += (state.cameraRotation * (1/60)) * (Math.PI / 180);
 
   layerDepths.forEach(({ layer, z, scale, opacity }) => {
     if (opacity <= 0 || !layer.canvas) return;
@@ -300,7 +304,7 @@ export function renderFrame(renderTime) {
     offscreenCtx.save();
     offscreenCtx.translate(bw / 2, bh / 2);
     
-    const twist = state.cameraAngle * (1.0 - z * 0.4);
+    const twist = localCameraAngle * (1.0 - z * 0.4);
     offscreenCtx.rotate(twist);
 
     // Apply crop scaling (cover) to match the layer aspect ratio to viewport buffer aspect ratio

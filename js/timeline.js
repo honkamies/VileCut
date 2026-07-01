@@ -78,43 +78,83 @@ function clampVideoIntervals() {
   });
 }
 
-export function normalizeTracks() {
-  const indices = [];
-  state.texts.forEach(t => indices.push(t.trackIndex !== undefined ? t.trackIndex : 0));
-  state.graphics.forEach(g => indices.push(g.trackIndex !== undefined ? g.trackIndex : 0));
-  if (state.videoBlocks) {
-    state.videoBlocks.forEach(v => indices.push(v.trackIndex !== undefined ? v.trackIndex : 0));
-  }
+export function swapTracks(trackIndexA, trackIndexB) {
+  if (trackIndexA === 0 || trackIndexB === 0) return;
 
-  // Separate Track 0 (Background) from Track 1+ (Foreground) to prevent foreground elements from slipping behind looping depth layers
-  const foregroundIndices = indices.filter(idx => idx >= 1);
-  const uniqueForeground = [...new Set(foregroundIndices)].sort((a, b) => a - b);
-  
+  const blocksA = [];
+  const blocksB = [];
+
   state.texts.forEach(t => {
-    const oldIdx = t.trackIndex !== undefined ? t.trackIndex : 0;
-    if (oldIdx === 0) {
-      t.trackIndex = 0;
-    } else {
-      t.trackIndex = uniqueForeground.indexOf(oldIdx) + 1;
-    }
+    const trk = t.trackIndex !== undefined ? t.trackIndex : 0;
+    if (trk === trackIndexA) blocksA.push(t);
+    else if (trk === trackIndexB) blocksB.push(t);
   });
+
   state.graphics.forEach(g => {
-    const oldIdx = g.trackIndex !== undefined ? g.trackIndex : 0;
-    if (oldIdx === 0) {
-      g.trackIndex = 0;
-    } else {
-      g.trackIndex = uniqueForeground.indexOf(oldIdx) + 1;
-    }
+    const trk = g.trackIndex !== undefined ? g.trackIndex : 0;
+    if (trk === trackIndexA) blocksA.push(g);
+    else if (trk === trackIndexB) blocksB.push(g);
   });
+
   if (state.videoBlocks) {
     state.videoBlocks.forEach(v => {
-      const oldIdx = v.trackIndex !== undefined ? v.trackIndex : 0;
-      if (oldIdx === 0) {
-        v.trackIndex = 0;
-      } else {
-        v.trackIndex = uniqueForeground.indexOf(oldIdx) + 1;
+      const trk = v.trackIndex !== undefined ? v.trackIndex : 0;
+      if (trk === trackIndexA) blocksA.push(v);
+      else if (trk === trackIndexB) blocksB.push(v);
+    });
+  }
+
+  blocksA.forEach(b => b.trackIndex = trackIndexB);
+  blocksB.forEach(b => b.trackIndex = trackIndexA);
+}
+
+export function normalizeTracks() {
+  const foregroundBlocks = [];
+  
+  state.texts.forEach(t => {
+    const trk = t.trackIndex !== undefined ? t.trackIndex : 0;
+    if (trk >= 1) {
+      foregroundBlocks.push({ type: 'text', ref: t });
+    }
+  });
+
+  state.graphics.forEach(g => {
+    const trk = g.trackIndex !== undefined ? g.trackIndex : 0;
+    if (trk >= 1) {
+      foregroundBlocks.push({ type: 'graphic', ref: g });
+    }
+  });
+
+  if (state.videoBlocks) {
+    state.videoBlocks.forEach(v => {
+      const trk = v.trackIndex !== undefined ? v.trackIndex : 0;
+      if (trk >= 1) {
+        foregroundBlocks.push({ type: 'video', ref: v });
       }
     });
+  }
+
+  // Sort foreground blocks: preserve relative order, use selected block and startTime as tie-breakers
+  foregroundBlocks.sort((a, b) => {
+    const trackDiff = (a.ref.trackIndex || 0) - (b.ref.trackIndex || 0);
+    if (trackDiff !== 0) return trackDiff;
+    const aSelected = a.ref.id === state.selectedTextId || a.ref.id === state.selectedGraphicId || a.ref.id === state.selectedVideoId;
+    const bSelected = b.ref.id === state.selectedTextId || b.ref.id === state.selectedGraphicId || b.ref.id === state.selectedVideoId;
+    if (aSelected && !bSelected) return 1;
+    if (!aSelected && bSelected) return -1;
+    return a.ref.startTime - b.ref.startTime;
+  });
+
+  // Assign clean, consecutive, unique track indices starting from 1
+  foregroundBlocks.forEach((blockItem, index) => {
+    blockItem.ref.trackIndex = index + 1;
+  });
+
+  // Force re-trigger of state proxy setters
+  state.texts = [...state.texts];
+  state.graphics = [...state.graphics];
+  if (state.videoBlocks) {
+    state.videoBlocks = [...state.videoBlocks];
   }
 }
 
@@ -267,6 +307,78 @@ export function updateTimelineTracks() {
       row.appendChild(block);
     });
 
+    UI.timelineTracks.appendChild(row);
+  }
+
+  // 1.5. Render Image Tunnel reference track if we have uploaded images
+  if (state.uploadedImages.length > 0) {
+    const row = document.createElement('div');
+    row.className = 'timeline-track-row image-tunnel-row';
+    row.style.height = '24px';
+    row.style.background = 'rgba(155, 81, 224, 0.03)';
+    row.style.borderBottom = '1px dashed rgba(155, 81, 224, 0.15)';
+    row.style.pointerEvents = 'none';
+
+    const block = document.createElement('div');
+    block.className = 'timeline-block image-tunnel-block';
+    block.style.left = '0%';
+    block.style.width = '100%';
+    block.style.height = '18px';
+    block.style.top = '3px';
+    block.style.background = 'linear-gradient(90deg, rgba(155, 81, 224, 0.08) 0%, rgba(0, 242, 254, 0.08) 100%)';
+    block.style.border = '1px dashed rgba(155, 81, 224, 0.3)';
+    block.style.display = 'flex';
+    block.style.alignItems = 'center';
+    block.style.justifyContent = 'space-between';
+    block.style.padding = '0 10px';
+    block.style.boxSizing = 'border-box';
+    block.style.position = 'absolute';
+    block.style.fontFamily = 'var(--font-display)';
+    block.style.fontSize = '0.65rem';
+    block.style.color = 'var(--text-muted)';
+
+    const labelSpan = document.createElement('span');
+    labelSpan.innerHTML = '🌀 <strong>Image Tunnel Loops</strong>';
+    labelSpan.style.color = 'rgba(255, 255, 255, 0.5)';
+    block.appendChild(labelSpan);
+
+    const speed = Math.abs(state.zoomSpeed);
+    let cycles = 1;
+    if (speed > 0.0001) {
+      cycles = Math.max(1, Math.round(dur * speed));
+    }
+    
+    for (let k = 1; k < cycles; k++) {
+      const pct = (k / cycles) * 100;
+      const marker = document.createElement('div');
+      marker.style.position = 'absolute';
+      marker.style.left = `${pct}%`;
+      marker.style.top = '0';
+      marker.style.bottom = '0';
+      marker.style.width = '1px';
+      marker.style.borderLeft = '2px dotted rgba(0, 242, 254, 0.5)';
+      marker.style.zIndex = '5';
+      
+      const markerLabel = document.createElement('span');
+      markerLabel.textContent = `Loop ${k}`;
+      markerLabel.style.position = 'absolute';
+      markerLabel.style.left = '4px';
+      markerLabel.style.bottom = '2px';
+      markerLabel.style.fontSize = '0.55rem';
+      markerLabel.style.color = 'var(--text-muted)';
+      markerLabel.style.fontFamily = 'var(--font-mono)';
+      marker.appendChild(markerLabel);
+      
+      block.appendChild(marker);
+    }
+
+    const infoSpan = document.createElement('span');
+    infoSpan.textContent = `${cycles} Zoom Cycle${cycles > 1 ? 's' : ''}`;
+    infoSpan.style.fontFamily = 'var(--font-mono)';
+    infoSpan.style.color = 'rgba(255, 255, 255, 0.3)';
+    block.appendChild(infoSpan);
+
+    row.appendChild(block);
     UI.timelineTracks.appendChild(row);
   }
 

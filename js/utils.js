@@ -37,7 +37,11 @@ export async function loadConfiguredFonts() {
     for (const font of fontList) {
       if (font.name && font.url) {
         try {
-          const fontFace = new FontFace(font.name, `url(${font.url})`);
+          let u;
+          try { u = new URL(font.url, location.origin); } catch { continue; }
+          if (!['http:', 'https:'].includes(u.protocol)) continue;
+
+          const fontFace = new FontFace(font.name, `url("${u.href}")`);
           const loadedFace = await fontFace.load();
           document.fonts.add(loadedFace);
 
@@ -79,16 +83,24 @@ export function getAdjustedZoomSpeed(dur) {
   return direction * (cycles / dur);
 }
 
+const fadeMaskCanvas = document.createElement('canvas');
+const fadeMaskCtx = fadeMaskCanvas.getContext('2d');
+
 export function applyEdgeFade(ctx, x, y, w, h, fadePercent) {
   if (fadePercent <= 0) return;
   
   const fadeX = w * (fadePercent / 100);
   const fadeY = h * (fadePercent / 100);
   
-  const maskCanvas = document.createElement('canvas');
-  maskCanvas.width = ctx.canvas.width;
-  maskCanvas.height = ctx.canvas.height;
-  const mCtx = maskCanvas.getContext('2d');
+  const cw = ctx.canvas.width;
+  const ch = ctx.canvas.height;
+  if (fadeMaskCanvas.width !== cw || fadeMaskCanvas.height !== ch) {
+    fadeMaskCanvas.width = cw;
+    fadeMaskCanvas.height = ch;
+  }
+  
+  const mCtx = fadeMaskCtx;
+  mCtx.clearRect(0, 0, cw, ch);
   
   mCtx.fillStyle = '#ffffff';
   mCtx.fillRect(x + fadeX, y + fadeY, w - 2 * fadeX, h - 2 * fadeY);
@@ -123,6 +135,6 @@ export function applyEdgeFade(ctx, x, y, w, h, fadePercent) {
   
   ctx.save();
   ctx.globalCompositeOperation = 'destination-in';
-  ctx.drawImage(maskCanvas, 0, 0);
+  ctx.drawImage(fadeMaskCanvas, 0, 0);
   ctx.restore();
 }

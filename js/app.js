@@ -15,7 +15,9 @@ import {
   selectVideo,
   selectGraphic,
   selectGlitchTrigger,
-  initTimelineEvents
+  initTimelineEvents,
+  normalizeTracks,
+  swapTracks
 } from './timeline.js';
 import { VideoExporter } from './exporter.js';
 
@@ -97,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ImageProcessor.reprocessAllImagesLayers();
       ImageProcessor.initializeRenderStack();
       updateImagesDeckUI();
+      updateTimelineTracks();
       autoExpandPanelsOnUpload();
     } else {
       state.imageLoaded = false;
@@ -373,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, UI.mainCanvas.width, UI.mainCanvas.height);
     updateImagesDeckUI();
+    updateTimelineTracks();
     ImageProcessor.renderActiveImageLayersPreview();
   });
 
@@ -1183,8 +1187,8 @@ document.addEventListener('DOMContentLoaded', () => {
       flickerIntensity: 0,
       transitionMode: 'fade-blur',
       transitionDuration: 0.4,
-      startTime: state.time,
-      endTime: Math.min(duration, state.time + 3.0),
+      startTime: 0,
+      endTime: duration,
       trackIndex: targetTrackIdx
     };
     
@@ -1321,7 +1325,7 @@ document.addEventListener('DOMContentLoaded', () => {
           id: 'grp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
           img: img,
           fileName: file.name,
-          startTime: state.time,
+          startTime: 0,
           endTime: duration,
           x: 0.0,
           y: 0.0,
@@ -1785,6 +1789,110 @@ document.addEventListener('DOMContentLoaded', () => {
         selectVideo(newBlock.id);
         renderFrame(state.time);
       });
+    });
+  }
+  // Layer Move Up / Down Event Listeners with track swapping
+  if (UI.btnVideoMoveUp) {
+    UI.btnVideoMoveUp.addEventListener('click', () => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        const newTrack = oldTrack + 1;
+        if (oldTrack === 0) {
+          block.trackIndex = 1;
+        } else {
+          swapTracks(oldTrack, newTrack);
+        }
+        normalizeTracks();
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.btnVideoMoveDown) {
+    UI.btnVideoMoveDown.addEventListener('click', () => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        if (oldTrack > 0) {
+          const newTrack = oldTrack - 1;
+          if (newTrack === 0) {
+            block.trackIndex = 0;
+          } else {
+            swapTracks(oldTrack, newTrack);
+          }
+          normalizeTracks();
+          updateTimelineTracks();
+          renderFrame(state.time);
+        }
+      }
+    });
+  }
+
+  if (UI.btnTextMoveUp) {
+    UI.btnTextMoveUp.addEventListener('click', () => {
+      if (!state.selectedTextId) return;
+      const block = state.texts.find(t => t.id === state.selectedTextId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        const newTrack = oldTrack + 1;
+        swapTracks(oldTrack, newTrack);
+        normalizeTracks();
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.btnTextMoveDown) {
+    UI.btnTextMoveDown.addEventListener('click', () => {
+      if (!state.selectedTextId) return;
+      const block = state.texts.find(t => t.id === state.selectedTextId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        if (oldTrack > 1) {
+          const newTrack = oldTrack - 1;
+          swapTracks(oldTrack, newTrack);
+          normalizeTracks();
+          updateTimelineTracks();
+          renderFrame(state.time);
+        }
+      }
+    });
+  }
+
+  if (UI.btnGraphicMoveUp) {
+    UI.btnGraphicMoveUp.addEventListener('click', () => {
+      if (!state.selectedGraphicId) return;
+      const block = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        const newTrack = oldTrack + 1;
+        swapTracks(oldTrack, newTrack);
+        normalizeTracks();
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.btnGraphicMoveDown) {
+    UI.btnGraphicMoveDown.addEventListener('click', () => {
+      if (!state.selectedGraphicId) return;
+      const block = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        if (oldTrack > 1) {
+          const newTrack = oldTrack - 1;
+          swapTracks(oldTrack, newTrack);
+          normalizeTracks();
+          updateTimelineTracks();
+          renderFrame(state.time);
+        }
+      }
     });
   }
 

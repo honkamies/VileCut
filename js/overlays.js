@@ -621,11 +621,31 @@ export function drawVideoOverlay(renderCtx, w, h, time, vid) {
   const video = vid.element;
   const vw = video.videoWidth || video.width || w;
   const vh = video.videoHeight || video.height || h;
-  const coverScale = Math.max(w / vw, h / vh);
-  const drawW = vw * coverScale;
-  const drawH = vh * coverScale;
-  const drawX = (w - drawW) / 2 + (vid.x !== undefined ? vid.x : 0.0) * w;
-  const drawY = (h - drawH) / 2 + (vid.y !== undefined ? vid.y : 0.0) * h;
+
+  const isForeground = (vid.trackIndex !== undefined ? vid.trackIndex : 0) >= 1;
+  let drawW, drawH, drawX, drawY;
+
+  if (isForeground) {
+    // Behave like a graphic overlay: base size on native video resolution scaled by scale factor
+    const scaleMultiplier = w / 1024;
+    const scaleFactor = vid.scale !== undefined ? vid.scale / 100 : 1.0;
+    drawW = vw * scaleFactor * scaleMultiplier;
+    drawH = vh * scaleFactor * scaleMultiplier;
+    
+    // Position coordinates: x and y are relative to canvas center
+    const cx = w / 2;
+    const cy = h / 2;
+    drawX = cx + (vid.x !== undefined ? vid.x : 0.0) * w - drawW / 2;
+    drawY = cy + (vid.y !== undefined ? vid.y : 0.0) * h - drawH / 2;
+  } else {
+    // Background cover-scale behavior
+    const coverScale = Math.max(w / vw, h / vh);
+    drawW = vw * coverScale;
+    drawH = vh * coverScale;
+    drawX = (w - drawW) / 2 + (vid.x !== undefined ? vid.x : 0.0) * w;
+    drawY = (h - drawH) / 2 + (vid.y !== undefined ? vid.y : 0.0) * h;
+  }
+
   overlayVideoCtx.drawImage(video, drawX, drawY, drawW, drawH);
   if (vid.edgeFade > 0) {
     applyEdgeFade(overlayVideoCtx, drawX, drawY, drawW, drawH, vid.edgeFade);

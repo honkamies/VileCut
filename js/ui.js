@@ -141,6 +141,8 @@ export const UI = {
   textTransitionDurationVal: document.getElementById('text-transition-duration-val'),
   btnCopyText: document.getElementById('btn-copy-text'),
   btnDeleteText: document.getElementById('btn-delete-text'),
+  btnTextMoveUp: document.getElementById('btn-text-move-up'),
+  btnTextMoveDown: document.getElementById('btn-text-move-down'),
 
   // Audio Settings Section References
   audioSettingsSection: document.getElementById('audio-settings-section'),
@@ -181,6 +183,10 @@ export const UI = {
   videoPosYVal: document.getElementById('video-pos-y-val'),
   videoEdgeFade: document.getElementById('video-edge-fade'),
   videoEdgeFadeVal: document.getElementById('video-edge-fade-val'),
+  videoScale: document.getElementById('video-scale'),
+  videoScaleVal: document.getElementById('video-scale-val'),
+  btnVideoMoveUp: document.getElementById('btn-video-move-up'),
+  btnVideoMoveDown: document.getElementById('btn-video-move-down'),
   videoFadeIn: document.getElementById('video-fade-in'),
   videoFadeInVal: document.getElementById('video-fade-in-val'),
   videoFadeOut: document.getElementById('video-fade-out'),
@@ -207,6 +213,8 @@ export const UI = {
   graphicFlickerIntensity: document.getElementById('graphic-flicker-intensity'),
   graphicFlickerIntensityVal: document.getElementById('graphic-flicker-intensity-val'),
   btnDeleteGraphic: document.getElementById('btn-delete-graphic'),
+  btnGraphicMoveUp: document.getElementById('btn-graphic-move-up'),
+  btnGraphicMoveDown: document.getElementById('btn-graphic-move-down'),
   graphicBrightness: document.getElementById('graphic-brightness'),
   graphicBrightnessVal: document.getElementById('graphic-brightness-val'),
   graphicContrast: document.getElementById('graphic-contrast'),
