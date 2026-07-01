@@ -2,6 +2,17 @@
 
 All notable changes to the Videomaddness application will be documented in this file.
 
+## [1.13.0] - 2026-07-01
+
+### Fixed
+- **Timeline Track Swapping**: Implemented row-level track swapping that works symmetrically regardless of block time overlap.
+- **Rendering Visibility Bug**: Fixed overlay drawing visibility by computing the maximum active track dynamically on every frame.
+- **Layer ordering bounds**: Restricted Text and Graphic overlays from dropping below Track 1 to prevent them from sliding behind the background image tunnel layer.
+
+### Added
+- **Image Tunnel Loop Reference Track**: Introduced a read-only visual timeline track indicating exactly where the background image loops repeat.
+- **Full Duration Preset**: Configured newly added Text and Graphic overlays to span the entire duration of the timeline by default.
+
 ## [1.12.0] - 2026-06-27
 
 ### Security
