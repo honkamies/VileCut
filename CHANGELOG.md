@@ -1,6 +1,20 @@
 # Changelog
 
-All notable changes to the Videomaddness application will be documented in this file.
+All notable changes to the VileCut application will be documented in this file.
+
+## [1.14.0] - 2026-07-06
+
+### Rebranded
+- **Rebranded from Videomaddness to VileCut**: Renamed all titles, headers, logos, container services, export file prefixes, script logs, and documentation to VileCut.
+
+### Fixed
+- **Timeline Video Block Selection**: Upgraded the timeline selection handler to target specific video block IDs (`vid_...`) instead of resolving to a generic boolean flag.
+- **XSS Prevention in Timeline Labels**: Refactored block label creation on the timeline to use structured DOM elements (`createTimelineLabel`) instead of unsafe `innerHTML` string interpolations.
+- **Camera Rotation Jumping**: Resolved rotational jump issues by accumulating time-based camera rotation with `cameraRotationBase`.
+- **Mask Graph Hue Calculation**: Fixed the mask graph renderer to correctly scale using `state.hueTolerance` rather than `B`.
+
+### Refactored
+- **Code Cleanups**: Removed unused canvas variables (`textCanvas`/`textCtx`) from the overlays manager.
 
 ## [1.13.0] - 2026-07-01
 

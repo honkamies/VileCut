@@ -2,6 +2,9 @@ import { state } from './state.js';
 import { UI } from './ui.js';
 import { getTimelineDuration } from './utils.js';
 
+let liquidTempCanvas = null;
+let liquidTempCtx = null;
+
 export class GlitchManager {
   static update(dt) {
     if (!state.glitchEnabled) {
@@ -351,15 +354,20 @@ export class GlitchManager {
         }
 
         if (severity > 0) {
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = w;
-          tempCanvas.height = h;
-          const tempCtx = tempCanvas.getContext('2d');
-          tempCtx.drawImage(renderCtx.canvas, 0, 0);
+          if (!liquidTempCanvas) {
+            liquidTempCanvas = document.createElement('canvas');
+            liquidTempCtx = liquidTempCanvas.getContext('2d');
+          }
+          if (liquidTempCanvas.width !== w || liquidTempCanvas.height !== h) {
+            liquidTempCanvas.width = w;
+            liquidTempCanvas.height = h;
+          }
+          liquidTempCtx.clearRect(0, 0, w, h);
+          liquidTempCtx.drawImage(renderCtx.canvas, 0, 0);
 
           renderCtx.clearRect(0, 0, w, h);
           renderCtx.filter = 'url(#liquid-warp-filter)';
-          renderCtx.drawImage(tempCanvas, 0, 0);
+          renderCtx.drawImage(liquidTempCanvas, 0, 0);
           renderCtx.filter = 'none';
         }
       }
@@ -401,19 +409,22 @@ export class GlitchManager {
 
     // 6. Monochrome Conversion (Applies to all styles)
     if (state.glitchMonochrome) {
-      const imgData = renderCtx.getImageData(0, 0, w, h);
-      const data = imgData.data;
-      const len = data.length;
-      for (let i = 0; i < len; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const v = 0.299 * r + 0.587 * g + 0.114 * b;
-        data[i] = v;
-        data[i + 1] = v;
-        data[i + 2] = v;
+      if (!liquidTempCanvas) {
+        liquidTempCanvas = document.createElement('canvas');
+        liquidTempCtx = liquidTempCanvas.getContext('2d');
       }
-      renderCtx.putImageData(imgData, 0, 0);
+      if (liquidTempCanvas.width !== w || liquidTempCanvas.height !== h) {
+        liquidTempCanvas.width = w;
+        liquidTempCanvas.height = h;
+      }
+      liquidTempCtx.clearRect(0, 0, w, h);
+      liquidTempCtx.drawImage(renderCtx.canvas, 0, 0);
+
+      renderCtx.save();
+      renderCtx.filter = 'grayscale(100%)';
+      renderCtx.clearRect(0, 0, w, h);
+      renderCtx.drawImage(liquidTempCanvas, 0, 0);
+      renderCtx.restore();
     }
   }
 }

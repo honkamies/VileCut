@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-echo "Starting Videomaddness Modular Test Server..."
+echo "Starting VileCut Modular Test Server..."
 
 # Check if Python is installed
 if command -v python3 &>/dev/null; then

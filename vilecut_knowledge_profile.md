@@ -1,13 +1,13 @@
-# MemPalace Knowledge Profile: Videomaddness Project
+# MemPalace Knowledge Profile: VileCut Project
 
-This profile contains the verbatim knowledge, architecture, schemas, and configurations of the **Videomaddness** application. It is structured for ingestion into AI long-term memory systems (Wings/Rooms/Drawers).
+This profile contains the verbatim knowledge, architecture, schemas, and configurations of the **VileCut** application. It is structured for ingestion into AI long-term memory systems (Wings/Rooms/Drawers).
 
 ---
 
-## WING: VIDEOMADDNESS (Project Core)
+## WING: VILECUT (Project Core)
 
 ### ROOM: Overview
-*   **Name:** Videomaddness (also referred to as the Chaotic Motion Machine)
+*   **Name:** VileCut (also referred to as the Chaotic Motion Machine)
 *   **Description:** A browser-based web application that parses static images into detail-balanced depth bands (layers) using luminosity and color histograms, and rendering them in an infinite exponential zoom camera tunnel to create seamless loop videos.
 *   **Tech Stack:** 
     *   **Frontend:** Pure HTML5 canvas, Vanilla CSS (cybernetic cyan/purple neon theme, glassmorphism), ES6 Javascript modules. No bundler or heavy build tools.
@@ -20,7 +20,7 @@ This profile contains the verbatim knowledge, architecture, schemas, and configu
 
 ### ROOM: Directory Structure
 ```
-Videomaddness/
+VileCut/
 ├── index.html              # HTML layout, sidebar parameters panel, and bottom timeline
 ├── style.css               # Neomorphic cyan/purple glassmorphic stylesheet
 ├── README.md               # Project documentation and features
@@ -122,9 +122,9 @@ Bypasses real-time captures using sequential frame-by-frame offline encoding:
     ```yaml
     version: '3.8'
     services:
-      videomaddness-modular:
+      vilecut-modular:
         build: .
-        container_name: videomaddness-modular
+        container_name: vilecut-modular
         ports:
           - "8080:80"
         restart: unless-stopped

@@ -1,6 +1,6 @@
-# Permanent Custom Fonts in Videomaddness
+# Permanent Custom Fonts in VileCut
 
-You can permanently load custom fonts into your Videomaddness container by placing the font files in this folder and registering them in the configuration file.
+You can permanently load custom fonts into your VileCut container by placing the font files in this folder and registering them in the configuration file.
 
 ## Setup Instructions
 

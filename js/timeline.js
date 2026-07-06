@@ -4,6 +4,25 @@ import { getTimelineDuration } from './utils.js';
 import { stopAudioSource, syncAudioPlayback, activeAudioGain } from './audio.js';
 import { renderFrame } from './renderer.js';
 
+function createTimelineLabel(startS, middleText, endS, icon = '') {
+  const cleanLabel = document.createElement('span');
+  cleanLabel.style.pointerEvents = 'none';
+  
+  const t1 = document.createElement('span');
+  t1.className = 'time-sig';
+  t1.textContent = `[${startS.toFixed(1)}s]`;
+  
+  const mid = document.createTextNode(icon ? ` ${icon} ${middleText} ` : ` ${middleText} `);
+  
+  const t2 = document.createElement('span');
+  t2.className = 'time-sig';
+  t2.textContent = `[${endS.toFixed(1)}s]`;
+  
+  cleanLabel.append(t1, mid, t2);
+  return cleanLabel;
+}
+
+// drag text id is global
 let dragMode = null; // 'seek', 'move', 'resize-left', 'resize-right'
 let dragTextId = null;
 let dragStartMouseX = 0;
@@ -11,7 +30,6 @@ let dragStartMouseY = 0;
 let lastDragTrackY = 0;
 let dragStartBlockStart = 0;
 let dragStartBlockEnd = 0;
-let dragStartSourceOffset = 0;
 
 let isZoomDragging = false;
 let zoomDragStartX = 0;
@@ -212,14 +230,10 @@ export function updateTimelineTracks() {
       block.style.left = `${startPct}%`;
       block.style.width = `${widthPct}%`;
       
-      const cleanLabel = document.createElement('span');
-      cleanLabel.style.pointerEvents = 'none';
-      
       const truncName = vidObj.fileName && vidObj.fileName.length > 18
         ? vidObj.fileName.substring(0, 15) + '...'
         : vidObj.fileName || 'Video';
-      const safeName = truncName.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      cleanLabel.innerHTML = `<span class="time-sig">[${vidObj.startTime.toFixed(1)}s]</span> 🎥 ${safeName} <span class="time-sig">[${vidObj.endTime.toFixed(1)}s]</span>`;
+      const cleanLabel = createTimelineLabel(vidObj.startTime, truncName, vidObj.endTime, '🎥');
       block.appendChild(cleanLabel);
       
       const leftHandle = document.createElement('div');
@@ -249,14 +263,10 @@ export function updateTimelineTracks() {
       block.style.left = `${startPct}%`;
       block.style.width = `${widthPct}%`;
       
-      const cleanLabel = document.createElement('span');
-      cleanLabel.style.pointerEvents = 'none';
-      
       const truncName = grpObj.fileName && grpObj.fileName.length > 15 
         ? grpObj.fileName.substring(0, 12) + '...'
         : grpObj.fileName || 'Graphic';
-      const safeName = truncName.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      cleanLabel.innerHTML = `<span class="time-sig">[${grpObj.startTime.toFixed(1)}s]</span> 🖼️ ${safeName} (${grpObj.scale}%) <span class="time-sig">[${grpObj.endTime.toFixed(1)}s]</span>`;
+      const cleanLabel = createTimelineLabel(grpObj.startTime, `${truncName} (${grpObj.scale}%)`, grpObj.endTime, '🖼️');
       block.appendChild(cleanLabel);
       
       const leftHandle = document.createElement('div');
@@ -286,10 +296,7 @@ export function updateTimelineTracks() {
       block.style.left = `${startPct}%`;
       block.style.width = `${widthPct}%`;
       
-      const cleanLabel = document.createElement('span');
-      cleanLabel.style.pointerEvents = 'none';
-      const safeText = (txtObj.text || '[Empty Text]').replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      cleanLabel.innerHTML = `<span class="time-sig">[${txtObj.startTime.toFixed(1)}s]</span> ${safeText} <span class="time-sig">[${txtObj.endTime.toFixed(1)}s]</span>`;
+      const cleanLabel = createTimelineLabel(txtObj.startTime, txtObj.text || '[Empty Text]', txtObj.endTime);
       block.appendChild(cleanLabel);
       
       const leftHandle = document.createElement('div');
@@ -400,10 +407,7 @@ export function updateTimelineTracks() {
     block.style.left = `${startPct}%`;
     block.style.width = `${widthPct}%`;
     
-    const cleanLabel = document.createElement('span');
-    cleanLabel.style.pointerEvents = 'none';
-    const safeFileName = (track.fileName || 'Audio').replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    cleanLabel.innerHTML = `<span class="time-sig">[${track.timelineStart.toFixed(1)}s]</span> 🎵 ${safeFileName} <span class="time-sig">[${(track.timelineStart + track.duration).toFixed(1)}s]</span>`;
+    const cleanLabel = createTimelineLabel(track.timelineStart, track.fileName || 'Audio', track.timelineStart + track.duration, '🎵');
     block.appendChild(cleanLabel);
     
     if (track.peaks) {
@@ -844,8 +848,8 @@ export function initTimelineEvents() {
       dragTextId = txtId;
       if (txtId === 'audio') {
         selectAudio(true);
-      } else if (txtId === 'video') {
-        selectVideo(true);
+      } else if (txtId.startsWith('vid_')) {
+        selectVideo(txtId);
       } else if (txtId.startsWith('grp_')) {
         selectGraphic(txtId);
       } else {
@@ -887,7 +891,6 @@ export function initTimelineEvents() {
           dragStartMouseX = e.clientX;
           dragStartBlockStart = track.timelineStart;
           dragStartBlockEnd = track.timelineStart + track.duration;
-          dragStartSourceOffset = track.sourceOffset;
         }
       } else if (dragTextId.startsWith('vid_')) {
         const vid = state.videoBlocks.find(v => v.id === dragTextId);

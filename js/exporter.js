@@ -377,7 +377,7 @@ export class VideoExporter {
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `videomaddness_${Date.now()}.mp4`;
+      a.download = `vilecut_${Date.now()}.mp4`;
       document.body.appendChild(a);
       a.click();
       
@@ -483,7 +483,7 @@ export class VideoExporter {
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `videomaddness_${Date.now()}.webm`;
+      a.download = `vilecut_${Date.now()}.webm`;
       document.body.appendChild(a);
       a.click();
       

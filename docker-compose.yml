@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
-  videomaddness-modular:
+  vilecut-modular:
     build: .
-    container_name: videomaddness-modular
+    container_name: vilecut-modular
     ports:
       - "8080:80"
     restart: unless-stopped

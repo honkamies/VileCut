@@ -34,10 +34,7 @@ export class Engine {
   }
 
   loop = (timestamp) => {
-    // We always keep the loop running to manage time properly, even if 'isPlaying' is false
-    // actually wait, the original app keeps the loop running even when paused? Let's check:
-    // "if (state.isPlaying && state.imageLoaded) { ... }" was in app.js
-    
+    // Keep the animation frame loop running to handle updates, seeking, and subscribers when paused.
     this.animationFrameId = requestAnimationFrame(this.loop);
 
     if (state.isExporting) {

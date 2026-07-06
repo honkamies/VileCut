@@ -15,7 +15,6 @@ export const kaleidoscopeMaskCtx = kaleidoscopeMaskCanvas.getContext('2d');
 export const ctx = UI.mainCanvas.getContext('2d');
 
 let lastVideoBufferFilter = '';
-let localCameraAngle = 0;
 
 
 
@@ -296,7 +295,7 @@ export function renderFrame(renderTime) {
     offscreenCtx.translate(driftX, driftY);
   }
 
-  localCameraAngle += (state.cameraRotation * (1/60)) * (Math.PI / 180);
+  const cameraAngle = state.cameraRotationBase + (state.cameraRotation * renderTime) * (Math.PI / 180);
 
   layerDepths.forEach(({ layer, z, scale, opacity }) => {
     if (opacity <= 0 || !layer.canvas) return;
@@ -304,7 +303,7 @@ export function renderFrame(renderTime) {
     offscreenCtx.save();
     offscreenCtx.translate(bw / 2, bh / 2);
     
-    const twist = localCameraAngle * (1.0 - z * 0.4);
+    const twist = cameraAngle * (1.0 - z * 0.4);
     offscreenCtx.rotate(twist);
 
     // Apply crop scaling (cover) to match the layer aspect ratio to viewport buffer aspect ratio

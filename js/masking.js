@@ -226,7 +226,7 @@ export class ImageProcessor {
       }
     } else if (state.maskType === 'color-range') {
       const B = 360 / N;
-      const halfB = B / 2;
+      const halfB = state.hueTolerance;
       const f = Math.max(0.1, halfB * state.maskFeather);
       for (let p = 0; p < srcPixels.length; p += 4) {
         const r = srcPixels[p];
@@ -559,7 +559,7 @@ export function drawMaskGraph() {
         let dH = Math.abs(val - Ci);
         if (dH > 180) dH = 360 - dH;
         
-        const halfB = B / 2;
+        const halfB = state.hueTolerance;
         const f = Math.max(0.1, halfB * state.maskFeather);
         
         if (dH <= halfB - f) {

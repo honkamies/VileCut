@@ -1,6 +1,6 @@
-# Videomaddness // Chaotic Motion Machine
+# VileCut // Chaotic Motion Machine
 
-![Videomaddness Editor](screenshot.png)
+![VileCut Editor](screenshot.png)
 
 A standalone browser-based web application designed to transform static images into infinite-diving, depth-sliced video loops. Perfect for generating hypnotic, symmetrical backgrounds and glitches for social media layouts.
 
@@ -78,9 +78,9 @@ This project is packaged with a lightweight `Dockerfile` and a `docker-compose.y
 1. Push this folder to your personal **GitHub** repository.
 2. Log into your **Portainer.io** panel.
 3. Go to **Stacks** > **Add stack**.
-4. Set a name (e.g., `videomaddness`).
+4. Set a name (e.g., `vilecut`).
 5. Choose **Build method** > **Repository**.
-6. Enter your GitHub Repository URL (e.g. `https://github.com/yourusername/videomaddness`).
+6. Enter your GitHub Repository URL (e.g. `https://github.com/yourusername/vilecut`).
 7. Leave **Repository reference** as `refs/heads/main` (or your active branch).
 8. Ensure **Compose path** is set to `docker-compose.yml`.
 9. Click **Deploy the stack**. Portainer will pull the code, build the Nginx container, and launch the service.

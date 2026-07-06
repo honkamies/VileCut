@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const img = await loadImage(file);
         const imgObj = {
-          id: Date.now() + "_" + Math.random().toString(36).substr(2, 9),
+          id: crypto.randomUUID(),
           name: file.name,
           img: img,
           layers: []
@@ -309,6 +309,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.time >= dur) {
         state.time = state.time % dur;
         wrapped = true;
+        // Make camera rotation continuous when wrapping time back to 0
+        state.cameraRotationBase += state.cameraRotation * dur * (Math.PI / 180);
       }
       
       if (state.glitchEnabled) {
@@ -576,6 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     UI.cameraRotation.value = 0;
     state.cameraRotation = 0;
+    state.cameraRotationBase = 0;
     UI.cameraRotationVal.innerText = '0.0°/s';
 
     UI.cameraDrift.value = 0;
@@ -755,6 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
       UI.zoomDepthVal.innerText = '4.0';
 
       state.cameraRotation = 0;
+      state.cameraRotationBase = 0;
       UI.cameraRotation.value = 0;
       UI.cameraRotationVal.innerText = '0.0°/s';
 
@@ -963,12 +967,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   UI.cameraRotation.addEventListener('input', (e) => {
-    state.cameraRotation = parseInt(e.target.value);
+    const oldSpeed = state.cameraRotation;
+    const newSpeed = parseInt(e.target.value);
+    state.cameraRotationBase += (oldSpeed - newSpeed) * state.time * (Math.PI / 180);
+    state.cameraRotation = newSpeed;
     UI.cameraRotationVal.innerText = `${state.cameraRotation.toFixed(1)}°/s`;
   });
 
   UI.btnResetRotation.addEventListener('click', () => {
     state.cameraRotation = 0;
+    state.cameraRotationBase = 0;
     state.cameraAngle = 0;
     UI.cameraRotation.value = 0;
     UI.cameraRotationVal.innerText = '0.0°/s';
@@ -1171,7 +1179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const duration = getTimelineDuration();
     const newText = {
-      id: 'txt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      id: 'txt_' + crypto.randomUUID(),
       text: 'NEW TEXT TRACK',
       font: 'Outfit',
       size: 40,
@@ -1221,7 +1229,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const targetTrackIdx = selectedTxt.trackIndex !== undefined ? selectedTxt.trackIndex : 0;
     
     const newText = {
-      id: 'txt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      id: 'txt_' + crypto.randomUUID(),
       text: 'NEXT TEXT',
       font: selectedTxt.font,
       size: selectedTxt.size,
@@ -1268,7 +1276,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const clonedText = {
       ...selectedTxt,
-      id: 'txt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      id: 'txt_' + crypto.randomUUID(),
       startTime: startTime,
       endTime: endTime
     };
@@ -1322,7 +1330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetTrackIdx = maxTrackIdx + 1;
 
         const newGraphic = {
-          id: 'grp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          id: 'grp_' + crypto.randomUUID(),
           img: img,
           fileName: file.name,
           startTime: 0,
@@ -1700,7 +1708,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const newBlock = {
-          id: 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          id: 'vid_' + crypto.randomUUID(),
           fileName: file.name,
           file: file,
           url: url,
@@ -1780,7 +1788,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clonedVideo.addEventListener('loadedmetadata', () => {
         const newBlock = {
           ...selectedBlock,
-          id: 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          id: 'vid_' + crypto.randomUUID(),
           element: clonedVideo,
           startTime: startTime,
           endTime: endTime
@@ -2281,7 +2289,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       const newTrigger = {
-        id: 'gt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        id: 'gt_' + crypto.randomUUID(),
         time: state.time,
         duration: 0.35,
         severity: 10

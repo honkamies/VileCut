@@ -5,8 +5,6 @@ const overlayVideoCanvas = document.createElement('canvas');
 const overlayVideoCtx = overlayVideoCanvas.getContext('2d');
 const overlayVideoMaskCanvas = document.createElement('canvas');
 const overlayVideoMaskCtx = overlayVideoMaskCanvas.getContext('2d');
-const textCanvas = document.createElement('canvas');
-const textCtx = textCanvas.getContext('2d');
 
 let lastOverlayVideoFilter = '';
 

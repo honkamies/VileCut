@@ -81,8 +81,8 @@ export const storeInstance = new Store({
   zoomSpeed: 0.05,
   zoomDepth: 4.0,
   cameraRotation: 0, // deg/sec
+  cameraRotationBase: 0, // base angle to prevent rotation jumps
   cameraDrift: 0.0,  // drift multiplier
-  cameraAngle: 0,    // accumulated angle
   gridActive: false,
 
   // Symmetries
@@ -110,13 +110,10 @@ export const storeInstance = new Store({
   shakeY: 0,
   shakeRot: 0,
 
-  // Exporter
   isExporting: false,
   exportFormat: 'mp4',
   exportRecorder: null,
   exportChunks: [],
-  exportFrame: 0,
-  exportTotalFrames: 0,
   exportFps: 30,
   exportDuration: 5,
   exportLoops: 1,

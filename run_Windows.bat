@@ -1,5 +1,5 @@
 @echo off
-echo Starting Videomaddness Modular Server...
+echo Starting VileCut Modular Server...
 
 :: Check if Python is installed
 python --version >nul 2>&1
