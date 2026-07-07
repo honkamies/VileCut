@@ -731,6 +731,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const btnCloseMobileWarning = document.getElementById('btn-close-mobile-warning');
+  const mobileWarningOverlay = document.getElementById('mobile-warning-overlay');
+  if (btnCloseMobileWarning && mobileWarningOverlay) {
+    btnCloseMobileWarning.addEventListener('click', () => {
+      mobileWarningOverlay.style.setProperty('display', 'none', 'important');
+    });
+  }
+
   if (UI.btnReloadApp) {
     UI.btnReloadApp.addEventListener('click', () => {
       location.reload();

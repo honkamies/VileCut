@@ -1113,24 +1113,55 @@
 
     <!-- Info Modal -->
     <div id="info-overlay" class="modal-overlay hidden" style="z-index: 3000;">
-      <div class="modal-content" style="text-align: center; max-width: 400px; padding: 30px;">
+      <div class="modal-content" style="max-width: 500px; padding: 30px;">
         <h2 style="color: var(--cyan); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-          <i data-lucide="mail"></i> VileCut
+          <i data-lucide="info"></i> About VileCut
+        </h2>
+        
+        <div style="text-align: left; margin-bottom: 25px;">
+          <p style="margin-bottom: 15px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
+            VileCut is a chaotic motion machine for creating infinite zooming loops, glitch art, and symmetrical visualizers directly from static images.
+          </p>
+          <ul style="margin-bottom: 20px; padding-left: 20px; line-height: 1.6; color: var(--text-color); font-size: 0.9rem;">
+            <li><strong>Full Timeline:</strong> Layer, arrange, and trim your tracks</li>
+            <li><strong>Rich Media:</strong> Support for audio tracks, video backgrounds, and image overlays</li>
+            <li><strong>Cybernetic FX:</strong> Dynamic glow effects, glitch triggering, and symmetry mirrors</li>
+            <li><strong>Advanced Typography:</strong> Multiline text with custom fonts and glitch animations</li>
+            <li><strong>High-Speed Export Engine:</strong> Native MP4 & WebM rendering directly in your browser</li>
+            <li><strong>Social Media Ready:</strong> Built-in aspect ratios (9:16, 1:1, 4:5) for TikTok, Reels, and Instagram</li>
+          </ul>
+        </div>
+
+        <div style="text-align: center;">
+          <p style="margin-bottom: 25px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
+            <strong>Got feedback, feature ideas, or found a bug?</strong><br>
+            I'd love to hear how you use it. Shoot me an email:<br><br>
+            <a href="mailto:gncd123@gmail.com" style="color: var(--cyan); text-decoration: none; font-weight: bold; font-size: 1.1rem; background: rgba(0, 242, 254, 0.1); padding: 8px 16px; border-radius: 6px; display: inline-block;">gncd123@gmail.com</a>
+          </p>
+          <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 25px;">
+            <strong style="color: var(--text-primary); display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 5px;">
+              <i data-lucide="github" style="width: 16px; height: 16px;"></i> Open Source & Secure
+            </strong>
+            Curious about how it works or want to verify its security? Check out the source code:<br>
+            <a href="https://github.com/honkamies/VileCut" target="_blank" rel="noopener noreferrer" style="color: var(--cyan); text-decoration: underline; margin-top: 5px; display: inline-block;">github.com/honkamies/VileCut</a>
+          </div>
+          <button id="btn-close-info" class="btn primary" style="width: 100%;">Close</button>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Warning Overlay -->
+    <div id="mobile-warning-overlay" class="modal-overlay hidden" style="background: rgba(6, 9, 19, 0.95); backdrop-filter: blur(10px); z-index: 5000;">
+      <div class="modal-content" style="max-width: 90%; text-align: center; padding: 30px;">
+        <h2 style="color: var(--pink); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+          <i data-lucide="monitor-x"></i> Desktop Recommended
         </h2>
         <p style="margin-bottom: 25px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
-          Thanks for using this chaotic motion machine!<br><br>
-          <strong>Got feedback, feature ideas, or found a bug?</strong><br>
-          I'd love to hear how you use it. Shoot me an email:<br><br>
-          <a href="mailto:gncd123@gmail.com" style="color: var(--cyan); text-decoration: none; font-weight: bold; font-size: 1.1rem; background: rgba(0, 242, 254, 0.1); padding: 8px 16px; border-radius: 6px; display: inline-block;">gncd123@gmail.com</a>
+          VileCut is a complex motion machine with a heavy timeline, rendering load, and multi-track UI. It is designed specifically for desktop browsers.<br><br>
+          For the best experience, please open this site on a computer.
         </p>
-        <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 25px;">
-          <strong style="color: var(--text-primary); display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 5px;">
-            <i data-lucide="github" style="width: 16px; height: 16px;"></i> Open Source & Secure
-          </strong>
-          Curious about how it works or want to verify its security? Check out the source code:<br>
-          <a href="https://github.com/honkamies/VileCut" target="_blank" rel="noopener noreferrer" style="color: var(--cyan); text-decoration: underline; margin-top: 5px; display: inline-block;">github.com/honkamies/VileCut</a>
-        </div>
-        <button id="btn-close-info" class="btn-primary" style="width: 100%;">Close</button>
+        <button id="btn-close-mobile-warning" class="btn secondary" style="width: 100%;">I understand, proceed anyway</button>
       </div>
     </div>
 
