@@ -728,6 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.target === UI.infoOverlay) {
         UI.infoOverlay.classList.add('hidden');
       }
+    });
+  }
   if (UI.btnReloadApp) {
     UI.btnReloadApp.addEventListener('click', () => {
       location.reload();
