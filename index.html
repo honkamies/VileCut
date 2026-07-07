@@ -1345,19 +1345,7 @@
       </div>
     </div>
 
-    <!-- Mobile Warning Overlay -->
-    <div id="mobile-warning-overlay" style="display: none; position: fixed; inset: 0; background: rgba(6, 9, 19, 0.95); backdrop-filter: blur(10px); z-index: 5000; align-items: center; justify-content: center;">
-      <div class="modal-card">
-        <h2 style="color: var(--pink); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-          <i data-lucide="monitor-x"></i> Desktop Recommended
-        </h2>
-        <p style="margin-bottom: 25px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
-          VileCut is a complex motion machine with a heavy timeline, rendering load, and multi-track UI. It is designed specifically for desktop browsers.<br><br>
-          For the best experience, please open this site on a computer.
-        </p>
-        <button id="btn-close-mobile-warning" class="btn secondary" style="width: 100%;">I understand, proceed anyway</button>
-      </div>
-    </div>
+
 
     <div id="export-overlay" class="modal-overlay hidden">
       <div class="modal-card">
@@ -1373,6 +1361,20 @@
         </div>
         <button id="btn-cancel-export" class="btn secondary">Cancel Export</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Mobile Warning Overlay (Moved outside app-container to prevent layout scaling issues) -->
+  <div id="mobile-warning-overlay" style="display: none; position: fixed; inset: 0; background: rgba(6, 9, 19, 0.95); backdrop-filter: blur(10px); z-index: 5000; align-items: center; justify-content: center;">
+    <div class="modal-card">
+      <h2 style="color: var(--pink); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+        <i data-lucide="monitor-x"></i> Desktop Recommended
+      </h2>
+      <p style="margin-bottom: 25px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
+        VileCut is a complex motion machine with a heavy timeline, rendering load, and multi-track UI. It is designed specifically for desktop browsers.<br><br>
+        For the best experience, please open this site on a computer.
+      </p>
+      <button id="btn-close-mobile-warning" class="btn secondary" style="width: 100%;">I understand, proceed anyway</button>
     </div>
   </div>
 
@@ -1393,8 +1395,15 @@
       var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
       if (isMobile) {
         var mobileOverlay = document.getElementById('mobile-warning-overlay');
-        if (mobileOverlay) {
+        var appContainer = document.querySelector('.app-container');
+        if (mobileOverlay && appContainer) {
+          appContainer.style.display = 'none'; // Hide giant desktop layout so viewport scales correctly
           mobileOverlay.style.display = 'flex';
+          
+          document.getElementById('btn-close-mobile-warning').addEventListener('click', function() {
+            mobileOverlay.style.display = 'none';
+            appContainer.style.display = 'flex'; // Restore app when they proceed
+          });
         }
       }
     });

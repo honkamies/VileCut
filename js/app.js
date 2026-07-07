@@ -728,17 +728,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.target === UI.infoOverlay) {
         UI.infoOverlay.classList.add('hidden');
       }
-    });
-  }
-
-  const btnCloseMobileWarning = document.getElementById('btn-close-mobile-warning');
-  const mobileWarningOverlay = document.getElementById('mobile-warning-overlay');
-  if (btnCloseMobileWarning && mobileWarningOverlay) {
-    btnCloseMobileWarning.addEventListener('click', () => {
-      mobileWarningOverlay.style.setProperty('display', 'none', 'important');
-    });
-  }
-
   if (UI.btnReloadApp) {
     UI.btnReloadApp.addEventListener('click', () => {
       location.reload();
