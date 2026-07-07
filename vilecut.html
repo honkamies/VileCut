@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VileCut // Chaotic Motion Machine</title>
+  <!-- SEO & Security -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; worker-src 'self' blob:;">
+  <meta name="description" content="Generate chaotic infinite-zooming videos, kaleidoscope mirroring, and pixel-sorting glitch art from static images. Export high-quality WebM videos directly in your browser.">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Lucide Icons -->
+  <script src="js/lucide.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <i data-lucide="activity" class="logo-icon glow-cyan"></i>
+        <h1>VILECUT</h1>
+        <span class="version-tag">v1.14.0</span>
+      </div>
+      <div class="header-actions">
+        <div id="fps-monitor" class="monitor-badge">
+          <span class="label">FPS:</span>
+          <span id="fps-value" class="value text-cyan">--</span>
+        </div>
+        <div class="theme-select-container">
+          <i data-lucide="palette" class="theme-select-icon"></i>
+          <select id="theme-select" class="theme-dropdown" title="Select Color Scheme">
+            <option value="cyberpunk" selected>Cyberpunk Neon</option>
+            <option value="high-contrast">High-Contrast Magenta</option>
+            <option value="crimson">Obsidian Crimson (Red/Black/Grey)</option>
+            <option value="matrix">Toxic Matrix (Black/Green)</option>
+            <option value="frozen">Frozen Odyssey (Icy Blue)</option>
+          </select>
+        </div>
+        <button id="btn-info-modal" class="btn-header" title="About & Feedback">
+          <i data-lucide="info" class="theme-select-icon"></i> Info
+        </button>
+        <button id="btn-reset-settings-only" class="btn-header" title="Reset All Settings (Keep Images)">
+          <i data-lucide="sliders" class="theme-select-icon"></i> Reset Settings
+        </button>
+        <button id="btn-reload-app" class="btn-header" title="Reset All & Reload Application">
+          <i data-lucide="refresh-cw" class="theme-select-icon"></i> Reload App
+        </button>
+      </div>
+    </header>
+
+    <div class="main-layout">
+      <!-- Left Panel: Input & Layering Controls -->
+      <aside class="panel left-panel scrollable">
+        <div class="panel-section">
+          <h2 class="section-title"><i data-lucide="image"></i> Source Images Deck</h2>
+          <label for="file-input" id="drop-zone" class="upload-zone">
+            <i data-lucide="upload-cloud" class="upload-icon"></i>
+            <p class="upload-text">Drag & drop image(s) or <span class="browse-link">browse</span></p>
+            <span class="upload-subtext">JPG, PNG, WebP up to 15MB</span>
+          </label>
+          <input type="file" id="file-input" accept="image/*" multiple style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;">
+          
+          <div id="images-deck" class="images-deck-box hidden">
+            <div class="deck-header">
+              <span class="deck-count">Loaded: <strong id="deck-count-val">0</strong></span>
+              <button id="btn-clear-deck" class="small-text-btn"><i data-lucide="trash-2"></i> Clear All</button>
+            </div>
+            <div id="deck-list" class="deck-items-list">
+              <!-- Dynamically populated loaded images list -->
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section collapsed" id="layer-isolation-section">
+          <h2 class="section-title"><i data-lucide="layers"></i> Layer Isolation</h2>
+          
+          <div class="mask-graph-container">
+            <canvas id="mask-graph-canvas" width="300" height="70"></canvas>
+            <div class="graph-x-labels">
+              <span id="graph-label-left">Shadows</span>
+              <span id="graph-label-right">Highlights</span>
+            </div>
+          </div>
+          
+          <div class="control-group">
+            <label for="mask-type">Mask Mode</label>
+            <div class="select-wrapper">
+              <select id="mask-type">
+                <option value="adaptive-luminosity" selected>Adaptive (Equal Pixel Count)</option>
+                <option value="luminosity">Luminosity (Brightness)</option>
+                <option value="color-range">Color Range (Hue Isolates)</option>
+                <option value="random">Randomized Bands</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="layer-count">Number of Layers</label>
+              <span id="layer-count-val" class="slider-val">5</span>
+            </div>
+            <input type="range" id="layer-count" min="3" max="10" step="1" value="5">
+          </div>
+
+          <div class="control-group" id="luminosity-smoothness-group">
+            <div class="slider-header">
+              <label for="mask-feather">Layer Blending (Feather)</label>
+              <span id="mask-feather-val" class="slider-val">0.3</span>
+            </div>
+            <input type="range" id="mask-feather" min="0.05" max="0.8" step="0.05" value="0.3">
+          </div>
+
+          <div class="control-group" id="layer-edge-fade-group">
+            <div class="slider-header">
+              <label for="layer-edge-fade">Layer Edge Fade (Vignette)</label>
+              <span id="layer-edge-fade-val" class="slider-val">10%</span>
+            </div>
+            <input type="range" id="layer-edge-fade" min="0" max="50" step="1" value="10">
+          </div>
+
+          <div class="control-group" id="color-range-hue-group" style="display: none;">
+            <div class="slider-header">
+              <label for="hue-tolerance">Hue Spread</label>
+              <span id="hue-tolerance-val" class="slider-val">45°</span>
+            </div>
+            <input type="range" id="hue-tolerance" min="15" max="180" step="5" value="45">
+          </div>
+
+          <button id="btn-regenerate-layers" class="btn secondary btn-full">
+            <i data-lucide="refresh-cw"></i> Re-Isolate Layers
+          </button>
+        </div>
+
+        <!-- Layer Inspector Section -->
+        <div class="panel-section" id="layer-inspector-section" style="display: none;">
+          <div class="section-title-row">
+            <h2 class="section-title"><i data-lucide="zoom-in"></i> Layer Inspector</h2>
+            <div class="inspector-bg-selectors">
+              <button class="bg-btn active" data-bg="checkerboard" title="Checkerboard BG"></button>
+              <button class="bg-btn bg-black" data-bg="black" title="Black BG"></button>
+              <button class="bg-btn bg-white" data-bg="white" title="White BG"></button>
+              <button class="bg-btn bg-magenta" data-bg="magenta" title="Magenta BG"></button>
+            </div>
+          </div>
+          
+          <div class="inspector-preview-container bg-checkerboard">
+            <canvas id="inspector-preview-canvas"></canvas>
+            <div class="inspector-badge" id="inspector-layer-name">L1</div>
+          </div>
+          
+          <div class="inspector-controls">
+            <span class="inspector-stat" id="inspector-layer-stat">Pixels: --</span>
+          </div>
+        </div>
+
+        <!-- Text Settings Section -->
+        <div class="panel-section" id="text-settings-section" style="display: none;">
+          <h2 class="section-title"><i data-lucide="type"></i> Text Settings</h2>
+          
+          <div class="control-group">
+            <label for="text-content">Overlay Text</label>
+            <textarea id="text-content" placeholder="SYSTEM FAILURE..." class="text-input-field" rows="3" style="resize: vertical; min-height: 60px;"></textarea>
+          </div>
+
+          <div class="control-group">
+            <label for="text-font">Font Family</label>
+            <div class="select-wrapper">
+              <select id="text-font">
+                <option value="Outfit" selected>Outfit</option>
+                <option value="JetBrains Mono">JetBrains Mono</option>
+                <option value="Impact">Impact (Heavy)</option>
+                <option value="Arial">Arial (Standard)</option>
+              </select>
+            </div>
+            <button id="btn-load-font" class="small-text-btn" style="margin-top: 4px; justify-content: center;">
+              <i data-lucide="upload"></i> Upload Font File (.ttf/.otf)
+            </button>
+            <input type="file" id="font-file-input" accept=".ttf,.otf,.woff,.woff2" style="display: none;">
+          </div>
+
+          <div class="grid-2-col">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="text-size">Size</label>
+                <span id="text-size-val" class="slider-val">40px</span>
+              </div>
+              <input type="range" id="text-size" min="12" max="300" step="1" value="40">
+            </div>
+
+            <div class="control-group">
+              <label for="text-color">Color</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="color" id="text-color" value="#00f2fe" style="width: 40px; height: 38px; border: 1px solid var(--border-subtle); border-radius: 6px; cursor: pointer; padding: 0; background: none; box-sizing: border-box;">
+                <div class="palette-swatches" style="display: flex; gap: 4px;">
+                  <button class="swatch-btn" data-color="#00f2fe" style="background:#00f2fe; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Cyan"></button>
+                  <button class="swatch-btn" data-color="#ff007f" style="background:#ff007f; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Pink"></button>
+                  <button class="swatch-btn" data-color="#39ff14" style="background:#39ff14; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Neon Green"></button>
+                  <button class="swatch-btn" data-color="#ffffff" style="background:#ffffff; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="White"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="text-pos-x">X Position</label>
+              <span id="text-pos-x-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="text-pos-x" min="-0.5" max="0.5" step="0.01" value="0.0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="text-pos-y">Y Position</label>
+              <span id="text-pos-y-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="text-pos-y" min="-0.5" max="0.5" step="0.01" value="0.0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="text-angle">Rotation Angle</label>
+              <span id="text-angle-val" class="slider-val">0°</span>
+            </div>
+            <input type="range" id="text-angle" min="-180" max="180" step="1" value="0">
+          </div>
+
+          <div class="grid-2-col">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="text-idle-wobble">Idle Jitter</label>
+                <span id="text-idle-wobble-val" class="slider-val">0.0px</span>
+              </div>
+              <input type="range" id="text-idle-wobble" min="0" max="50" step="0.5" value="0.0">
+            </div>
+
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="text-idle-skew">Glitch Twitch</label>
+                <span id="text-idle-skew-val" class="slider-val">0%</span>
+              </div>
+              <input type="range" id="text-idle-skew" min="0" max="100" step="1" value="0">
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label for="text-glitch-mode">Glitch Style</label>
+            <div class="select-wrapper">
+              <select id="text-glitch-mode">
+                <option value="none">No Glitch</option>
+                <option value="rgb-split" selected>RGB Chromatic Split</option>
+                <option value="scramble">Matrix Scramble</option>
+                <option value="flicker">Flicker & Noise</option>
+                <option value="chaos">Chaos Composite</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="text-glitch-intensity">Glitch Intensity</label>
+              <span id="text-glitch-intensity-val" class="slider-val">50%</span>
+            </div>
+            <input type="range" id="text-glitch-intensity" min="0" max="100" step="5" value="50">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="text-flicker-intensity">Flicker Intensity</label>
+              <span id="text-flicker-intensity-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="text-flicker-intensity" min="0" max="100" step="5" value="0">
+          </div>
+
+          <div class="control-group-switch" style="margin-top: 10px; margin-bottom: 15px;">
+            <label class="switch-label" for="text-glitch-mono">Monochrome Glitch FX</label>
+            <input type="checkbox" id="text-glitch-mono">
+          </div>
+
+          <div class="control-group">
+            <label for="text-transition">In/Out Transition</label>
+            <div class="select-wrapper">
+              <select id="text-transition">
+                <option value="none">No Transition</option>
+                <option value="fade">Fade (Opacity)</option>
+                <option value="fade-blur" selected>Fade & Cinematic Blur</option>
+                <option value="scale-zoom">Scale Zoom</option>
+                <option value="slide-glitch">Slide Glitch</option>
+                <option value="glitch-reveal">Glitch Reveal (Static)</option>
+                <option value="character-scatter">Character Scatter</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="text-transition-duration">Transition Duration</label>
+              <span id="text-transition-duration-val" class="slider-val">0.4s</span>
+            </div>
+            <input type="range" id="text-transition-duration" min="0.1" max="2.0" step="0.1" value="0.4">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <label>Timeline Layer (Track)</label>
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 5px;">
+              <button id="btn-text-move-down" class="btn secondary small-btn" title="Move Layer Down" style="padding: 6px 10px; flex: 1; font-size: 0.75rem;">
+                <i data-lucide="arrow-down"></i> Move Down
+              </button>
+              <button id="btn-text-move-up" class="btn secondary small-btn" title="Move Layer Up" style="padding: 6px 10px; flex: 1; font-size: 0.75rem;">
+                <i data-lucide="arrow-up"></i> Move Up
+              </button>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
+            <button id="btn-copy-text" class="btn secondary" style="flex: 1; border-color: rgba(0, 242, 254, 0.25);">
+              <i data-lucide="copy"></i> Duplicate
+            </button>
+            <button id="btn-delete-text" class="btn secondary" style="flex: 1; color: var(--pink); border-color: rgba(255, 0, 127, 0.25);">
+              <i data-lucide="trash-2"></i> Delete
+            </button>
+          </div>
+        </div>
+
+        <!-- Audio Settings Section -->
+        <div class="panel-section" id="audio-settings-section" style="display: none;">
+          <h2 class="section-title"><i data-lucide="music"></i> Audio Settings</h2>
+          
+          <div class="control-group" style="background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.1); margin-bottom: 15px;">
+            <div style="font-family: var(--font-display); font-size: 0.85rem; color: var(--text-primary); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="audio-file-name">soundtrack.mp3</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);" id="audio-file-duration">Length: 0.0s</div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="audio-timeline-start">Timeline Position</label>
+              <span id="audio-timeline-start-val" class="slider-val">0.0s</span>
+            </div>
+            <input type="range" id="audio-timeline-start" min="-20.0" max="20.0" step="0.1" value="0.0">
+            <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 2px;">When the audio starts relative to the video loop start. Can be negative.</div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="audio-volume">Volume</label>
+              <span id="audio-volume-val" class="slider-val">80%</span>
+            </div>
+            <input type="range" id="audio-volume" min="0" max="100" step="5" value="80">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="audio-fade-in">Fade In Duration</label>
+              <span id="audio-fade-in-val" class="slider-val">0.0s</span>
+            </div>
+            <input type="range" id="audio-fade-in" min="0.0" max="5.0" step="0.1" value="0.0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="audio-fade-out">Fade Out Duration</label>
+              <span id="audio-fade-out-val" class="slider-val">0.0s</span>
+            </div>
+            <input type="range" id="audio-fade-out" min="0.0" max="5.0" step="0.1" value="0.0">
+          </div>
+
+          <button id="btn-delete-audio" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
+
+            <i data-lucide="trash-2"></i> Delete Soundtrack
+          </button>
+        </div>
+
+        <!-- Video Settings Section -->
+        <div class="panel-section" id="video-settings-section" style="display: none;">
+          <h2 class="section-title"><i data-lucide="video"></i> Video Settings</h2>
+          
+          <div class="control-group" style="background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.1); margin-bottom: 15px;">
+            <div style="font-family: var(--font-display); font-size: 0.85rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="video-file-name">No Video Loaded</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);" id="video-file-duration">Length: 0.0s</div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="video-timeline-start">Timeline Position</label>
+              <span id="video-timeline-start-val" class="slider-val">0.0s</span>
+            </div>
+            <input type="range" id="video-timeline-start" min="0.0" max="60.0" step="0.1" value="0.0">
+          </div>
+
+          <div class="control-group checkbox-group" style="margin-top: 10px;">
+            <label for="video-monochrome">Monochrome Background</label>
+            <input type="checkbox" id="video-monochrome">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <label for="video-mirror-mode">Video Mirror Symmetry</label>
+            <div class="select-wrapper">
+              <select id="video-mirror-mode">
+                <option value="none" selected>No Symmetries</option>
+                <option value="horizontal">Horizontal Mirror (Left ⇄ Right)</option>
+                <option value="vertical">Vertical Mirror (Top ⇄ Bottom)</option>
+                <option value="quad">Quad Mirror (4 Symmetrical Quadrants)</option>
+                <option value="kaleidoscope">Kaleidoscope (Radial Slices)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group" id="video-kaleidoscope-slices-group" style="display: none; margin-top: 10px;">
+            <div class="slider-header">
+              <label for="video-k-slices">Video Radial Slices</label>
+              <span id="video-k-slices-val" class="slider-val">8</span>
+            </div>
+            <input type="range" id="video-k-slices" min="3" max="24" step="1" value="8">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="video-brightness">Video Brightness</label>
+              <span id="video-brightness-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="video-brightness" min="50" max="150" step="1" value="100">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="video-contrast">Video Contrast</label>
+              <span id="video-contrast-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="video-contrast" min="50" max="150" step="1" value="100">
+          </div>
+
+          <div class="grid-2-col" style="margin-top: 10px;">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="video-pos-x">X Position (Pan)</label>
+                <span id="video-pos-x-val" class="slider-val">0%</span>
+              </div>
+              <input type="range" id="video-pos-x" min="-1.0" max="1.0" step="0.01" value="0.0">
+            </div>
+
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="video-pos-y">Y Position (Pan)</label>
+                <span id="video-pos-y-val" class="slider-val">0%</span>
+              </div>
+              <input type="range" id="video-pos-y" min="-1.0" max="1.0" step="0.01" value="0.0">
+            </div>
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="video-scale">Video Scale</label>
+              <span id="video-scale-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="video-scale" min="5" max="300" step="1" value="100">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="video-edge-fade">Edge Fade (Feather)</label>
+              <span id="video-edge-fade-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="video-edge-fade" min="0" max="50" step="1" value="0">
+          </div>
+
+          <div class="grid-2-col" style="margin-top: 10px;">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="video-fade-in">Fade In Duration</label>
+                <span id="video-fade-in-val" class="slider-val">0.0s</span>
+              </div>
+              <input type="range" id="video-fade-in" min="0.0" max="5.0" step="0.1" value="0.0">
+            </div>
+
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="video-fade-out">Fade Out Duration</label>
+                <span id="video-fade-out-val" class="slider-val">0.0s</span>
+              </div>
+              <input type="range" id="video-fade-out" min="0.0" max="5.0" step="0.1" value="0.0">
+            </div>
+          </div>
+
+
+          <div class="control-group" style="margin-top: 10px;">
+            <label>Timeline Layer (Track)</label>
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 5px;">
+              <button id="btn-video-move-down" class="btn secondary small-btn" title="Move Layer Down" style="padding: 6px 10px; flex: 1; font-size: 0.75rem;">
+                <i data-lucide="arrow-down"></i> Move Down
+              </button>
+              <button id="btn-video-move-up" class="btn secondary small-btn" title="Move Layer Up" style="padding: 6px 10px; flex: 1; font-size: 0.75rem;">
+                <i data-lucide="arrow-up"></i> Move Up
+              </button>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 15px; width: 100%;">
+            <button id="btn-duplicate-video" class="btn secondary" style="flex: 1; border-color: rgba(0, 242, 254, 0.25);">
+              <i data-lucide="copy"></i> Duplicate
+            </button>
+            <button id="btn-delete-video" class="btn secondary" style="flex: 1; color: var(--pink); border-color: rgba(255, 0, 127, 0.25);">
+              <i data-lucide="trash-2"></i> Delete
+            </button>
+          </div>
+        </div>
+
+        <!-- Glitch Trigger Settings Section -->
+        <div class="panel-section" id="glitch-trigger-settings-section" style="display: none;">
+          <h2 class="section-title"><i data-lucide="zap"></i> Glitch Trigger Settings</h2>
+          
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="glitch-trigger-time">Trigger Time</label>
+              <span id="glitch-trigger-time-val" class="slider-val">0.00s</span>
+            </div>
+            <input type="range" id="glitch-trigger-time" min="0.0" max="60.0" step="0.01" value="0.00">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="glitch-trigger-duration">Glitch Duration</label>
+              <span id="glitch-trigger-duration-val" class="slider-val">0.35s</span>
+            </div>
+            <input type="range" id="glitch-trigger-duration" min="0.05" max="2.0" step="0.05" value="0.35">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="glitch-trigger-severity">Glitch Severity</label>
+              <span id="glitch-trigger-severity-val" class="slider-val">10px</span>
+            </div>
+            <input type="range" id="glitch-trigger-severity" min="1" max="100" step="1" value="10">
+          </div>
+
+          <button id="btn-delete-glitch-trigger" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
+            <i data-lucide="trash-2"></i> Delete Trigger
+          </button>
+        </div>
+
+
+        <!-- Graphic Settings Section -->
+        <div class="panel-section" id="graphic-settings-section" style="display: none;">
+          <h2 class="section-title"><i data-lucide="image"></i> Graphic Settings</h2>
+          
+          <div class="control-group" style="background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.1); margin-bottom: 15px;">
+            <div style="font-family: var(--font-display); font-size: 0.85rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="graphic-file-name">No File Loaded</div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-timeline-start">Start Time</label>
+              <span id="graphic-timeline-start-val" class="slider-val">0.0s</span>
+            </div>
+            <input type="range" id="graphic-timeline-start" min="0.0" max="60.0" step="0.1" value="0.0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-timeline-end">End Time</label>
+              <span id="graphic-timeline-end-val" class="slider-val">3.0s</span>
+            </div>
+            <input type="range" id="graphic-timeline-end" min="0.1" max="60.0" step="0.1" value="3.0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-pos-x">Position X</label>
+              <span id="graphic-pos-x-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="graphic-pos-x" min="-100" max="100" step="1" value="0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-pos-y">Position Y</label>
+              <span id="graphic-pos-y-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="graphic-pos-y" min="-100" max="100" step="1" value="0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-scale">Scale</label>
+              <span id="graphic-scale-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="graphic-scale" min="5" max="300" step="5" value="100">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="graphic-brightness">Brightness</label>
+              <span id="graphic-brightness-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="graphic-brightness" min="50" max="150" step="1" value="100">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="slider-header">
+              <label for="graphic-contrast">Contrast</label>
+              <span id="graphic-contrast-val" class="slider-val">100%</span>
+            </div>
+            <input type="range" id="graphic-contrast" min="50" max="150" step="1" value="100">
+          </div>
+
+          <div class="control-group-switch" style="margin-top: 10px;">
+            <label class="switch-label" for="graphic-glow-active">Glow Effect</label>
+            <input type="checkbox" id="graphic-glow-active">
+          </div>
+
+          <div class="grid-2-col" style="margin-top: 10px; margin-bottom: 5px;">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="graphic-glow-radius">Glow Strength</label>
+                <span id="graphic-glow-radius-val" class="slider-val">20px</span>
+              </div>
+              <input type="range" id="graphic-glow-radius" min="0" max="100" step="1" value="20">
+            </div>
+
+            <div class="control-group">
+              <label for="graphic-glow-color">Glow Color</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="color" id="graphic-glow-color" value="#ff007f" style="width: 40px; height: 38px; border: 1px solid var(--border-subtle); border-radius: 6px; cursor: pointer; padding: 0; background: none; box-sizing: border-box;">
+                <div class="palette-swatches" style="display: flex; gap: 4px;">
+                  <button class="graphic-glow-swatch-btn" data-color="#ff007f" style="background:#ff007f; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Pink"></button>
+                  <button class="graphic-glow-swatch-btn" data-color="#00f2fe" style="background:#00f2fe; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Cyan"></button>
+                  <button class="graphic-glow-swatch-btn" data-color="#39ff14" style="background:#39ff14; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Neon Green"></button>
+                  <button class="graphic-glow-swatch-btn" data-color="#ffffff" style="background:#ffffff; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="White"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-glitch-frequency">Glitch Chance</label>
+              <span id="graphic-glitch-frequency-val" class="slider-val">10%</span>
+            </div>
+            <input type="range" id="graphic-glitch-frequency" min="0" max="100" step="5" value="10">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-glitch-amplitude">Glitch Amplitude</label>
+              <span id="graphic-glitch-amplitude-val" class="slider-val">20%</span>
+            </div>
+            <input type="range" id="graphic-glitch-amplitude" min="0" max="100" step="5" value="20">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="graphic-flicker-intensity">Flicker Intensity</label>
+              <span id="graphic-flicker-intensity-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="graphic-flicker-intensity" min="0" max="100" step="5" value="0">
+          </div>
+
+          <div class="control-group" style="margin-top: 10px;">
+            <label>Timeline Layer (Track)</label>
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 5px;">
+              <button id="btn-graphic-move-down" class="btn secondary small-btn" title="Move Layer Down" style="padding: 6px 10px; flex: 1; font-size: 0.75rem;">
+                <i data-lucide="arrow-down"></i> Move Down
+              </button>
+              <button id="btn-graphic-move-up" class="btn secondary small-btn" title="Move Layer Up" style="padding: 6px 10px; flex: 1; font-size: 0.75rem;">
+                <i data-lucide="arrow-up"></i> Move Up
+              </button>
+            </div>
+          </div>
+
+          <button id="btn-delete-graphic" class="btn secondary btn-full" style="color: var(--pink); border-color: rgba(255, 0, 127, 0.25); margin-top: 15px;">
+            <i data-lucide="trash-2"></i> Delete Graphic
+          </button>
+        </div>
+
+        <div class="panel-section collapsed" id="extracted-layers-section">
+          <div class="section-title-row">
+            <h2 class="section-title"><i data-lucide="eye"></i> Extracted Layers</h2>
+            <button id="btn-random-layers-order" class="small-text-btn" title="Randomize Render Ordering"><i data-lucide="shuffle"></i> Shuffle Depth</button>
+          </div>
+          <div id="layers-list" class="layers-grid">
+            <div class="empty-state">No image uploaded</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Panel: The Viewport & Timeline -->
+      <main class="viewport-area">
+        <div class="canvas-container">
+          <div id="canvas-loading" class="canvas-loader hidden">
+            <div class="spinner"></div>
+            <span>Processing Frame Buffer...</span>
+          </div>
+          <canvas id="main-canvas"></canvas>
+          
+          <!-- Glitch Trigger Indicator (visual flash) -->
+          <div id="glitch-flash" class="glitch-flash-overlay"></div>
+          
+          <!-- Viewport Controls Overlay -->
+          <div class="viewport-controls">
+            <button id="btn-play-pause" class="viewport-btn active" title="Play / Pause Animation">
+              <i data-lucide="pause" id="play-pause-icon"></i>
+            </button>
+            <button id="btn-step" class="viewport-btn" title="Step 1 Frame">
+              <i data-lucide="skip-forward"></i>
+            </button>
+            <button id="btn-manual-glitch" class="viewport-btn highlight" title="Trigger Instant Glitch">
+              <i data-lucide="zap"></i>
+            </button>
+            <div class="control-divider"></div>
+            <button id="btn-toggle-grid" class="viewport-btn" title="Toggle Composition Grid">
+              <i data-lucide="grid"></i>
+            </button>
+            <button id="btn-reset-view" class="viewport-btn" title="Reset Viewport">
+              <i data-lucide="rotate-ccw"></i>
+            </button>
+            <button id="btn-fullscreen" class="viewport-btn" title="Fullscreen Viewport">
+              <i data-lucide="maximize-2"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- The Timeline Area -->
+        <div class="timeline-area">
+          <div class="timeline-header">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <div class="timeline-title">
+                <i data-lucide="clock" class="text-cyan"></i>
+                <span>Loop Timeline</span>
+                <span id="timeline-timecode" class="timecode">00.0s / 05.0s</span>
+                <div style="display: inline-flex; gap: 4px; align-items: center; margin-left: 6px;">
+                  <button id="btn-timeline-start" class="timeline-nav-btn" title="Jump to Start (0s)">
+                    <i data-lucide="chevrons-left"></i>
+                  </button>
+                  <button id="btn-timeline-end" class="timeline-nav-btn" title="Jump to End">
+                    <i data-lucide="chevrons-right"></i>
+                  </button>
+                </div>
+              </div>
+              <div id="timeline-duration-control" class="timeline-duration-control">
+                <label for="timeline-duration-slider">Loop Duration:</label>
+                <input type="range" id="timeline-duration-slider" min="1" max="60" step="1" value="5">
+                <span id="timeline-duration-val">5s</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <button id="btn-add-text-new" class="btn secondary small-btn" title="Add Text (New Track)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-custom" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">
+                  <path d="M4 8V6h8v2M8 6v9" />
+                  <rect x="2" y="2" width="20" height="20" rx="4" opacity="0.35" />
+                  <path d="M19 13v6M16 16h6" />
+                </svg>
+              </button>
+              <button id="btn-add-text-same" class="btn secondary small-btn" title="Add Text (Same Track)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-custom" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">
+                  <path d="M5 8V5h10v3M10 5v12M8 17h4" />
+                  <path d="M19 11v6M16 14h6" />
+                </svg>
+              </button>
+              <button id="btn-add-graphic" class="btn secondary small-btn" title="Add Graphic">
+                <i data-lucide="image"></i>
+              </button>
+              <input type="file" id="graphic-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="display: none;">
+              <button id="btn-add-audio" class="btn secondary small-btn" title="Add Audio">
+                <i data-lucide="music"></i>
+              </button>
+              <input type="file" id="audio-file-input" accept="audio/mp3,audio/mpeg,audio/*" style="display: none;">
+              <button id="btn-add-video" class="btn secondary small-btn" title="Add Video Background">
+                <i data-lucide="video"></i>
+              </button>
+              <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/*" style="display: none;">
+              <button id="btn-add-glitch-trigger" class="btn secondary small-btn" title="Add Glitch Trigger" disabled>
+                <i data-lucide="zap" style="color: var(--pink);"></i>
+              </button>
+              <div class="divider-vertical" style="width: 1px; height: 16px; background: var(--border-subtle); margin: 0 4px;"></div>
+              <button id="btn-timeline-zoom" class="btn secondary small-btn" style="cursor: ew-resize;" title="Drag left/right to zoom (Double-click to Fit)">
+                <i data-lucide="zoom-in"></i>
+              </button>
+              <button id="btn-timeline-fit" class="btn secondary small-btn" title="Fit Timeline to Screen">
+                <i data-lucide="maximize-2"></i>
+              </button>
+            </div>
+          </div>
+          <div class="timeline-body-wrapper">
+            <div id="timeline-tracks-container" class="timeline-tracks-container">
+              <!-- Timeline Ruler -->
+              <div class="timeline-ruler" id="timeline-ruler">
+                <!-- Dynamically generated time marks -->
+              </div>
+              <div class="timeline-tracks" id="timeline-tracks">
+                <!-- Track rows dynamically generated in app.js -->
+              </div>
+              <!-- Playhead Line -->
+              <div class="timeline-playhead" id="timeline-playhead"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Right Panel: Symmetry, Motion, Glitch & Export Controls -->
+      <aside class="panel right-panel scrollable">
+        <!-- Section 1: Infinite Motion Parameters -->
+        <div class="panel-section collapsed" id="infinite-motion-section">
+          <h2 class="section-title"><i data-lucide="move"></i> Infinite Motion</h2>
+          
+          <div class="control-group">
+            <label for="aspect-ratio">Canvas Aspect Ratio</label>
+            <div class="select-wrapper">
+              <select id="aspect-ratio">
+                <option value="original" selected>Original (Match Image)</option>
+                <option value="16-9">16:9 Landscape (YouTube)</option>
+                <option value="9-16">9:16 Portrait (TikTok/Reels)</option>
+                <option value="1-1">1:1 Square (Instagram Post)</option>
+                <option value="4-5">4:5 Vertical (Instagram Feed)</option>
+                <option value="21-9">21:9 Cinema (Ultrawide)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="zoom-speed">Diving Speed</label>
+              <span id="zoom-speed-val" class="slider-val">0.05</span>
+            </div>
+            <input type="range" id="zoom-speed" min="-0.2" max="0.2" step="0.005" value="0.05">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="zoom-depth">Depth Spacing</label>
+              <span id="zoom-depth-val" class="slider-val">4.0</span>
+            </div>
+            <input type="range" id="zoom-depth" min="1.5" max="10.0" step="0.25" value="4.0">
+          </div>
+
+          <div class="grid-2-col">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="camera-rotation">Rotation Speed</label>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span id="camera-rotation-val" class="slider-val">0.0°/s</span>
+                  <button id="btn-reset-rotation" class="small-reset-btn" title="Reset Rotation Angle & Speed">
+                    <i data-lucide="rotate-ccw"></i>
+                  </button>
+                </div>
+              </div>
+              <input type="range" id="camera-rotation" min="-90" max="90" step="2" value="0">
+            </div>
+
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="camera-drift">Drift Speed</label>
+                <span id="camera-drift-val" class="slider-val">0.0</span>
+              </div>
+              <input type="range" id="camera-drift" min="0" max="2" step="0.1" value="0">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Symmetry (Sleek Mirrors) -->
+        <div class="panel-section collapsed">
+          <h2 class="section-title"><i data-lucide="git-merge"></i> Symmetrical Matrix</h2>
+          
+          <div class="control-group">
+            <label for="mirror-mode">Mirror Symmetry</label>
+            <div class="select-wrapper">
+              <select id="mirror-mode">
+                <option value="none" selected>No Symmetries</option>
+                <option value="horizontal">Horizontal Mirror (Left ⇄ Right)</option>
+                <option value="vertical">Vertical Mirror (Top ⇄ Bottom)</option>
+                <option value="quad">Quad Mirror (4 Symmetrical Quadrants)</option>
+                <option value="kaleidoscope">Kaleidoscope (Radial Slices)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group" id="kaleidoscope-slices-group" style="display: none;">
+            <div class="slider-header">
+              <label for="k-slices">Radial Slices</label>
+              <span id="k-slices-val" class="slider-val">8</span>
+            </div>
+            <input type="range" id="k-slices" min="3" max="24" step="1" value="8">
+          </div>
+        </div>
+
+        <!-- Section 3: Cybernetic Glitch FX -->
+        <div class="panel-section collapsed">
+          <h2 class="section-title"><i data-lucide="skull"></i> Cybernetic Glitch FX</h2>
+          
+          <div class="control-group-switch">
+            <label class="switch-label" for="glitch-enabled">Glitch FX Enabled</label>
+            <input type="checkbox" id="glitch-enabled">
+          </div>
+          <div class="control-group">
+            <label>Active Glitch Styles (Stackable)</label>
+            <div class="checkbox-list-container">
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-rgb" checked>
+                <label for="glitch-style-rgb">RGB & Pixel Sort</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-vhs">
+                <label for="glitch-style-vhs">Analog VCR Scanline Sag</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-block">
+                <label for="glitch-style-block">Digital Block Tearing</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-liquid">
+                <label for="glitch-style-liquid">Liquid Warp Filter (GPU)</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-flicker">
+                <label for="glitch-style-flicker">Flicker & Strobe</label>
+              </div>
+              <div class="checkbox-row" style="padding-left: 24px;">
+                <input type="checkbox" id="glitch-flicker-highlights">
+                <label for="glitch-flicker-highlights" style="font-size: 0.85rem; color: var(--text-muted);">Highlights Only</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group checkbox-group" style="margin-top: 10px;">
+            <label for="glitch-style-random">Randomize Style on Trigger</label>
+            <input type="checkbox" id="glitch-style-random">
+          </div>
+          <div class="divider"></div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="rgb-split">RGB Displacement</label>
+              <span id="rgb-split-val" class="slider-val">0 px</span>
+            </div>
+            <input type="range" id="rgb-split" min="0" max="30" step="1" value="0">
+          </div>
+
+          <div class="control-group checkbox-group">
+            <label for="glitch-monochrome">Monochrome Glitch FX</label>
+            <input type="checkbox" id="glitch-monochrome">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="pixel-sort">Pixel Sorting Intensity</label>
+              <span id="pixel-sort-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="pixel-sort" min="0" max="100" step="5" value="0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="depth-modulation">Depth Jitter / Modulation</label>
+              <span id="depth-modulation-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="depth-modulation" min="0" max="100" step="5" value="0">
+          </div>
+
+          <div class="grid-2-col">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="glitch-frequency">Shake Chance</label>
+                <span id="glitch-frequency-val" class="slider-val">5%</span>
+              </div>
+              <input type="range" id="glitch-frequency" min="0" max="50" step="1" value="5">
+            </div>
+
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="glitch-severity">Shake Intensity</label>
+                <span id="glitch-severity-val" class="slider-val">10px</span>
+              </div>
+              <input type="range" id="glitch-severity" min="2" max="60" step="2" value="10">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Video Exporting Wizard -->
+        <div class="panel-section export-section collapsed">
+          <h2 class="section-title text-cyan"><i data-lucide="video"></i> Exporting Machine</h2>
+          
+          <div class="control-group">
+            <label for="export-mode">Export Length Mode</label>
+            <div class="select-wrapper">
+              <select id="export-mode">
+                <option value="duration" selected>By Duration (Seconds)</option>
+                <option value="loops">By Cycles (Perfect Loops)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-2-col">
+            <div class="control-group" id="export-duration-group">
+              <div class="slider-header">
+                <label for="export-duration">Duration (Sec)</label>
+                <span id="export-duration-val" class="slider-val">5s</span>
+              </div>
+              <input type="range" id="export-duration" min="1" max="60" step="1" value="5">
+            </div>
+
+            <div class="control-group" id="export-loops-group" style="display: none;">
+              <div class="slider-header">
+                <label for="export-loops">Cycles (Loops)</label>
+                <span id="export-loops-val" class="slider-val">1</span>
+              </div>
+              <input type="range" id="export-loops" min="1" max="10" step="1" value="1">
+            </div>
+
+            <div class="control-group">
+              <label for="export-fps">Frame Rate</label>
+              <div class="select-wrapper">
+                <select id="export-fps">
+                  <option value="30" selected>30 FPS</option>
+                  <option value="60">60 FPS</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Est. Info Readout -->
+          <div class="control-group">
+            <div id="export-estimate-box" class="monitor-badge" style="justify-content: center; width: 100%; border-color: rgba(0, 242, 254, 0.15);">
+              <span id="export-estimate-text" style="font-size: 0.75rem; text-align: center; color: var(--text-secondary);">Est. Video Length: 5.0 seconds (0.25 loops)</span>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label for="export-format">Export Format</label>
+            <div class="select-wrapper">
+              <select id="export-format">
+                <option value="mp4" selected>MP4 Video (H.264 - Highly Compatible)</option>
+                <option value="webm">WebM Video (VP9/VP8)</option>
+              </select>
+            </div>
+            <div id="mp4-warning" style="display: none; margin-top: 6px; font-size: 0.7rem; color: #ffb703; align-items: center; gap: 4px; line-height: 1.2;">
+              <i data-lucide="alert-triangle" style="width: 12px; height: 12px; flex-shrink: 0;"></i>
+              <span>MP4 (WebCodecs) is disabled in insecure contexts. Falling back to WebM.</span>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label for="export-resolution">Export Resolution</label>
+            <div class="select-wrapper">
+              <select id="export-resolution">
+                <option value="viewport" selected>Match Canvas Ratio (Max 1080p)</option>
+                <option value="1080">1080p Full HD (1920 x 1080 - 16:9)</option>
+                <option value="720">720p HD (1280 x 720 - 16:9)</option>
+                <option value="1080s">Square Post (1080 x 1080 - 1:1)</option>
+                <option value="original">Original Image Ratio</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group-switch" style="margin-top: 10px;">
+            <label class="switch-label" for="video-fade-in-active">Global Fade In</label>
+            <input type="checkbox" id="video-fade-in-active">
+          </div>
+          <div class="control-group" id="video-fade-in-duration-group" style="display: none; margin-top: 5px; margin-bottom: 10px;">
+            <div class="slider-header">
+              <label for="video-fade-in-duration">Fade In Duration (s)</label>
+              <span id="video-fade-in-duration-val" class="slider-val">0.5s</span>
+            </div>
+            <input type="range" id="video-fade-in-duration" min="0.1" max="2.0" step="0.1" value="0.5">
+          </div>
+
+          <div class="control-group-switch" style="margin-top: 5px;">
+            <label class="switch-label" for="video-fade-out-active">Global Fade Out</label>
+            <input type="checkbox" id="video-fade-out-active">
+          </div>
+          <div class="control-group" id="video-fade-out-duration-group" style="display: none; margin-top: 5px; margin-bottom: 10px;">
+            <div class="slider-header">
+              <label for="video-fade-out-duration">Fade Out Duration (s)</label>
+              <span id="video-fade-out-duration-val" class="slider-val">0.5s</span>
+            </div>
+            <input type="range" id="video-fade-out-duration" min="0.1" max="2.0" step="0.1" value="0.5">
+          </div>
+
+          <button id="btn-export-video" class="btn primary btn-full">
+            <i data-lucide="download"></i> Begin Video Export
+          </button>
+        </div>
+        <div class="panel-section collapsed">
+          <h2 class="section-title"><i data-lucide="skull"></i> Cybernetic Glitch FX</h2>
+          
+          <div class="control-group-switch">
+            <label class="switch-label" for="glitch-enabled">Glitch FX Enabled</label>
+            <input type="checkbox" id="glitch-enabled">
+          </div>
+          <div class="control-group">
+            <label>Active Glitch Styles (Stackable)</label>
+            <div class="checkbox-list-container">
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-rgb" checked>
+                <label for="glitch-style-rgb">RGB & Pixel Sort</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-vhs">
+                <label for="glitch-style-vhs">Analog VCR Scanline Sag</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-block">
+                <label for="glitch-style-block">Digital Block Tearing</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-liquid">
+                <label for="glitch-style-liquid">Liquid Warp Filter (GPU)</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="glitch-style-flicker">
+                <label for="glitch-style-flicker">Flicker & Strobe</label>
+              </div>
+              <div class="checkbox-row" style="padding-left: 24px;">
+                <input type="checkbox" id="glitch-flicker-highlights">
+                <label for="glitch-flicker-highlights" style="font-size: 0.85rem; color: var(--text-muted);">Highlights Only</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group checkbox-group" style="margin-top: 10px;">
+            <label for="glitch-style-random">Randomize Style on Trigger</label>
+            <input type="checkbox" id="glitch-style-random">
+          </div>
+          <div class="divider"></div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="rgb-split">RGB Displacement</label>
+              <span id="rgb-split-val" class="slider-val">0 px</span>
+            </div>
+            <input type="range" id="rgb-split" min="0" max="30" step="1" value="0">
+          </div>
+
+          <div class="control-group checkbox-group">
+            <label for="glitch-monochrome">Monochrome Glitch FX</label>
+            <input type="checkbox" id="glitch-monochrome">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="pixel-sort">Pixel Sorting Intensity</label>
+              <span id="pixel-sort-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="pixel-sort" min="0" max="100" step="5" value="0">
+          </div>
+
+          <div class="control-group">
+            <div class="slider-header">
+              <label for="depth-modulation">Depth Jitter / Modulation</label>
+              <span id="depth-modulation-val" class="slider-val">0%</span>
+            </div>
+            <input type="range" id="depth-modulation" min="0" max="100" step="5" value="0">
+          </div>
+
+          <div class="grid-2-col">
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="glitch-frequency">Shake Chance</label>
+                <span id="glitch-frequency-val" class="slider-val">5%</span>
+              </div>
+              <input type="range" id="glitch-frequency" min="0" max="50" step="1" value="5">
+            </div>
+
+            <div class="control-group">
+              <div class="slider-header">
+                <label for="glitch-severity">Shake Intensity</label>
+                <span id="glitch-severity-val" class="slider-val">10px</span>
+              </div>
+              <input type="range" id="glitch-severity" min="2" max="60" step="2" value="10">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Video Exporting Wizard -->
+        <div class="panel-section export-section collapsed">
+          <h2 class="section-title text-cyan"><i data-lucide="video"></i> Exporting Machine</h2>
+          
+          <div class="control-group">
+            <label for="export-mode">Export Length Mode</label>
+            <div class="select-wrapper">
+              <select id="export-mode">
+                <option value="duration" selected>By Duration (Seconds)</option>
+                <option value="loops">By Cycles (Perfect Loops)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-2-col">
+            <div class="control-group" id="export-duration-group">
+              <div class="slider-header">
+                <label for="export-duration">Duration (Sec)</label>
+                <span id="export-duration-val" class="slider-val">5s</span>
+              </div>
+              <input type="range" id="export-duration" min="1" max="60" step="1" value="5">
+            </div>
+
+            <div class="control-group" id="export-loops-group" style="display: none;">
+              <div class="slider-header">
+                <label for="export-loops">Cycles (Loops)</label>
+                <span id="export-loops-val" class="slider-val">1</span>
+              </div>
+              <input type="range" id="export-loops" min="1" max="10" step="1" value="1">
+            </div>
+
+            <div class="control-group">
+              <label for="export-fps">Frame Rate</label>
+              <div class="select-wrapper">
+                <select id="export-fps">
+                  <option value="30" selected>30 FPS</option>
+                  <option value="60">60 FPS</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Est. Info Readout -->
+          <div class="control-group">
+            <div id="export-estimate-box" class="monitor-badge" style="justify-content: center; width: 100%; border-color: rgba(0, 242, 254, 0.15);">
+              <span id="export-estimate-text" style="font-size: 0.75rem; text-align: center; color: var(--text-secondary);">Est. Video Length: 5.0 seconds (0.25 loops)</span>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label for="export-format">Export Format</label>
+            <div class="select-wrapper">
+              <select id="export-format">
+                <option value="mp4" selected>MP4 Video (H.264 - Highly Compatible)</option>
+                <option value="webm">WebM Video (VP9/VP8)</option>
+              </select>
+            </div>
+            <div id="mp4-warning" style="display: none; margin-top: 6px; font-size: 0.7rem; color: #ffb703; align-items: center; gap: 4px; line-height: 1.2;">
+              <i data-lucide="alert-triangle" style="width: 12px; height: 12px; flex-shrink: 0;"></i>
+              <span>MP4 (WebCodecs) is disabled in insecure contexts. Falling back to WebM.</span>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label for="export-resolution">Export Resolution</label>
+            <div class="select-wrapper">
+              <select id="export-resolution">
+                <option value="viewport" selected>Match Canvas Ratio (Max 1080p)</option>
+                <option value="1080">1080p Full HD (1920 x 1080 - 16:9)</option>
+                <option value="720">720p HD (1280 x 720 - 16:9)</option>
+                <option value="1080s">Square Post (1080 x 1080 - 1:1)</option>
+                <option value="original">Original Image Ratio</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group-switch" style="margin-top: 10px;">
+            <label class="switch-label" for="video-fade-in-active">Global Fade In</label>
+            <input type="checkbox" id="video-fade-in-active">
+          </div>
+          <div class="control-group" id="video-fade-in-duration-group" style="display: none; margin-top: 5px; margin-bottom: 10px;">
+            <div class="slider-header">
+              <label for="video-fade-in-duration">Fade In Duration (s)</label>
+              <span id="video-fade-in-duration-val" class="slider-val">0.5s</span>
+            </div>
+            <input type="range" id="video-fade-in-duration" min="0.1" max="2.0" step="0.1" value="0.5">
+          </div>
+
+          <div class="control-group-switch" style="margin-top: 5px;">
+            <label class="switch-label" for="video-fade-out-active">Global Fade Out</label>
+            <input type="checkbox" id="video-fade-out-active">
+          </div>
+          <div class="control-group" id="video-fade-out-duration-group" style="display: none; margin-top: 5px; margin-bottom: 10px;">
+            <div class="slider-header">
+              <label for="video-fade-out-duration">Fade Out Duration (s)</label>
+              <span id="video-fade-out-duration-val" class="slider-val">0.5s</span>
+            </div>
+            <input type="range" id="video-fade-out-duration" min="0.1" max="2.0" step="0.1" value="0.5">
+          </div>
+
+          <button id="btn-export-video" class="btn primary btn-full">
+            <i data-lucide="download"></i> Begin Video Export
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Export Overlay Status -->
+    <!-- Welcome Modal -->
+    <div id="welcome-overlay" class="modal-overlay hidden" style="z-index: 4000;">
+      <div class="modal-card" style="position: relative;">
+        <button id="btn-close-welcome-x" style="position: absolute; top: 15px; right: 15px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; padding: 5px;"><i data-lucide="x"></i></button>
+        <h2 style="color: var(--cyan); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+          <i data-lucide="zap"></i> Welcome to VileCut
+        </h2>
+        <p style="margin-bottom: 15px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
+          VileCut is a chaotic motion machine for creating infinite zooming loops, glitch art, and symmetrical visualizers directly from static images.
+        </p>
+        <ul style="margin-bottom: 20px; padding-left: 20px; line-height: 1.6; color: var(--text-color); font-size: 0.9rem;">
+          <li><strong>Full Timeline:</strong> Layer, arrange, and trim your tracks</li>
+          <li><strong>Rich Media:</strong> Support for audio tracks, video backgrounds, and image overlays</li>
+          <li><strong>Cybernetic FX:</strong> Dynamic glow effects, glitch triggering, and symmetry mirrors</li>
+          <li><strong>Advanced Typography:</strong> Multiline text with custom fonts and glitch animations</li>
+          <li><strong>High-Speed Export Engine:</strong> Native MP4 & WebM rendering directly in your browser</li>
+          <li><strong>Social Media Ready:</strong> Built-in aspect ratios (9:16, 1:1, 4:5) for TikTok, Reels, and Instagram</li>
+        </ul>
+        <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-left: 3px solid var(--pink); margin-bottom: 25px; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+          <strong style="color: var(--pink); display: block; margin-bottom: 5px;">Privacy & Local Processing</strong>
+          Everything happens entirely in your browser client-side. Your images, videos, and audio are never uploaded to any server. High-quality exports are generated locally using your device's resources.
+        </div>
+        <button id="btn-close-welcome" class="btn primary" style="width: 100%;">Got it, let's go</button>
+      </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="info-overlay" class="modal-overlay hidden" style="z-index: 3000;">
+      <div class="modal-card">
+        <h2 style="color: var(--cyan); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+          <i data-lucide="info"></i> About VileCut
+        </h2>
+        
+        <div style="text-align: left; margin-bottom: 25px;">
+          <p style="margin-bottom: 15px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
+            VileCut is a chaotic motion machine for creating infinite zooming loops, glitch art, and symmetrical visualizers directly from static images.
+          </p>
+          <ul style="margin-bottom: 20px; padding-left: 20px; line-height: 1.6; color: var(--text-color); font-size: 0.9rem;">
+            <li><strong>Full Timeline:</strong> Layer, arrange, and trim your tracks</li>
+            <li><strong>Rich Media:</strong> Support for audio tracks, video backgrounds, and image overlays</li>
+            <li><strong>Cybernetic FX:</strong> Dynamic glow effects, glitch triggering, and symmetry mirrors</li>
+            <li><strong>Advanced Typography:</strong> Multiline text with custom fonts and glitch animations</li>
+            <li><strong>High-Speed Export Engine:</strong> Native MP4 & WebM rendering directly in your browser</li>
+            <li><strong>Social Media Ready:</strong> Built-in aspect ratios (9:16, 1:1, 4:5) for TikTok, Reels, and Instagram</li>
+          </ul>
+        </div>
+
+        <div style="text-align: center;">
+          <p style="margin-bottom: 25px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
+            <strong>Got feedback, feature ideas, or found a bug?</strong><br>
+            I'd love to hear how you use it. Shoot me an email:<br><br>
+            <a href="mailto:gncd123@gmail.com" style="color: var(--cyan); text-decoration: none; font-weight: bold; font-size: 1.1rem; background: rgba(0, 242, 254, 0.1); padding: 8px 16px; border-radius: 6px; display: inline-block;">gncd123@gmail.com</a>
+          </p>
+          <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 25px;">
+            <strong style="color: var(--text-primary); display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 5px;">
+              <i data-lucide="github" style="width: 16px; height: 16px;"></i> Open Source & Secure
+            </strong>
+            Curious about how it works or want to verify its security? You can view the source code or download the project to run it completely locally on your own machine:<br>
+            <a href="https://github.com/honkamies/VileCut" target="_blank" rel="noopener noreferrer" style="color: var(--cyan); text-decoration: underline; margin-top: 5px; display: inline-block;">github.com/honkamies/VileCut</a>
+          </div>
+          <button id="btn-close-info" class="btn primary" style="width: 100%;">Close</button>
+        </div>
+      </div>
+    </div>
+
+
+
+    <div id="export-overlay" class="modal-overlay hidden">
+      <div class="modal-card">
+        <i data-lucide="loader" class="modal-icon spinner text-purple"></i>
+        <h3>Rendering Video Sequence</h3>
+        <p class="modal-description">Generating frames deterministically to prevent speed lags. Please keep the window active.</p>
+        <div class="progress-bar-container">
+          <div id="export-progress-bar" class="progress-bar" style="width: 0%;"></div>
+        </div>
+        <div class="export-stats">
+          <span id="export-frame-count">Frame 0 of 150</span>
+          <span id="export-percent">0%</span>
+        </div>
+        <button id="btn-cancel-export" class="btn secondary">Cancel Export</button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- SVG Filters for Cybernetic Glitches -->
+  <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" width="0" height="0">
+    <defs>
+      <filter id="liquid-warp-filter">
+        <feTurbulence type="fractalNoise" id="liquid-noise" baseFrequency="0.02 0.08" numOctaves="1" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" id="liquid-displace" scale="0" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- JS -->
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
