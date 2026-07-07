@@ -36,6 +36,9 @@ export const UI = {
   btnInfoModal: document.getElementById('btn-info-modal'),
   infoOverlay: document.getElementById('info-overlay'),
   btnCloseInfo: document.getElementById('btn-close-info'),
+  welcomeOverlay: document.getElementById('welcome-overlay'),
+  btnCloseWelcome: document.getElementById('btn-close-welcome'),
+  btnCloseWelcomeX: document.getElementById('btn-close-welcome-x'),
   btnResetSettingsOnly: document.getElementById('btn-reset-settings-only'),
   btnReloadApp: document.getElementById('btn-reload-app'),
 

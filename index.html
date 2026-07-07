@@ -1085,6 +1085,32 @@
     </div>
 
     <!-- Export Overlay Status -->
+    <!-- Welcome Modal -->
+    <div id="welcome-overlay" class="modal-overlay hidden" style="z-index: 4000;">
+      <div class="modal-content" style="max-width: 500px; padding: 30px; position: relative; border: 1px solid rgba(0, 242, 254, 0.2); box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);">
+        <button id="btn-close-welcome-x" style="position: absolute; top: 15px; right: 15px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; padding: 5px;"><i data-lucide="x"></i></button>
+        <h2 style="color: var(--cyan); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+          <i data-lucide="zap"></i> Welcome to VileCut
+        </h2>
+        <p style="margin-bottom: 15px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
+          VileCut is a chaotic motion machine for creating infinite zooming loops, glitch art, and symmetrical visualizers directly from static images.
+        </p>
+        <ul style="margin-bottom: 20px; padding-left: 20px; line-height: 1.6; color: var(--text-color); font-size: 0.9rem;">
+          <li><strong>Full Timeline:</strong> Layer, arrange, and trim your tracks</li>
+          <li><strong>Rich Media:</strong> Support for audio tracks, video backgrounds, and image overlays</li>
+          <li><strong>Cybernetic FX:</strong> Dynamic glow effects, glitch triggering, and symmetry mirrors</li>
+          <li><strong>Advanced Typography:</strong> Multiline text with custom fonts and glitch animations</li>
+          <li><strong>High-Speed Export Engine:</strong> Native MP4 & WebM rendering directly in your browser</li>
+          <li><strong>Social Media Ready:</strong> Built-in aspect ratios (9:16, 1:1, 4:5) for TikTok, Reels, and Instagram</li>
+        </ul>
+        <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-left: 3px solid var(--pink); margin-bottom: 25px; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+          <strong style="color: var(--pink); display: block; margin-bottom: 5px;">Privacy & Local Processing</strong>
+          Everything happens entirely in your browser client-side. Your images, videos, and audio are never uploaded to any server. High-quality exports are generated locally using your device's resources.
+        </div>
+        <button id="btn-close-welcome" class="btn primary" style="width: 100%;">Got it, let's go</button>
+      </div>
+    </div>
+
     <!-- Info Modal -->
     <div id="info-overlay" class="modal-overlay hidden" style="z-index: 3000;">
       <div class="modal-content" style="text-align: center; max-width: 400px; padding: 30px;">

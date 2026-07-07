@@ -692,6 +692,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (UI.welcomeOverlay) {
+    const hasSeenWelcome = localStorage.getItem('vilecut_welcomed');
+    if (!hasSeenWelcome) {
+      UI.welcomeOverlay.classList.remove('hidden');
+    }
+
+    const closeWelcome = () => {
+      UI.welcomeOverlay.classList.add('hidden');
+      localStorage.setItem('vilecut_welcomed', 'true');
+    };
+
+    if (UI.btnCloseWelcome) {
+      UI.btnCloseWelcome.addEventListener('click', closeWelcome);
+    }
+    if (UI.btnCloseWelcomeX) {
+      UI.btnCloseWelcomeX.addEventListener('click', closeWelcome);
+    }
+    
+    UI.welcomeOverlay.addEventListener('click', (e) => {
+      if (e.target === UI.welcomeOverlay) {
+        closeWelcome();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !UI.welcomeOverlay.classList.contains('hidden')) {
+        closeWelcome();
+      }
+    });
+  }
+
   if (UI.infoOverlay) {
     UI.infoOverlay.addEventListener('click', (e) => {
       if (e.target === UI.infoOverlay) {
