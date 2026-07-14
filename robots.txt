@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /vilecut.html
+Disallow: /temp/
+
+Sitemap: https://vilecut.com/sitemap.xml
