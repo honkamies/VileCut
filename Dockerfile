@@ -1,13 +1,12 @@
-FROM nginx:alpine
+FROM nginx:1.27-alpine
 
-# Copy static assets to Nginx web directory
-COPY index.html /usr/share/nginx/html/
-COPY style.css /usr/share/nginx/html/
+# Custom server config (gzip, caching, security headers)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy static assets to the Nginx web directory
+COPY index.html vilecut.html style.css robots.txt sitemap.xml CNAME /usr/share/nginx/html/
 COPY js/ /usr/share/nginx/html/js/
 COPY fonts/ /usr/share/nginx/html/fonts/
 
-# Expose port 80 for web traffic
 EXPOSE 80
-
-# Run nginx in foreground
 CMD ["nginx", "-g", "daemon off;"]

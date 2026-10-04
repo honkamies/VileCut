@@ -5,6 +5,18 @@ import { getTimelineDuration } from './utils.js';
 let liquidTempCanvas = null;
 let liquidTempCtx = null;
 
+// Reusable scratch buffers: avoids allocating multi-megabyte pixel buffers on every rendered frame
+let scratchImageData = null;
+let blockTearBuf = null;
+let sortKeys = null;
+
+function getScratchImageData(ctx, w, h) {
+  if (!scratchImageData || scratchImageData.width !== w || scratchImageData.height !== h) {
+    scratchImageData = ctx.createImageData(w, h);
+  }
+  return scratchImageData;
+}
+
 export class GlitchManager {
   static update(dt) {
     if (!state.glitchEnabled) {
@@ -136,7 +148,7 @@ export class GlitchManager {
       if (shift > 0) {
         const imgData = renderCtx.getImageData(0, 0, w, h);
         const src = imgData.data;
-        const outData = renderCtx.createImageData(w, h);
+        const outData = getScratchImageData(renderCtx, w, h);
         const dst = outData.data;
         const len = src.length;
 
@@ -196,26 +208,22 @@ export class GlitchManager {
             
             const spanLen = end - start;
             if (spanLen > 8) {
-              const pixels = [];
-              for (let i = start; i < end; i++) {
-                const idx = rowStart + i * 4;
-                pixels.push({
-                  r: data[idx],
-                  g: data[idx+1],
-                  b: data[idx+2],
-                  a: data[idx+3],
-                  br: 0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2]
-                });
-              }
-
-              pixels.sort((a, b) => b.br - a.br);
-
+              // Pack brightness (high bits) and RGBA (low 32 bits) into one float64 so a native
+              // numeric sort replaces per-pixel objects and a comparator callback.
+              if (!sortKeys || sortKeys.length < w) sortKeys = new Float64Array(w);
+              const px32 = new Uint32Array(data.buffer, data.byteOffset, data.length >> 2);
+              const rowPx = rowStart >> 2;
               for (let i = 0; i < spanLen; i++) {
                 const idx = rowStart + (start + i) * 4;
-                data[idx] = pixels[i].r;
-                data[idx+1] = pixels[i].g;
-                data[idx+2] = pixels[i].b;
-                data[idx+3] = pixels[i].a;
+                const br = Math.round(0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2]);
+                sortKeys[i] = br * 4294967296 + px32[rowPx + start + i];
+              }
+              const keys = sortKeys.subarray(0, spanLen);
+              keys.sort();
+              // Brightest first, matching the previous descending order
+              for (let i = 0; i < spanLen; i++) {
+                const key = keys[spanLen - 1 - i];
+                px32[rowPx + start + i] = key % 4294967296;
               }
             }
             x = end + 1;
@@ -236,7 +244,7 @@ export class GlitchManager {
       if (amplitude > 0) {
         const imgData = renderCtx.getImageData(0, 0, w, h);
         const src = imgData.data;
-        const outData = renderCtx.createImageData(w, h);
+        const outData = getScratchImageData(renderCtx, w, h);
         const dst = outData.data;
         const rowBytes = w * 4;
         const timePhase = state.time * 25.0; 
@@ -300,7 +308,11 @@ export class GlitchManager {
           }
         }
 
-        const tempBuf = new Uint8ClampedArray(data);
+        if (!blockTearBuf || blockTearBuf.length !== data.length) {
+          blockTearBuf = new Uint8ClampedArray(data.length);
+        }
+        blockTearBuf.set(data);
+        const tempBuf = blockTearBuf;
 
         for (let r = 0; r < rows; r++) {
           const startY = r * blockSize;

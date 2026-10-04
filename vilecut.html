@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VileCut // Chaotic Motion Machine</title>
   <!-- SEO & Security -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; worker-src 'self' blob:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; worker-src 'self' blob:;">
   <meta name="description" content="VileCut is an infinite-zoom video loops editor designed for underground music scenes like metal, industrial, and electronic. Generate chaotic motion loops, kaleidoscope mirroring, and pixel-sorting glitch art from static images.">
   <meta name="keywords" content="vilecut, chaotic motion machine, infinite zoom, metal music video editor, underground music visualizer, loop generator, glitch art, pixel sorting">
   <link rel="canonical" href="https://vilecut.com/vilecut.html">
@@ -45,9 +45,7 @@
   }
   </script>
   <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link href="fonts/fonts.css" rel="stylesheet">
   <!-- CSS -->
   <link rel="stylesheet" href="style.css">
   <!-- Lucide Icons -->
@@ -60,7 +58,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VILECUT</h1>
-        <span class="version-tag">v1.14.0</span>
+        <span class="version-tag">v1.15.0</span>
       </div>
       <div class="header-actions">
         <div id="fps-monitor" class="monitor-badge">

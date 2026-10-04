@@ -2,6 +2,19 @@
 
 All notable changes to the VileCut application will be documented in this file.
 
+## [1.15.0] - 2026-10-03
+
+### Fixed
+- **Docker image served a 404**: the Dockerfile did not copy `vilecut.html`, `robots.txt` or `sitemap.xml`, so the landing-page redirect led nowhere.
+
+### Performance
+- **Glitch effects**: reuse scratch `ImageData` / block-tear buffers instead of allocating every frame; pixel sort now uses a packed numeric sort instead of per-pixel objects and a comparator.
+- **Self-hosted fonts**: Outfit and JetBrains Mono are served from `fonts/` (no Google Fonts requests); CSP tightened accordingly.
+- **nginx**: gzip, long-lived caching for static assets and basic security headers.
+
+### Chore
+- Added `.gitattributes` for consistent line endings.
+
 ## [1.14.0] - 2026-07-06
 
 ### Rebranded
