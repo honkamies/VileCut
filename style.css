@@ -1359,6 +1359,15 @@ select:focus, select:hover {
   box-shadow: 0 0 8px rgba(255, 0, 127, 0.3);
 }
 
+.viewport-btn.highlight-cyan {
+  color: var(--cyan);
+}
+
+.viewport-btn.highlight-cyan:hover {
+  background: rgba(0, 242, 254, 0.1);
+  box-shadow: 0 0 8px rgba(0, 242, 254, 0.3);
+}
+
 .control-divider {
   width: 1px;
   height: 20px;
@@ -1726,4 +1735,12 @@ select:focus, select:hover {
   #mobile-warning-overlay {
     display: flex !important;
   }
+}
+
+.swatch-btn {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.swatch-btn:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }

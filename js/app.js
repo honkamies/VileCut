@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { UI } from './ui.js';
-import { getPseudoRandom, loadConfiguredFonts, getTimelineDuration } from './utils.js';
+import { getPseudoRandom, loadConfiguredFonts, getTimelineDuration, generateUUID } from './utils.js';
 import { ImageProcessor, drawInspectorPreview, drawMaskGraph } from './masking.js';
 import { GlitchManager } from './glitch.js';
 import { stopAudioSource, syncAudioPlayback, getAudioContext, activeAudioGain, activeAudioSource } from './audio.js';
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const img = await loadImage(file);
         const imgObj = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           name: file.name,
           img: img,
           layers: []
@@ -211,30 +211,54 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- ESTIMATE AND TIMELINE SYNCHRONIZATION ---
   function updateExportEstimate() {
     if (!UI.exportEstimateText) return;
+    const isGif = state.exportFormat === 'gif';
+    const fps = parseInt(UI.exportFps ? UI.exportFps.value : (state.exportFps || 30)) || 30;
+
+    let duration = 5;
+    let cycles = 0;
     if (state.exportMode === 'duration') {
-      const duration = state.exportDuration;
+      duration = state.exportDuration;
       const absSpeed = Math.abs(state.zoomSpeed);
-      const loops = absSpeed > 0.0001 ? duration * absSpeed : 0;
-      UI.exportEstimateText.innerText = `Est. Video Length: ${duration}s (${loops.toFixed(2)} cycles)`;
+      cycles = absSpeed > 0.0001 ? duration * absSpeed : 0;
     } else {
       const loops = state.exportLoops;
       const absSpeed = Math.abs(state.zoomSpeed);
       if (absSpeed < 0.001) {
-        UI.exportEstimateText.innerText = `Est. Video Length: Infinite (Zoom Speed is 0)`;
-      } else {
-        const duration = loops / absSpeed;
-        UI.exportEstimateText.innerText = `Est. Video Length: ${duration.toFixed(1)}s (${loops} cycles)`;
+        UI.exportEstimateText.innerText = isGif ? `Est. GIF Length: Infinite (Zoom Speed is 0)` : `Est. Video Length: Infinite (Zoom Speed is 0)`;
+        return;
       }
+      duration = loops / absSpeed;
+      cycles = loops;
+    }
+
+    if (isGif) {
+      const totalFrames = Math.ceil(duration * fps);
+      UI.exportEstimateText.innerText = `Est. GIF: ${duration.toFixed(1)}s (${totalFrames} frames @ ${fps}fps, ${cycles.toFixed(2)} cycles)`;
+    } else {
+      UI.exportEstimateText.innerText = `Est. Video Length: ${duration.toFixed(1)}s (${cycles.toFixed(2)} cycles)`;
     }
   }
 
   function updateMp4WarningVisibility() {
-    if (!UI.mp4Warning) return;
-    const hasWebCodecs = typeof window.VideoEncoder !== 'undefined';
-    if (state.exportFormat === 'mp4' && !hasWebCodecs) {
-      UI.mp4Warning.style.display = 'flex';
-    } else {
-      UI.mp4Warning.style.display = 'none';
+    updateExportFormatVisibility();
+  }
+
+  function updateExportFormatVisibility() {
+    const isGif = state.exportFormat === 'gif';
+    if (UI.gifTip) {
+      UI.gifTip.style.display = isGif ? 'flex' : 'none';
+    }
+    if (UI.mp4Warning) {
+      const hasWebCodecs = typeof window.VideoEncoder !== 'undefined';
+      if (state.exportFormat === 'mp4' && !hasWebCodecs) {
+        UI.mp4Warning.style.display = 'flex';
+      } else {
+        UI.mp4Warning.style.display = 'none';
+      }
+    }
+    if (UI.btnExportVideo) {
+      UI.btnExportVideo.innerHTML = isGif ? '<i data-lucide="download"></i> Begin GIF Export' : '<i data-lucide="download"></i> Begin Video Export';
+      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
     }
   }
 
@@ -533,15 +557,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  UI.btnStep.addEventListener('click', () => {
-    if (!state.isPlaying) {
-      state.time += 0.033;
-      if (state.glitchEnabled) {
-        GlitchManager.update(0.033);
-      }
-      renderFrame(state.time);
+  function stepFrame(direction = 1) {
+    if (state.uploadedImages.length === 0 || state.layers.length === 0) return;
+
+    if (state.isPlaying) {
+      state.isPlaying = false;
+      UI.btnPlayPause.classList.remove('active');
+      UI.playPauseIcon.setAttribute('data-lucide', 'play');
+      stopAudioSource();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     }
-  });
+
+    const fps = state.exportFps || 30;
+    const stepDelta = 1 / fps;
+    const dur = getTimelineDuration();
+
+    state.prevTime = state.time;
+    state.time += direction * stepDelta;
+
+    if (state.time >= dur) {
+      state.time = state.time % dur;
+    } else if (state.time < 0) {
+      state.time = (state.time % dur + dur) % dur;
+    }
+
+    if (state.glitchEnabled) {
+      GlitchManager.update(stepDelta);
+    }
+
+    updatePlayhead();
+    renderFrame(state.time);
+    if (state.videoBlocks && state.videoBlocks.length > 0) {
+      syncVideoPlayback();
+    }
+  }
+
+  if (UI.btnStep) {
+    UI.btnStep.addEventListener('click', () => stepFrame(1));
+  }
+  if (UI.btnStepBack) {
+    UI.btnStepBack.addEventListener('click', () => stepFrame(-1));
+  }
+  if (UI.btnTimelineStepForward) {
+    UI.btnTimelineStepForward.addEventListener('click', () => stepFrame(1));
+  }
+  if (UI.btnTimelineStepBack) {
+    UI.btnTimelineStepBack.addEventListener('click', () => stepFrame(-1));
+  }
+  if (UI.btnSnapshotPng) {
+    UI.btnSnapshotPng.addEventListener('click', () => VideoExporter.exportCurrentFramePNG());
+  }
+  if (UI.btnTimelineSnapshotPng) {
+    UI.btnTimelineSnapshotPng.addEventListener('click', () => VideoExporter.exportCurrentFramePNG());
+  }
+  if (UI.btnExportFramePng) {
+    UI.btnExportFramePng.addEventListener('click', () => VideoExporter.exportCurrentFramePNG());
+  }
 
   UI.btnManualGlitch.addEventListener('click', () => {
     GlitchManager.triggerGlitch();
@@ -853,6 +924,41 @@ document.addEventListener('DOMContentLoaded', () => {
       if (UI.glitchFlickerHighlights) UI.glitchFlickerHighlights.checked = false;
       state.activeSpikeStyle = null;
 
+      // 4.5 Geometric FX Reset
+      state.geometricEnabled = false;
+      if (UI.geometricEnabled) UI.geometricEnabled.checked = false;
+      state.geoCurtainActive = false;
+      if (UI.geoCurtainActive) UI.geoCurtainActive.checked = false;
+      const curtainControls = document.getElementById('geo-curtain-controls');
+      if (curtainControls) curtainControls.style.display = 'none';
+      state.geoCurtainLumTrigger = 'all';
+      if (UI.geoCurtainLumTrigger) UI.geoCurtainLumTrigger.value = 'all';
+      if (UI.geoCurtainLumGateGroup) UI.geoCurtainLumGateGroup.style.display = 'none';
+      state.geoCurtainMinLum = 0;
+      if (UI.geoCurtainMinLum) UI.geoCurtainMinLum.value = 0;
+      if (UI.geoCurtainMinLumVal) UI.geoCurtainMinLumVal.innerText = '0%';
+      state.geoCurtainMaxLum = 100;
+      if (UI.geoCurtainMaxLum) UI.geoCurtainMaxLum.value = 100;
+      if (UI.geoCurtainMaxLumVal) UI.geoCurtainMaxLumVal.innerText = '100%';
+      state.geoCurtainColorMode = 'neon';
+      if (UI.geoCurtainColorMode) UI.geoCurtainColorMode.value = 'neon';
+      if (UI.geoCurtainTintGroup) UI.geoCurtainTintGroup.style.display = 'none';
+      state.geoCurtainLumMod = 40;
+      if (UI.geoCurtainLumMod) UI.geoCurtainLumMod.value = 40;
+      if (UI.geoCurtainLumModVal) UI.geoCurtainLumModVal.innerText = '40%';
+      state.geoCurtainOriginDot = true;
+      if (UI.geoCurtainOriginDot) UI.geoCurtainOriginDot.checked = true;
+      state.geoCurtainMultiEdge = false;
+      if (UI.geoCurtainMultiEdge) UI.geoCurtainMultiEdge.checked = false;
+      state.geoNodesActive = false;
+      if (UI.geoNodesActive) UI.geoNodesActive.checked = false;
+      const nodesControls = document.getElementById('geo-nodes-controls');
+      if (nodesControls) nodesControls.style.display = 'none';
+      state.geoContoursActive = false;
+      if (UI.geoContoursActive) UI.geoContoursActive.checked = false;
+      const contourControls = document.getElementById('geo-contours-controls');
+      if (contourControls) contourControls.style.display = 'none';
+
       // 5. Exporter Settings
       state.exportFormat = 'mp4';
       if (UI.exportFormat) {
@@ -1062,6 +1168,248 @@ document.addEventListener('DOMContentLoaded', () => {
     renderFrame(state.time);
   });
 
+  // --- Micro-Geometric & Pixel FX Bindings ---
+  if (UI.geometricEnabled) {
+    UI.geometricEnabled.addEventListener('change', (e) => {
+      state.geometricEnabled = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+
+  // Module A: Spectral Edge Curtain
+  const geoCurtainControls = document.getElementById('geo-curtain-controls');
+  if (UI.geoCurtainActive) {
+    UI.geoCurtainActive.addEventListener('change', (e) => {
+      state.geoCurtainActive = e.target.checked;
+      if (geoCurtainControls) geoCurtainControls.style.display = e.target.checked ? 'block' : 'none';
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainDirection) {
+    UI.geoCurtainDirection.addEventListener('change', (e) => {
+      state.geoCurtainDirection = e.target.value;
+      if (UI.geoCurtainAngleGroup) {
+        UI.geoCurtainAngleGroup.style.display = (e.target.value === 'custom') ? 'block' : 'none';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainAngle) {
+    UI.geoCurtainAngle.addEventListener('input', (e) => {
+      state.geoCurtainAngle = parseInt(e.target.value);
+      if (UI.geoCurtainAngleVal) UI.geoCurtainAngleVal.innerText = `${state.geoCurtainAngle}°`;
+      if (UI.geoCurtainDirection && UI.geoCurtainDirection.value !== 'custom') {
+        UI.geoCurtainDirection.value = 'custom';
+        state.geoCurtainDirection = 'custom';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainBidirectional) {
+    UI.geoCurtainBidirectional.addEventListener('change', (e) => {
+      state.geoCurtainBidirectional = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainMultiEdge) {
+    UI.geoCurtainMultiEdge.addEventListener('change', (e) => {
+      state.geoCurtainMultiEdge = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainLumTrigger) {
+    UI.geoCurtainLumTrigger.addEventListener('change', (e) => {
+      state.geoCurtainLumTrigger = e.target.value;
+      if (UI.geoCurtainLumGateGroup) {
+        UI.geoCurtainLumGateGroup.style.display = (e.target.value === 'custom') ? 'block' : 'none';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainMinLum) {
+    UI.geoCurtainMinLum.addEventListener('input', (e) => {
+      state.geoCurtainMinLum = parseInt(e.target.value);
+      if (UI.geoCurtainMinLumVal) UI.geoCurtainMinLumVal.innerText = `${state.geoCurtainMinLum}%`;
+      if (UI.geoCurtainLumTrigger && UI.geoCurtainLumTrigger.value !== 'custom') {
+        UI.geoCurtainLumTrigger.value = 'custom';
+        state.geoCurtainLumTrigger = 'custom';
+        if (UI.geoCurtainLumGateGroup) UI.geoCurtainLumGateGroup.style.display = 'block';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainMaxLum) {
+    UI.geoCurtainMaxLum.addEventListener('input', (e) => {
+      state.geoCurtainMaxLum = parseInt(e.target.value);
+      if (UI.geoCurtainMaxLumVal) UI.geoCurtainMaxLumVal.innerText = `${state.geoCurtainMaxLum}%`;
+      if (UI.geoCurtainLumTrigger && UI.geoCurtainLumTrigger.value !== 'custom') {
+        UI.geoCurtainLumTrigger.value = 'custom';
+        state.geoCurtainLumTrigger = 'custom';
+        if (UI.geoCurtainLumGateGroup) UI.geoCurtainLumGateGroup.style.display = 'block';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainColorMode) {
+    UI.geoCurtainColorMode.addEventListener('change', (e) => {
+      state.geoCurtainColorMode = e.target.value;
+      if (UI.geoCurtainTintGroup) {
+        UI.geoCurtainTintGroup.style.display = (e.target.value === 'tint') ? 'block' : 'none';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainTintColor) {
+    UI.geoCurtainTintColor.addEventListener('input', (e) => {
+      state.geoCurtainTintColor = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+  document.querySelectorAll('.geo-curtain-swatch').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const color = e.currentTarget.getAttribute('data-color');
+      state.geoCurtainTintColor = color;
+      if (UI.geoCurtainTintColor) UI.geoCurtainTintColor.value = color;
+      renderFrame(state.time);
+    });
+  });
+  if (UI.geoCurtainLumMod) {
+    UI.geoCurtainLumMod.addEventListener('input', (e) => {
+      state.geoCurtainLumMod = parseInt(e.target.value);
+      if (UI.geoCurtainLumModVal) UI.geoCurtainLumModVal.innerText = `${state.geoCurtainLumMod}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainOriginDot) {
+    UI.geoCurtainOriginDot.addEventListener('change', (e) => {
+      state.geoCurtainOriginDot = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainLength) {
+    UI.geoCurtainLength.addEventListener('input', (e) => {
+      state.geoCurtainLength = parseInt(e.target.value);
+      if (UI.geoCurtainLengthVal) UI.geoCurtainLengthVal.innerText = `${state.geoCurtainLength}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainDensity) {
+    UI.geoCurtainDensity.addEventListener('input', (e) => {
+      state.geoCurtainDensity = parseInt(e.target.value);
+      if (UI.geoCurtainDensityVal) UI.geoCurtainDensityVal.innerText = `${state.geoCurtainDensity}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainThreshold) {
+    UI.geoCurtainThreshold.addEventListener('input', (e) => {
+      state.geoCurtainThreshold = parseInt(e.target.value);
+      if (UI.geoCurtainThresholdVal) UI.geoCurtainThresholdVal.innerText = `${state.geoCurtainThreshold}`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainFlicker) {
+    UI.geoCurtainFlicker.addEventListener('input', (e) => {
+      state.geoCurtainFlicker = parseInt(e.target.value);
+      if (UI.geoCurtainFlickerVal) UI.geoCurtainFlickerVal.innerText = `${state.geoCurtainFlicker}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainOpacity) {
+    UI.geoCurtainOpacity.addEventListener('input', (e) => {
+      state.geoCurtainOpacity = parseInt(e.target.value);
+      if (UI.geoCurtainOpacityVal) UI.geoCurtainOpacityVal.innerText = `${state.geoCurtainOpacity}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainBlend) {
+    UI.geoCurtainBlend.addEventListener('change', (e) => {
+      state.geoCurtainBlend = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+
+  // Module B: Micro-HUD Geometry Nodes
+  const geoNodesControls = document.getElementById('geo-nodes-controls');
+  if (UI.geoNodesActive) {
+    UI.geoNodesActive.addEventListener('change', (e) => {
+      state.geoNodesActive = e.target.checked;
+      if (geoNodesControls) geoNodesControls.style.display = e.target.checked ? 'block' : 'none';
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoNodeShape) {
+    UI.geoNodeShape.addEventListener('change', (e) => {
+      state.geoNodeShape = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoNodeDensity) {
+    UI.geoNodeDensity.addEventListener('input', (e) => {
+      state.geoNodeDensity = parseInt(e.target.value);
+      if (UI.geoNodeDensityVal) UI.geoNodeDensityVal.innerText = `${state.geoNodeDensity}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoNodeSize) {
+    UI.geoNodeSize.addEventListener('input', (e) => {
+      state.geoNodeSize = parseInt(e.target.value);
+      if (UI.geoNodeSizeVal) UI.geoNodeSizeVal.innerText = `${state.geoNodeSize}px`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoNodeColor) {
+    UI.geoNodeColor.addEventListener('input', (e) => {
+      state.geoNodeColor = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+  document.querySelectorAll('.geo-node-swatch').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const color = e.currentTarget.getAttribute('data-color');
+      state.geoNodeColor = color;
+      if (UI.geoNodeColor) UI.geoNodeColor.value = color;
+      renderFrame(state.time);
+    });
+  });
+
+  // Module C: Topographic Contours
+  const geoContoursControls = document.getElementById('geo-contours-controls');
+  if (UI.geoContoursActive) {
+    UI.geoContoursActive.addEventListener('change', (e) => {
+      state.geoContoursActive = e.target.checked;
+      if (geoContoursControls) geoContoursControls.style.display = e.target.checked ? 'block' : 'none';
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoContourLevels) {
+    UI.geoContourLevels.addEventListener('input', (e) => {
+      state.geoContourLevels = parseInt(e.target.value);
+      if (UI.geoContourLevelsVal) UI.geoContourLevelsVal.innerText = `${state.geoContourLevels}`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoContourOpacity) {
+    UI.geoContourOpacity.addEventListener('input', (e) => {
+      state.geoContourOpacity = parseInt(e.target.value);
+      if (UI.geoContourOpacityVal) UI.geoContourOpacityVal.innerText = `${state.geoContourOpacity}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoContourColor) {
+    UI.geoContourColor.addEventListener('input', (e) => {
+      state.geoContourColor = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+  document.querySelectorAll('.geo-contour-swatch').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const color = e.currentTarget.getAttribute('data-color');
+      state.geoContourColor = color;
+      if (UI.geoContourColor) UI.geoContourColor.value = color;
+      renderFrame(state.time);
+    });
+  });
+
   // Exporter Parameters Bindings
   UI.exportMode.addEventListener('change', (e) => {
     state.exportMode = e.target.value;
@@ -1128,7 +1476,24 @@ document.addEventListener('DOMContentLoaded', () => {
   if (UI.exportFormat) {
     UI.exportFormat.addEventListener('change', (e) => {
       state.exportFormat = e.target.value;
-      updateMp4WarningVisibility();
+      if (state.exportFormat === 'gif') {
+        if (UI.exportFps && UI.exportFps.value === '60') {
+          UI.exportFps.value = '24';
+          state.exportFps = 24;
+        }
+        if (UI.exportResolution && UI.exportResolution.value === '1080') {
+          UI.exportResolution.value = '720';
+        }
+      }
+      updateExportFormatVisibility();
+      updateExportEstimate();
+    });
+  }
+
+  if (UI.exportFps) {
+    UI.exportFps.addEventListener('change', (e) => {
+      state.exportFps = parseInt(e.target.value) || 30;
+      updateExportEstimate();
     });
   }
 
@@ -1209,7 +1574,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const duration = getTimelineDuration();
     const newText = {
-      id: 'txt_' + crypto.randomUUID(),
+      id: 'txt_' + generateUUID(),
       text: 'NEW TEXT TRACK',
       font: 'Outfit',
       size: 40,
@@ -1259,7 +1624,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const targetTrackIdx = selectedTxt.trackIndex !== undefined ? selectedTxt.trackIndex : 0;
     
     const newText = {
-      id: 'txt_' + crypto.randomUUID(),
+      id: 'txt_' + generateUUID(),
       text: 'NEXT TEXT',
       font: selectedTxt.font,
       size: selectedTxt.size,
@@ -1306,7 +1671,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const clonedText = {
       ...selectedTxt,
-      id: 'txt_' + crypto.randomUUID(),
+      id: 'txt_' + generateUUID(),
       startTime: startTime,
       endTime: endTime
     };
@@ -1360,7 +1725,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetTrackIdx = maxTrackIdx + 1;
 
         const newGraphic = {
-          id: 'grp_' + crypto.randomUUID(),
+          id: 'grp_' + generateUUID(),
           img: img,
           fileName: file.name,
           startTime: 0,
@@ -1738,7 +2103,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const newBlock = {
-          id: 'vid_' + crypto.randomUUID(),
+          id: 'vid_' + generateUUID(),
           fileName: file.name,
           file: file,
           url: url,
@@ -1818,7 +2183,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clonedVideo.addEventListener('loadedmetadata', () => {
         const newBlock = {
           ...selectedBlock,
-          id: 'vid_' + crypto.randomUUID(),
+          id: 'vid_' + generateUUID(),
           element: clonedVideo,
           startTime: startTime,
           endTime: endTime
@@ -2319,7 +2684,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       const newTrigger = {
-        id: 'gt_' + crypto.randomUUID(),
+        id: 'gt_' + generateUUID(),
         time: state.time,
         duration: 0.35,
         severity: 10
@@ -2404,6 +2769,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       e.preventDefault();
       UI.btnPlayPause.click();
+    } else if (e.key === ',' || (e.code === 'ArrowLeft' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey)) {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        return;
+      }
+      e.preventDefault();
+      stepFrame(-1);
+    } else if (e.key === '.' || (e.code === 'ArrowRight' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey)) {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        return;
+      }
+      e.preventDefault();
+      stepFrame(1);
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       const activeEl = document.activeElement;
       if (activeEl && (

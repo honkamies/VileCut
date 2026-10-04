@@ -110,6 +110,43 @@ export const storeInstance = new Store({
   shakeY: 0,
   shakeRot: 0,
 
+  // Micro-Geometric & Pixel FX
+  geometricEnabled: false,
+
+  // Spectral Edge Curtain
+  geoCurtainActive: false,
+  geoCurtainDirection: 'down',
+  geoCurtainAngle: 0,
+  geoCurtainBidirectional: false,
+  geoCurtainLength: 50,
+  geoCurtainDensity: 60,
+  geoCurtainThreshold: 35,
+  geoCurtainFlicker: 25,
+  geoCurtainOpacity: 75,
+  geoCurtainBlend: 'screen',
+  geoCurtainLumTrigger: 'all',
+  geoCurtainMinLum: 0,
+  geoCurtainMaxLum: 100,
+  geoCurtainColorMode: 'neon',
+  geoCurtainTintColor: '#00f2fe',
+  geoCurtainLumMod: 40,
+  geoCurtainOriginDot: true,
+  geoCurtainMultiEdge: false,
+
+  // Micro-HUD Geometry Nodes
+  geoNodesActive: false,
+  geoNodeShape: 'bracket',
+  geoNodeDensity: 35,
+  geoNodeSize: 8,
+  geoNodeStroke: 1,
+  geoNodeColor: '#00f2fe',
+
+  // Topographic Contours
+  geoContoursActive: false,
+  geoContourLevels: 12,
+  geoContourOpacity: 70,
+  geoContourColor: '#39ff14',
+
   isExporting: false,
   exportFormat: 'mp4',
   exportRecorder: null,

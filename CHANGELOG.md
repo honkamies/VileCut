@@ -2,6 +2,33 @@
 
 All notable changes to the VileCut application will be documented in this file.
 
+## [1.16.0] - 2026-10-04
+
+### Added
+- **Spectral Edge Curtain (Micro-Geometric FX)**:
+  - Real-time luminance edge detection with 0–360° directional beam projection and bidirectional beam extension.
+  - Granular edge threshold and beam length controls, neon boost multiplier, laser anchor beads, and energy dynamics.
+  - Luminosity detection gating: trigger beams specifically on highlights, shadows, or custom floor/ceiling luminance ranges.
+  - Strobe & flicker frequency modulation for chaotic rave and analog visualizer aesthetics.
+- **Client-Side Animated GIF Exporting (`.gif`)**:
+  - Zero-dependency client-side animated GIF rendering via embedded modern `gifenc` module.
+  - Automatic Netscape 2.0 loop extension headers (`repeat: 0`) for infinite looping.
+  - Per-frame dynamic 256-color palette quantization (`rgb565`) for vibrant neon and glitch preservation without color banding.
+  - Frame delay normalization protecting against browser timing clamping.
+  - GIF-optimized presets: 15 & 24 FPS framerates, 540p, 480p, and 480x480 square aspect ratios.
+  - Live progress feedback with frame counts, percentage, and cancellation support.
+- **Step-by-Step Frame Movement**:
+  - Precision frame-by-frame navigation controls (Backward and Forward) on both the canvas viewport toolbar and timeline navigation bar.
+  - Standard NLE keyboard shortcuts: `,` (comma) and `.` (period), or `Left Arrow` and `Right Arrow`.
+  - Deterministic time stepping with playhead updates, timecode tracking, glitch state progression, and video layer sync.
+- **Instant 1-Click PNG Snapshot**:
+  - High-resolution single-frame PNG capture accessible via canvas overlay, timeline action bar, and export wizard.
+  - Visual camera shutter screen flash feedback and deterministic full-resolution rendering.
+
+### Fixed
+- **Insecure Context UUID Generation**: Replaced `crypto.randomUUID()` with an RFC4122-compliant fallback generator (`generateUUID`) to prevent crashes on non-HTTPS local container and IP setups.
+- **UI Overflow**: Resolved control element overlap and border clipping on multi-edge ribbons, bidirectional switches, and beam adjustment sliders.
+
 ## [1.15.0] - 2026-10-03
 
 ### Fixed

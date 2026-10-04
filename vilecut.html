@@ -58,7 +58,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VILECUT</h1>
-        <span class="version-tag">v1.15.0</span>
+        <span class="version-tag">v1.16.0</span>
       </div>
       <div class="header-actions">
         <div id="fps-monitor" class="monitor-badge">
@@ -735,11 +735,18 @@
           
           <!-- Viewport Controls Overlay -->
           <div class="viewport-controls">
-            <button id="btn-play-pause" class="viewport-btn active" title="Play / Pause Animation">
+            <button id="btn-step-back" class="viewport-btn" title="Step 1 Frame Backward (Left Arrow / ,)">
+              <i data-lucide="step-back"></i>
+            </button>
+            <button id="btn-play-pause" class="viewport-btn active" title="Play / Pause Animation (Space)">
               <i data-lucide="pause" id="play-pause-icon"></i>
             </button>
-            <button id="btn-step" class="viewport-btn" title="Step 1 Frame">
-              <i data-lucide="skip-forward"></i>
+            <button id="btn-step" class="viewport-btn" title="Step 1 Frame Forward (Right Arrow / .)">
+              <i data-lucide="step-forward"></i>
+            </button>
+            <div class="control-divider"></div>
+            <button id="btn-snapshot-png" class="viewport-btn highlight-cyan" title="Export Current Frame as PNG (Instant Snapshot)">
+              <i data-lucide="camera"></i>
             </button>
             <button id="btn-manual-glitch" class="viewport-btn highlight" title="Trigger Instant Glitch">
               <i data-lucide="zap"></i>
@@ -769,6 +776,12 @@
                   <button id="btn-timeline-start" class="timeline-nav-btn" title="Jump to Start (0s)">
                     <i data-lucide="chevrons-left"></i>
                   </button>
+                  <button id="btn-timeline-step-back" class="timeline-nav-btn" title="Step 1 Frame Backward (Left Arrow / ,)">
+                    <i data-lucide="step-back"></i>
+                  </button>
+                  <button id="btn-timeline-step-forward" class="timeline-nav-btn" title="Step 1 Frame Forward (Right Arrow / .)">
+                    <i data-lucide="step-forward"></i>
+                  </button>
                   <button id="btn-timeline-end" class="timeline-nav-btn" title="Jump to End">
                     <i data-lucide="chevrons-right"></i>
                   </button>
@@ -796,6 +809,9 @@
               </button>
               <button id="btn-add-graphic" class="btn secondary small-btn" title="Add Graphic">
                 <i data-lucide="image"></i>
+              </button>
+              <button id="btn-timeline-snapshot-png" class="btn secondary small-btn" title="Export Current Frame as PNG (Instant Snapshot)" style="color: var(--cyan); border-color: rgba(0, 242, 254, 0.35); gap: 4px;">
+                <i data-lucide="camera" style="width: 14px; height: 14px;"></i> Snapshot PNG
               </button>
               <input type="file" id="graphic-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="display: none;">
               <button id="btn-add-audio" class="btn secondary small-btn" title="Add Audio">
@@ -1012,6 +1028,292 @@
           </div>
         </div>
 
+        <!-- Section 3.5: Micro-Geometric & Pixel FX -->
+        <div class="panel-section collapsed" id="geometric-fx-section">
+          <h2 class="section-title"><i data-lucide="grid"></i> Micro-Geometric & Pixel FX</h2>
+          
+          <div class="control-group-switch">
+            <label class="switch-label" for="geometric-enabled">Geometric FX Enabled</label>
+            <input type="checkbox" id="geometric-enabled">
+          </div>
+
+          <!-- Module A: Spectral Edge Curtain -->
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="control-group-switch" style="margin-bottom: 8px;">
+              <label class="switch-label" for="geo-curtain-active" style="font-size: 0.85rem; font-weight: 600; color: var(--cyan);">
+                <i data-lucide="sparkles" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Spectral Edge Curtain
+              </label>
+              <input type="checkbox" id="geo-curtain-active">
+            </div>
+
+            <div id="geo-curtain-controls" style="display: none; padding-left: 6px;">
+              <!-- 1. Direction & Geometry -->
+              <div class="control-group">
+                <label for="geo-curtain-direction">Extrusion Direction</label>
+                <div class="select-wrapper">
+                  <select id="geo-curtain-direction">
+                    <option value="down" selected>Down (Cascade)</option>
+                    <option value="up">Up (Rise)</option>
+                    <option value="right">Right (Sweep East)</option>
+                    <option value="left">Left (Sweep West)</option>
+                    <option value="custom">Custom Angle</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="control-group" id="geo-curtain-angle-group" style="display: none; margin-top: 10px;">
+                <div class="slider-header">
+                  <label for="geo-curtain-angle">Angle Degree</label>
+                  <span id="geo-curtain-angle-val" class="slider-val">0°</span>
+                </div>
+                <input type="range" id="geo-curtain-angle" min="0" max="360" step="1" value="0">
+              </div>
+
+              <div class="control-group-switch" style="margin-top: 10px;">
+                <label class="switch-label" for="geo-curtain-bidirectional">Bidirectional (Over Origin)</label>
+                <input type="checkbox" id="geo-curtain-bidirectional">
+              </div>
+
+              <div class="control-group-switch" style="margin-top: 8px;">
+                <label class="switch-label" for="geo-curtain-multi-edge">Multi-Edge Ribbons</label>
+                <input type="checkbox" id="geo-curtain-multi-edge">
+              </div>
+
+              <!-- 2. Luminance Trigger Gating (When it appears) -->
+              <div class="control-group" style="margin-top: 12px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.12);">
+                <label for="geo-curtain-lum-trigger" style="color: var(--cyan); font-weight: 600; font-size: 0.8rem;">
+                  <i data-lucide="sun" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> Trigger Luminance Gate
+                </label>
+                <div class="select-wrapper" style="margin-top: 6px;">
+                  <select id="geo-curtain-lum-trigger">
+                    <option value="all" selected>All Brightness (Global Edges)</option>
+                    <option value="highlights">Highlights Only (&gt; 47%)</option>
+                    <option value="super-highlights">Hot Highlights (&gt; 70%)</option>
+                    <option value="shadows">Shadows / Outlines (&lt; 40%)</option>
+                    <option value="midtones">Midtones Only (25% - 75%)</option>
+                    <option value="custom">Custom Brightness Range</option>
+                  </select>
+                </div>
+
+                <div id="geo-curtain-lum-gate-group" style="display: none; margin-top: 10px;">
+                  <div class="control-group">
+                    <div class="slider-header">
+                      <label for="geo-curtain-min-lum">Min Brightness Floor</label>
+                      <span id="geo-curtain-min-lum-val" class="slider-val">0%</span>
+                    </div>
+                    <input type="range" id="geo-curtain-min-lum" min="0" max="100" step="1" value="0">
+                  </div>
+
+                  <div class="control-group" style="margin-top: 10px;">
+                    <div class="slider-header">
+                      <label for="geo-curtain-max-lum">Max Brightness Ceiling</label>
+                      <span id="geo-curtain-max-lum-val" class="slider-val">100%</span>
+                    </div>
+                    <input type="range" id="geo-curtain-max-lum" min="0" max="100" step="1" value="100">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3. Detected Pixel Appearance -->
+              <div class="control-group" style="margin-top: 12px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.12);">
+                <label for="geo-curtain-color-mode" style="color: var(--cyan); font-weight: 600; font-size: 0.8rem;">
+                  <i data-lucide="palette" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> Beam Appearance &amp; Color
+                </label>
+                <div class="select-wrapper" style="margin-top: 6px;">
+                  <select id="geo-curtain-color-mode">
+                    <option value="neon" selected>Hyper-Vibrant Neon Boost</option>
+                    <option value="source">Natural Source Pixel Colors</option>
+                    <option value="white">Pure Laser White</option>
+                    <option value="tint">Custom Tint Tone</option>
+                  </select>
+                </div>
+
+                <div id="geo-curtain-tint-group" style="display: none; margin-top: 8px;">
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="geo-curtain-tint-color" value="#00f2fe" style="width: 36px; height: 32px; border: 1px solid var(--border-subtle); border-radius: 6px; cursor: pointer; padding: 0; background: none;">
+                    <div class="palette-swatches" style="display: flex; gap: 4px;">
+                      <button class="swatch-btn geo-curtain-swatch" data-color="#00f2fe" style="background:#00f2fe; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Cyan"></button>
+                      <button class="swatch-btn geo-curtain-swatch" data-color="#ff007f" style="background:#ff007f; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Pink"></button>
+                      <button class="swatch-btn geo-curtain-swatch" data-color="#39ff14" style="background:#39ff14; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Neon Green"></button>
+                      <button class="swatch-btn geo-curtain-swatch" data-color="#ffbe0b" style="background:#ffbe0b; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Gold"></button>
+                      <button class="swatch-btn geo-curtain-swatch" data-color="#ffffff" style="background:#ffffff; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="White"></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="control-group" style="margin-top: 10px;">
+                  <div class="slider-header">
+                    <label for="geo-curtain-lum-mod" title="Brighter pixels cast longer &amp; stronger beams">Energy Dynamics</label>
+                    <span id="geo-curtain-lum-mod-val" class="slider-val">40%</span>
+                  </div>
+                  <input type="range" id="geo-curtain-lum-mod" min="0" max="100" step="5" value="40">
+                </div>
+
+                <div class="control-group-switch" style="margin-top: 10px;">
+                  <label class="switch-label" for="geo-curtain-origin-dot">Laser Anchor Beads</label>
+                  <input type="checkbox" id="geo-curtain-origin-dot" checked>
+                </div>
+              </div>
+
+              <!-- 4. Beam Dimensions & Blending (Full-width rows with generous breathing room) -->
+              <div class="control-group" style="margin-top: 12px;">
+                <div class="slider-header">
+                  <label for="geo-curtain-length">Beam Length</label>
+                  <span id="geo-curtain-length-val" class="slider-val">50%</span>
+                </div>
+                <input type="range" id="geo-curtain-length" min="10" max="250" step="5" value="50">
+              </div>
+
+              <div class="control-group" style="margin-top: 10px;">
+                <div class="slider-header">
+                  <label for="geo-curtain-density">Beam Density</label>
+                  <span id="geo-curtain-density-val" class="slider-val">60%</span>
+                </div>
+                <input type="range" id="geo-curtain-density" min="10" max="100" step="5" value="60">
+              </div>
+
+              <div class="control-group" style="margin-top: 10px;">
+                <div class="slider-header">
+                  <label for="geo-curtain-threshold">Edge Sensitivity</label>
+                  <span id="geo-curtain-threshold-val" class="slider-val">35</span>
+                </div>
+                <input type="range" id="geo-curtain-threshold" min="10" max="90" step="1" value="35">
+              </div>
+
+              <div class="control-group" style="margin-top: 10px;">
+                <div class="slider-header">
+                  <label for="geo-curtain-flicker">Flicker &amp; Strobe</label>
+                  <span id="geo-curtain-flicker-val" class="slider-val">25%</span>
+                </div>
+                <input type="range" id="geo-curtain-flicker" min="0" max="100" step="5" value="25">
+              </div>
+
+              <div class="control-group" style="margin-top: 10px;">
+                <div class="slider-header">
+                  <label for="geo-curtain-opacity">Opacity</label>
+                  <span id="geo-curtain-opacity-val" class="slider-val">75%</span>
+                </div>
+                <input type="range" id="geo-curtain-opacity" min="10" max="100" step="5" value="75">
+              </div>
+
+              <div class="control-group" style="margin-top: 10px;">
+                <label for="geo-curtain-blend">Blend Mode</label>
+                <div class="select-wrapper">
+                  <select id="geo-curtain-blend">
+                    <option value="screen" selected>Screen (Glow)</option>
+                    <option value="source-over">Normal (Solid)</option>
+                    <option value="lighter">Lighter (Laser)</option>
+                    <option value="overlay">Overlay</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Module B: Micro-HUD Geometry Nodes -->
+          <div class="control-group">
+            <div class="control-group-switch" style="margin-bottom: 8px;">
+              <label class="switch-label" for="geo-nodes-active" style="font-size: 0.85rem; font-weight: 600; color: var(--cyan);">
+                <i data-lucide="layers" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Micro-HUD Geometry Nodes
+              </label>
+              <input type="checkbox" id="geo-nodes-active">
+            </div>
+
+            <div id="geo-nodes-controls" style="display: none; padding-left: 6px;">
+              <div class="control-group">
+                <label for="geo-node-shape">Symbol Shape</label>
+                <div class="select-wrapper">
+                  <select id="geo-node-shape">
+                    <option value="bracket" selected>Corner Brackets (⌜ ⌟)</option>
+                    <option value="cross">Micro Crosshairs (＋)</option>
+                    <option value="diamond">Hairline Diamonds (◇)</option>
+                    <option value="dot">Target Dots (•)</option>
+                    <option value="mixed">Mixed CAD Symbols</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid-2-col">
+                <div class="control-group">
+                  <div class="slider-header">
+                    <label for="geo-node-density">Density</label>
+                    <span id="geo-node-density-val" class="slider-val">35%</span>
+                  </div>
+                  <input type="range" id="geo-node-density" min="10" max="80" step="5" value="35">
+                </div>
+
+                <div class="control-group">
+                  <div class="slider-header">
+                    <label for="geo-node-size">Symbol Size</label>
+                    <span id="geo-node-size-val" class="slider-val">8px</span>
+                  </div>
+                  <input type="range" id="geo-node-size" min="4" max="20" step="1" value="8">
+                </div>
+              </div>
+
+              <div class="control-group" style="margin-top: 6px;">
+                <label for="geo-node-color">Node Color</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="color" id="geo-node-color" value="#00f2fe" style="width: 40px; height: 38px; border: 1px solid var(--border-subtle); border-radius: 6px; cursor: pointer; padding: 0; background: none;">
+                  <div class="palette-swatches" style="display: flex; gap: 4px;">
+                    <button class="swatch-btn geo-node-swatch" data-color="#00f2fe" style="background:#00f2fe; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Cyan"></button>
+                    <button class="swatch-btn geo-node-swatch" data-color="#ff007f" style="background:#ff007f; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Pink"></button>
+                    <button class="swatch-btn geo-node-swatch" data-color="#39ff14" style="background:#39ff14; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Neon Green"></button>
+                    <button class="swatch-btn geo-node-swatch" data-color="#ffffff" style="background:#ffffff; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="White"></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Module C: Topographic Contour Isolines -->
+          <div class="control-group">
+            <div class="control-group-switch" style="margin-bottom: 8px;">
+              <label class="switch-label" for="geo-contours-active" style="font-size: 0.85rem; font-weight: 600; color: var(--cyan);">
+                <i data-lucide="activity" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Topographic Contours
+              </label>
+              <input type="checkbox" id="geo-contours-active">
+            </div>
+
+            <div id="geo-contours-controls" style="display: none; padding-left: 6px;">
+              <div class="grid-2-col">
+                <div class="control-group">
+                  <div class="slider-header">
+                    <label for="geo-contour-levels">Elevation Steps</label>
+                    <span id="geo-contour-levels-val" class="slider-val">12</span>
+                  </div>
+                  <input type="range" id="geo-contour-levels" min="4" max="28" step="2" value="12">
+                </div>
+
+                <div class="control-group">
+                  <div class="slider-header">
+                    <label for="geo-contour-opacity">Opacity</label>
+                    <span id="geo-contour-opacity-val" class="slider-val">70%</span>
+                  </div>
+                  <input type="range" id="geo-contour-opacity" min="10" max="100" step="5" value="70">
+                </div>
+              </div>
+
+              <div class="control-group" style="margin-top: 6px;">
+                <label for="geo-contour-color">Contour Laser Color</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="color" id="geo-contour-color" value="#39ff14" style="width: 40px; height: 38px; border: 1px solid var(--border-subtle); border-radius: 6px; cursor: pointer; padding: 0; background: none;">
+                  <div class="palette-swatches" style="display: flex; gap: 4px;">
+                    <button class="swatch-btn geo-contour-swatch" data-color="#39ff14" style="background:#39ff14; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Neon Green"></button>
+                    <button class="swatch-btn geo-contour-swatch" data-color="#00f2fe" style="background:#00f2fe; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Cyan"></button>
+                    <button class="swatch-btn geo-contour-swatch" data-color="#ff007f" style="background:#ff007f; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Pink"></button>
+                    <button class="swatch-btn geo-contour-swatch" data-color="#ffffff" style="background:#ffffff; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="White"></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Section 4: Video Exporting Wizard -->
         <div class="panel-section export-section collapsed">
           <h2 class="section-title text-cyan"><i data-lucide="video"></i> Exporting Machine</h2>
@@ -1047,6 +1349,8 @@
               <label for="export-fps">Frame Rate</label>
               <div class="select-wrapper">
                 <select id="export-fps">
+                  <option value="15">15 FPS (Optimized GIF)</option>
+                  <option value="24">24 FPS (Cinematic / GIF)</option>
                   <option value="30" selected>30 FPS</option>
                   <option value="60">60 FPS</option>
                 </select>
@@ -1067,7 +1371,12 @@
               <select id="export-format">
                 <option value="mp4" selected>MP4 Video (H.264 - Highly Compatible)</option>
                 <option value="webm">WebM Video (VP9/VP8)</option>
+                <option value="gif">Animated GIF (Seamless Loop .gif)</option>
               </select>
+            </div>
+            <div id="gif-tip" style="display: none; margin-top: 6px; font-size: 0.72rem; color: #00f2fe; align-items: center; gap: 5px; line-height: 1.3; background: rgba(0, 242, 254, 0.08); padding: 6px 10px; border-radius: 4px; border: 1px solid rgba(0, 242, 254, 0.2);">
+              <i data-lucide="info" style="width: 13px; height: 13px; flex-shrink: 0;"></i>
+              <span>GIFs loop infinitely with no audio. 15–24 FPS and 480p–720p recommended for optimal file size.</span>
             </div>
             <div id="mp4-warning" style="display: none; margin-top: 6px; font-size: 0.7rem; color: #ffb703; align-items: center; gap: 4px; line-height: 1.2;">
               <i data-lucide="alert-triangle" style="width: 12px; height: 12px; flex-shrink: 0;"></i>
@@ -1082,7 +1391,10 @@
                 <option value="viewport" selected>Match Canvas Ratio (Max 1080p)</option>
                 <option value="1080">1080p Full HD (1920 x 1080 - 16:9)</option>
                 <option value="720">720p HD (1280 x 720 - 16:9)</option>
+                <option value="540">540p Medium (960 x 540 - 16:9)</option>
+                <option value="480">480p SD (854 x 480 - 16:9)</option>
                 <option value="1080s">Square Post (1080 x 1080 - 1:1)</option>
+                <option value="480s">Square 480p (480 x 480 - 1:1)</option>
                 <option value="original">Original Image Ratio</option>
               </select>
             </div>
@@ -1114,6 +1426,9 @@
 
           <button id="btn-export-video" class="btn primary btn-full">
             <i data-lucide="download"></i> Begin Video Export
+          </button>
+          <button id="btn-export-frame-png" class="btn secondary btn-full" style="margin-top: 8px; color: var(--cyan); border-color: rgba(0, 242, 254, 0.35); gap: 6px;" title="Export Current Frame as High-Resolution PNG">
+            <i data-lucide="camera"></i> Export Current Frame (PNG)
           </button>
         </div>
       </aside>

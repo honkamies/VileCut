@@ -5,6 +5,7 @@ import { stopAudioSource, getAudioContext, exportAudioNode, setExportAudioNode, 
 import { GlitchManager } from './glitch.js';
 import { renderFrame, resizeMainCanvas } from './renderer.js';
 import { Muxer, ArrayBufferTarget } from './mp4-muxer.js';
+import { GIFEncoder, quantize, applyPalette } from './gifenc.js';
 
 export class VideoExporter {
   static async export() {
@@ -13,6 +14,11 @@ export class VideoExporter {
     state.isExporting = true;
     state.exportCancel = false;
     UI.exportOverlay.classList.remove('hidden');
+
+    const titleEl = UI.exportOverlay.querySelector('h3');
+    if (titleEl) {
+      titleEl.innerText = state.exportFormat === 'gif' ? 'Rendering Animated GIF' : 'Rendering Video Sequence';
+    }
 
     const originalW = UI.mainCanvas.width;
     const originalH = UI.mainCanvas.height;
@@ -53,13 +59,23 @@ export class VideoExporter {
       resW = 1920; resH = 1080;
     } else if (mode === '1080s') {
       resW = 1080; resH = 1080;
+    } else if (mode === '540') {
+      resW = 960; resH = 540;
+    } else if (mode === '480') {
+      resW = 854; resH = 480;
+    } else if (mode === '480s') {
+      resW = 480; resH = 480;
     } else {
       // mode is 'original' or 'viewport'
+      let maxDim = 1080;
+      if (state.exportFormat === 'gif') {
+        maxDim = 720; // Safe upper bound for GIF memory
+      }
       if (ratio >= 1.0) {
-        resH = 1080;
+        resH = maxDim;
         resW = Math.round(resH * ratio);
       } else {
-        resW = 1080;
+        resW = maxDim;
         resH = Math.round(resW / ratio);
       }
     }
@@ -71,7 +87,18 @@ export class VideoExporter {
     UI.mainCanvas.width = resW;
     UI.mainCanvas.height = resH;
 
-    // Check if we should use the new MP4 WebCodecs exporter or WebM fallback
+    // Check export format: GIF, MP4 (WebCodecs), or WebM fallback
+    if (state.exportFormat === 'gif') {
+      try {
+        await VideoExporter.exportGIF(duration, fps, resW, resH, originalW, originalH);
+      } catch (err) {
+        console.error("GIF export failed:", err);
+        alert("GIF export failed: " + err.message);
+        VideoExporter.endExport(originalW, originalH);
+      }
+      return;
+    }
+
     const hasWebCodecs = typeof window.VideoEncoder !== 'undefined';
     const useWebCodecsMP4 = state.exportFormat === 'mp4' && hasWebCodecs;
 
@@ -400,6 +427,133 @@ export class VideoExporter {
     }
   }
 
+  static async exportGIF(duration, fps, resW, resH, originalW, originalH) {
+    const totalFrames = Math.ceil(duration * fps);
+    const delayMs = Math.max(20, Math.round(1000 / fps));
+
+    const tempPlaying = state.isPlaying;
+    state.isPlaying = false;
+    stopAudioSource();
+    if (state.videoBlocks && state.videoBlocks.length > 0) {
+      state.videoBlocks.forEach(b => {
+        if (b.element) b.element.pause();
+      });
+    }
+
+    // Reset wrap counts for all layers to align with starting time 0.0
+    state.layers.forEach(layer => {
+      layer.lastWrapCount = null;
+    });
+
+    const gif = GIFEncoder();
+
+    UI.exportProgressBar.style.width = `0%`;
+    UI.exportFrameCount.innerText = `Preparing GIF: Frame 0 / ${totalFrames}`;
+    UI.exportPercent.innerText = `0%`;
+
+    try {
+      for (let i = 0; i < totalFrames; i++) {
+        if (state.exportCancel) break;
+
+        state.prevTime = state.time;
+        state.time = i / fps;
+
+        const dur = getTimelineDuration();
+        const loopTime = state.time % dur;
+        const activeBlocks = state.videoBlocks ? state.videoBlocks.filter(b => loopTime >= b.startTime && loopTime < b.endTime) : [];
+        if (activeBlocks.length > 0) {
+          await Promise.all(activeBlocks.map(block => {
+            if (!block.element) return Promise.resolve();
+            const video = block.element;
+            const relativeTime = loopTime - block.startTime;
+            return new Promise(resolve => {
+              let resolved = false;
+              let timeoutId = null;
+              const onSeeked = () => {
+                if (resolved) return;
+                resolved = true;
+                if (timeoutId) clearTimeout(timeoutId);
+                video.removeEventListener('seeked', onSeeked);
+                resolve();
+              };
+              video.addEventListener('seeked', onSeeked);
+              video.currentTime = relativeTime;
+              timeoutId = setTimeout(onSeeked, 3000);
+            });
+          }));
+        }
+
+        if (state.glitchEnabled) {
+          GlitchManager.update(1 / fps);
+        }
+
+        renderFrame(state.time);
+
+        // Read RGBA pixels directly from rendered canvas
+        const frameCtx = UI.mainCanvas.getContext('2d');
+        const imgData = frameCtx.getImageData(0, 0, resW, resH);
+        const rgba = imgData.data;
+
+        // High fidelity color quantization with rgb565
+        const palette = quantize(rgba, 256, { format: 'rgb565' });
+        const index = applyPalette(rgba, palette, 'rgb565');
+
+        // Write frame (repeat: 0 on first frame writes Netscape looping extension)
+        gif.writeFrame(index, resW, resH, {
+          palette,
+          delay: delayMs,
+          repeat: i === 0 ? 0 : undefined
+        });
+
+        const pct = Math.round(((i + 1) / totalFrames) * 100);
+        UI.exportProgressBar.style.width = `${pct}%`;
+        UI.exportFrameCount.innerText = `Rendering GIF: Frame ${i + 1} / ${totalFrames}`;
+        UI.exportPercent.innerText = `${pct}%`;
+
+        // Yield to allow browser to repaint progress and handle events
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      if (state.exportCancel) {
+        state.isPlaying = tempPlaying;
+        if (state.isPlaying) syncAudioPlayback();
+        VideoExporter.endExport(originalW, originalH);
+        return;
+      }
+
+      UI.exportFrameCount.innerText = `Finalizing GIF file...`;
+      UI.exportProgressBar.style.width = `100%`;
+      UI.exportPercent.innerText = `100%`;
+      await new Promise(resolve => setTimeout(resolve, 30));
+
+      gif.finish();
+      const bytes = gif.bytes();
+      const blob = new Blob([bytes], { type: 'image/gif' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `vilecut_${Date.now()}.gif`;
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 500);
+
+    } catch (gifErr) {
+      console.error("GIF encoding failed:", gifErr);
+      throw gifErr;
+    } finally {
+      state.isPlaying = tempPlaying;
+      if (state.isPlaying) {
+        syncAudioPlayback();
+      }
+      VideoExporter.endExport(originalW, originalH);
+    }
+  }
+
   static exportWebM(duration, fps, resW, resH, originalW, originalH) {
     // Initialize export audio routing
     if (state.audioTrack) {
@@ -570,6 +724,112 @@ export class VideoExporter {
     UI.mainCanvas.height = origH;
     
     resizeMainCanvas();
+  }
+
+  static exportCurrentFramePNG() {
+    if (state.uploadedImages.length === 0 || state.layers.length === 0) {
+      alert("Please upload an image first.");
+      return;
+    }
+
+    if (state.isPlaying) {
+      state.isPlaying = false;
+      if (UI.btnPlayPause) UI.btnPlayPause.classList.remove('active');
+      if (UI.playPauseIcon) UI.playPauseIcon.setAttribute('data-lucide', 'play');
+      stopAudioSource();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // Trigger visual camera shutter flash
+    const flashEl = document.getElementById('glitch-flash');
+    if (flashEl) {
+      flashEl.classList.add('active');
+      setTimeout(() => flashEl.classList.remove('active'), 120);
+    }
+
+    const originalW = UI.mainCanvas.width;
+    const originalH = UI.mainCanvas.height;
+
+    const mode = UI.exportResolution ? UI.exportResolution.value : 'viewport';
+    const activeImg = state.uploadedImages[state.activeImageIndex >= 0 ? state.activeImageIndex : 0]?.img;
+
+    let resW = originalW;
+    let resH = originalH;
+
+    if (activeImg) {
+      let ratio = activeImg.naturalWidth / activeImg.naturalHeight;
+      if (mode === 'viewport') {
+        const arMode = state.aspectRatio;
+        if (arMode === '16-9') ratio = 16 / 9;
+        else if (arMode === '9-16') ratio = 9 / 16;
+        else if (arMode === '1-1') ratio = 1 / 1;
+        else if (arMode === '4-5') ratio = 4 / 5;
+        else if (arMode === '21-9') ratio = 21 / 9;
+      }
+
+      if (mode === '720') {
+        resW = 1280; resH = 720;
+      } else if (mode === '1080') {
+        resW = 1920; resH = 1080;
+      } else if (mode === '1080s') {
+        resW = 1080; resH = 1080;
+      } else if (mode === '540') {
+        resW = 960; resH = 540;
+      } else if (mode === '480') {
+        resW = 854; resH = 480;
+      } else if (mode === '480s') {
+        resW = 480; resH = 480;
+      } else if (mode === 'original') {
+        resW = activeImg.naturalWidth;
+        resH = activeImg.naturalHeight;
+      } else {
+        // mode is 'viewport'
+        if (ratio >= 1.0) {
+          resH = 1080;
+          resW = Math.round(resH * ratio);
+        } else {
+          resW = 1080;
+          resH = Math.round(resW / ratio);
+        }
+      }
+    }
+
+    // Ensure even dimensions
+    resW = Math.round(resW / 2) * 2;
+    resH = Math.round(resH / 2) * 2;
+
+    // Render at high-resolution export dimensions
+    UI.mainCanvas.width = resW;
+    UI.mainCanvas.height = resH;
+    renderFrame(state.time);
+
+    // Export PNG blob
+    UI.mainCanvas.toBlob((blob) => {
+      // Restore canvas viewport dimensions immediately
+      UI.mainCanvas.width = originalW;
+      UI.mainCanvas.height = originalH;
+      resizeMainCanvas();
+      renderFrame(state.time);
+
+      if (!blob) {
+        console.error("Failed to generate PNG snapshot blob");
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      const timecodeStr = state.time.toFixed(2).replace('.', '_');
+      a.download = `vilecut_frame_${timecodeStr}s_${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 500);
+    }, 'image/png');
   }
 }
 

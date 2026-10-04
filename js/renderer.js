@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { UI } from './ui.js';
 import { getTimelineDuration, getAdjustedZoomSpeed, getPseudoRandom, applyEdgeFade } from './utils.js';
 import { GlitchManager } from './glitch.js';
+import { GeometricFxManager } from './geometric_fx.js';
 import { drawTextOverlays, drawGraphicOverlays, drawVideoOverlay } from './overlays.js';
 
 export const offscreenCanvas = document.createElement('canvas');
@@ -321,6 +322,10 @@ export function renderFrame(renderTime) {
 
   if (state.glitchEnabled) {
     GlitchManager.applyPostProcessGlitches(offscreenCtx, bw, bh);
+  }
+
+  if (state.geometricEnabled) {
+    GeometricFxManager.apply(offscreenCtx, bw, bh);
   }
 
   ctx.fillStyle = '#000000';
