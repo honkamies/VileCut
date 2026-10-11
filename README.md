@@ -46,7 +46,7 @@ I asked AGY to create this as I needed something like this to my underground met
 
 - **Spectral Edge Curtain (Micro-Geometric FX)**: Real-time luminance edge detection generating directional laser beams (0–360° or bidirectional) with luminance threshold gating (highlights, shadows, or custom levels), flicker modulation, laser anchor beads, and energy dynamics.
 - **Animated GIF Exporting**: Zero-dependency client-side animated GIF rendering (`.gif`) with seamless infinite looping, per-frame 256-color palette quantization (`rgb565`), and optimized presets (15/24 FPS, 480p/540p/720p) for Discord and social sharing.
-- **Precision Frame Stepping & 1-Click PNG Snapshot**: Scrub animations frame-by-frame with NLE keyboard shortcuts (<kbd>,</kbd> / <kbd>.</kbd> or arrow keys) and canvas/timeline toolbar buttons, with instant 1-click high-resolution PNG still capture.
+- **Danger Zone Extended 10-Minute Engine**: Dedicated sidecar engine (`/danger/`) accessible directly from the header via the **"Dangerzone longvideo"** button. Streams multi-minute full-length music video renders (up to 10–15 minutes / 600–900s) directly to disk using the File System Access API (`FileSystemWritableFileStreamTarget`), keeping RAM usage $< 50\text{MB}$ and preventing browser OOM crashes. Features Screen WakeLock to avoid display sleep and real-time FPS/ETA metrics.
 - **UI Themes & Resets**: Toggle between styling themes and reset granular configurations without losing loaded media.
 
   ![Themes and Resets](screenshots/themeandresetbuttons.png)

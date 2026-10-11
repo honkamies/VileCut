@@ -2,6 +2,17 @@
 
 All notable changes to the VileCut application will be documented in this file.
 
+## [1.17.0] - 2026-10-11
+
+### Added
+- **Danger Zone // Extended 10-Minute Video Pipeline (`/danger/`)**:
+  - High-duration rendering engine configured for extended exports up to 10–15 minutes (600–900 seconds) without risking browser memory exhaustion.
+  - Direct entrance button in header ("Dangerzone longvideo") linking to the dedicated hazard engine.
+  - **Direct-to-Disk MP4 Streaming**: Leverages the Chromium File System Access API (`FileSystemWritableFileStreamTarget`) for renders $\ge 45\text{s}$, streaming encoded H.264/AAC packets chunk-by-chunk to disk while maintaining $< 50\text{MB}$ RAM footprint.
+  - **Memory Safeguards**: GIF exports locked out for durations $> 30\text{s}$ to prevent 60GB+ browser tab crashes.
+  - **Screen WakeLock Integration**: Automatically requests `navigator.wakeLock` during active renders to prevent OS/display sleep.
+  - **Live Encoding Telemetry**: Real-time render metrics displaying processing speed (FPS), accurate ETA countdown, and stream target mode (Direct Disk vs RAM Buffer).
+
 ## [1.16.0] - 2026-10-04
 
 ### Added

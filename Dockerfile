@@ -7,6 +7,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY index.html vilecut.html style.css robots.txt sitemap.xml CNAME /usr/share/nginx/html/
 COPY js/ /usr/share/nginx/html/js/
 COPY fonts/ /usr/share/nginx/html/fonts/
+COPY danger/ /usr/share/nginx/html/danger/
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

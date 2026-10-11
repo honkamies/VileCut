@@ -1,0 +1,3438 @@
+import { state } from './state.js';
+import { UI } from './ui.js';
+import { getPseudoRandom, loadConfiguredFonts, getTimelineDuration, generateUUID, formatDurationLabel, formatTimecode, parseDurationInput } from './utils.js';
+
+import { ImageProcessor, drawInspectorPreview, drawMaskGraph } from './masking.js';
+import { GlitchManager } from './glitch.js';
+import { stopAudioSource, syncAudioPlayback, getAudioContext, activeAudioGain, activeAudioSource } from './audio.js';
+import { resizeMainCanvas, renderFrame, ctx } from './renderer.js';
+import { engine } from './engine.js';
+import {
+  updateTimelineTracks,
+  updateTimelineRuler,
+  updatePlayhead,
+  selectText,
+  selectAudio,
+  selectVideo,
+  selectGraphic,
+  selectGlitchTrigger,
+  initTimelineEvents,
+  normalizeTracks,
+  swapTracks
+} from './timeline.js';
+import { VideoExporter } from './exporter.js';
+import { LyricsManager } from './lyrics.js';
+
+
+
+// Run on application load
+document.addEventListener('DOMContentLoaded', () => {
+  // --- COLLAPSIBLE PANEL SECTIONS ---
+  document.querySelectorAll('.panel-section').forEach((section) => {
+    const header = section.querySelector('.section-title-row') || section.querySelector('.section-title');
+    if (!header) return;
+
+    const trigger = section.querySelector('.section-title');
+    if (trigger) {
+      trigger.addEventListener('click', (e) => {
+        if (e.target.closest('button') || e.target.closest('.inspector-bg-selectors') || e.target.closest('input') || e.target.closest('select')) {
+          return;
+        }
+        section.classList.toggle('collapsed');
+      });
+    }
+
+    const contentWrapper = document.createElement('div');
+    contentWrapper.className = 'panel-section-content';
+
+    const children = Array.from(section.children);
+    children.forEach((child) => {
+      if (child !== header) {
+        contentWrapper.appendChild(child);
+      }
+    });
+
+    section.appendChild(contentWrapper);
+  });
+
+  // Initialize Lucide Icons
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+
+  // --- IMAGE HELPERS ---
+  async function loadImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Failed to load image structure."));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error("Failed to read file."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function addImages(files) {
+    UI.canvasLoading.classList.remove('hidden');
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const img = await loadImage(file);
+        const imgObj = {
+          id: generateUUID(),
+          name: file.name,
+          img: img,
+          layers: []
+        };
+        state.uploadedImages.push(imgObj);
+      } catch (err) {
+        console.error("Error loading image: " + file.name, err);
+        alert("Error loading " + file.name + ": " + err.message);
+      }
+    }
+    
+    if (state.uploadedImages.length > 0) {
+      state.imageLoaded = true;
+      if (state.activeImageIndex === -1) {
+        state.activeImageIndex = 0;
+      }
+      
+      ImageProcessor.reprocessAllImagesLayers();
+      ImageProcessor.initializeRenderStack();
+      updateImagesDeckUI();
+      updateTimelineTracks();
+      autoExpandPanelsOnUpload();
+    } else {
+      state.imageLoaded = false;
+    }
+    UI.canvasLoading.classList.add('hidden');
+  }
+
+  async function handleMultipleImageFiles(files) {
+    await addImages(files);
+    
+    if (state.uploadedImages.length > 0) {
+      engine.start();
+    }
+  }
+
+  function updateImagesDeckUI() {
+    if (state.uploadedImages.length === 0) {
+      UI.imagesDeck.classList.add('hidden');
+      state.activeImageIndex = -1;
+      ImageProcessor.renderActiveImageLayersPreview();
+      return;
+    }
+
+    UI.imagesDeck.classList.remove('hidden');
+    UI.deckCountVal.innerText = state.uploadedImages.length;
+    UI.deckList.innerHTML = '';
+
+    state.uploadedImages.forEach((imgObj, idx) => {
+      const item = document.createElement('div');
+      item.className = 'deck-item' + (idx === state.activeImageIndex ? ' active' : '');
+      item.dataset.index = idx;
+
+      const thumb = document.createElement('img');
+      thumb.className = 'deck-item-thumb';
+      thumb.src = imgObj.img.src;
+
+      const info = document.createElement('div');
+      info.className = 'deck-item-info';
+
+      const name = document.createElement('span');
+      name.className = 'deck-item-name';
+      name.innerText = imgObj.name;
+
+      const dims = document.createElement('span');
+      dims.className = 'deck-item-dims';
+      dims.innerText = `${imgObj.img.naturalWidth} x ${imgObj.img.naturalHeight}px`;
+
+      info.appendChild(name);
+      info.appendChild(dims);
+
+      const btnRemove = document.createElement('button');
+      btnRemove.className = 'btn-remove-deck-item';
+      btnRemove.title = 'Remove this image';
+      const icon = document.createElement('i');
+      icon.setAttribute('data-lucide', 'x');
+      btnRemove.appendChild(icon);
+
+      btnRemove.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeImageFromDeck(idx);
+      });
+
+      item.appendChild(thumb);
+      item.appendChild(info);
+      item.appendChild(btnRemove);
+
+      item.addEventListener('click', () => {
+        state.activeImageIndex = idx;
+        updateImagesDeckUI();
+        ImageProcessor.renderActiveImageLayersPreview();
+      });
+
+      UI.deckList.appendChild(item);
+    });
+
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  }
+
+  function removeImageFromDeck(index) {
+    const removedId = state.uploadedImages[index].id;
+    state.uploadedImages.splice(index, 1);
+    
+    if (state.uploadedImages.length === 0) {
+      state.activeImageIndex = -1;
+      state.imageLoaded = false;
+      state.layers = [];
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, UI.mainCanvas.width, UI.mainCanvas.height);
+    } else {
+      if (state.activeImageIndex >= state.uploadedImages.length) {
+        state.activeImageIndex = state.uploadedImages.length - 1;
+      }
+      
+      state.layers.forEach(layer => {
+        if (layer.sourceImageId === removedId) {
+          const randomImgObj = state.uploadedImages[Math.floor(Math.random() * state.uploadedImages.length)];
+          layer.canvas = randomImgObj.layers[layer.index];
+          layer.sourceImageId = randomImgObj.id;
+        }
+      });
+    }
+    
+    updateImagesDeckUI();
+    ImageProcessor.renderActiveImageLayersPreview();
+  }
+
+  // --- ESTIMATE AND TIMELINE SYNCHRONIZATION ---
+  function updateExportEstimate() {
+    if (!UI.exportEstimateText) return;
+    const isGif = state.exportFormat === 'gif';
+    const fps = parseInt(UI.exportFps ? UI.exportFps.value : (state.exportFps || 30)) || 30;
+
+    let duration = 30;
+    let cycles = 0;
+    if (state.exportMode === 'duration') {
+      duration = state.exportDuration;
+      const absSpeed = Math.abs(state.zoomSpeed);
+      cycles = absSpeed > 0.0001 ? duration * absSpeed : 0;
+    } else {
+      const loops = state.exportLoops;
+      const absSpeed = Math.abs(state.zoomSpeed);
+      if (absSpeed < 0.001) {
+        UI.exportEstimateText.innerText = isGif ? `Est. GIF Length: Infinite (Zoom Speed is 0)` : `Est. Video Length: Infinite (Zoom Speed is 0)`;
+        return;
+      }
+      duration = loops / absSpeed;
+      cycles = loops;
+    }
+
+    const totalFrames = Math.ceil(duration * fps);
+    const mins = Math.floor(duration / 60);
+    const secs = Math.round(duration % 60);
+    const timeStr = mins > 0 ? `${mins}m ${secs > 0 ? secs + 's' : ''}` : `${duration.toFixed(1)}s`;
+    const streamNotice = duration >= 45 ? ' • Direct-to-Disk Stream Active' : '';
+
+    if (isGif) {
+      UI.exportEstimateText.innerText = `Est. GIF: ${duration.toFixed(1)}s (${totalFrames.toLocaleString()} frames @ ${fps}fps, ${cycles.toFixed(2)} cycles)`;
+    } else {
+      UI.exportEstimateText.innerText = `Est. Video: ${timeStr} (${totalFrames.toLocaleString()} frames @ ${fps}fps, ${cycles.toFixed(2)} cycles)${streamNotice}`;
+    }
+  }
+
+  function updateMp4WarningVisibility() {
+    updateExportFormatVisibility();
+  }
+
+  function updateExportFormatVisibility() {
+    const isGif = state.exportFormat === 'gif';
+    if (UI.gifTip) {
+      UI.gifTip.style.display = isGif ? 'flex' : 'none';
+    }
+    if (UI.mp4Warning) {
+      const hasWebCodecs = typeof window.VideoEncoder !== 'undefined';
+      if (state.exportFormat === 'mp4' && !hasWebCodecs) {
+        UI.mp4Warning.style.display = 'flex';
+      } else {
+        UI.mp4Warning.style.display = 'none';
+      }
+    }
+    if (UI.btnExportVideo) {
+      UI.btnExportVideo.innerHTML = isGif ? '<i data-lucide="download"></i> Begin GIF Export' : '<i data-lucide="download"></i> Begin Video Export';
+      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+    }
+  }
+
+  function updateGlitchTriggerButtonState() {
+    if (UI.btnAddGlitchTrigger) {
+      UI.btnAddGlitchTrigger.disabled = !state.glitchEnabled;
+    }
+  }
+
+  function autoExpandPanelsOnUpload() {
+    if (UI.layerIsolationSection) {
+      UI.layerIsolationSection.classList.remove('collapsed');
+    }
+    if (UI.extractedLayersSection) {
+      UI.extractedLayersSection.classList.remove('collapsed');
+    }
+    if (UI.infiniteMotionSection) {
+      UI.infiniteMotionSection.classList.remove('collapsed');
+    }
+  }
+
+  function syncVideoPlayback() {
+    if (!state.videoBlocks || state.videoBlocks.length === 0) return;
+    const dur = getTimelineDuration();
+    const playheadTime = state.time % dur;
+    
+    state.videoBlocks.forEach(block => {
+      const video = block.element;
+      if (!video) return;
+      
+      const isActive = (playheadTime >= block.startTime && playheadTime < block.endTime);
+      
+      if (isActive) {
+        const targetTime = playheadTime - block.startTime;
+        if (state.isPlaying && state.imageLoaded) {
+          if (video.paused) {
+            video.play().catch(e => console.log("Video auto-play blocked:", e));
+          }
+          const diff = Math.abs(video.currentTime - targetTime);
+          if (diff > 0.15) {
+            video.currentTime = targetTime;
+          }
+        } else {
+          if (!video.paused) {
+            video.pause();
+          }
+          if (Math.abs(video.currentTime - targetTime) > 0.05) {
+            video.currentTime = targetTime;
+          }
+        }
+      } else {
+        if (!video.paused) {
+          video.pause();
+        }
+      }
+    });
+  }
+
+  // --- ANIMATION LOOP DECOUPLED VIA ENGINE ---
+  engine.subscribe((dt, timestamp) => {
+    if (dt > 0) {
+      state.fps = Math.round(1 / dt);
+      UI.fpsValue.innerText = state.fps;
+    }
+
+    if (state.isPlaying && state.imageLoaded) {
+      const dur = getTimelineDuration();
+      state.prevTime = state.time;
+      state.time += dt;
+      
+      let wrapped = false;
+      if (state.time >= dur) {
+        state.time = state.time % dur;
+        wrapped = true;
+        // Make camera rotation continuous when wrapping time back to 0
+        state.cameraRotationBase += state.cameraRotation * dur * (Math.PI / 180);
+      }
+      
+      if (state.glitchEnabled) {
+        GlitchManager.update(dt);
+      }
+
+      if (state.audioTrack) {
+        if (wrapped) {
+          syncAudioPlayback();
+        } else {
+          const start = state.audioTrack.timelineStart;
+          const end = start + state.audioTrack.duration;
+          const shouldBePlaying = (state.time >= start && state.time < end);
+          if (shouldBePlaying && !activeAudioSource) {
+            syncAudioPlayback();
+          }
+        }
+      }
+      
+      renderFrame(state.time);
+      updatePlayhead();
+    }
+
+    if (state.videoBlocks && state.videoBlocks.length > 0) {
+      syncVideoPlayback();
+    }
+  });
+
+  // --- DRAG AND DROP / FILE INPUTS ---
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  }, false);
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+  }, false);
+
+  UI.dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    UI.dropZone.classList.add('dragover');
+  });
+
+  UI.dropZone.addEventListener('dragleave', () => {
+    UI.dropZone.classList.remove('dragover');
+  });
+
+  UI.dropZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    UI.dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+      handleMultipleImageFiles(e.dataTransfer.files);
+    }
+  });
+
+  UI.fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      handleMultipleImageFiles(e.target.files);
+    }
+  });
+
+  UI.btnClearDeck.addEventListener('click', () => {
+    state.uploadedImages = [];
+    state.activeImageIndex = -1;
+    state.imageLoaded = false;
+    state.layers = [];
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, UI.mainCanvas.width, UI.mainCanvas.height);
+    updateImagesDeckUI();
+    updateTimelineTracks();
+    ImageProcessor.renderActiveImageLayersPreview();
+  });
+
+  // Toggle Switches Bindings
+  UI.glitchEnabled.addEventListener('change', (e) => {
+    state.glitchEnabled = e.target.checked;
+    updateGlitchTriggerButtonState();
+  });
+
+  if (UI.glitchMonochrome) {
+    UI.glitchMonochrome.addEventListener('change', (e) => {
+      state.glitchMonochrome = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+
+  const bindGlitchCheckbox = (elem, stateKey) => {
+    if (elem) {
+      elem.addEventListener('change', (e) => {
+        state[stateKey] = e.target.checked;
+        renderFrame(state.time);
+      });
+    }
+  };
+  bindGlitchCheckbox(UI.glitchStyleRgbSort, 'glitchStyleRgbSort');
+  bindGlitchCheckbox(UI.glitchStyleVhs, 'glitchStyleVhs');
+  bindGlitchCheckbox(UI.glitchStyleBlock, 'glitchStyleBlock');
+  bindGlitchCheckbox(UI.glitchStyleLiquid, 'glitchStyleLiquid');
+  bindGlitchCheckbox(UI.glitchStyleRandom, 'glitchStyleRandom');
+  bindGlitchCheckbox(UI.glitchStyleFlicker, 'glitchStyleFlicker');
+  bindGlitchCheckbox(UI.glitchFlickerHighlights, 'glitchFlickerHighlightsOnly');
+
+  // Inspector Background Switcher Bindings
+  UI.inspectorBgSelectors.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      UI.inspectorBgSelectors.forEach(b => b.classList.remove('active'));
+      const mode = e.target.getAttribute('data-bg');
+      state.inspectorBgMode = mode;
+      e.target.classList.add('active');
+      drawInspectorPreview();
+    });
+  });
+
+  // Layer Parameter Updates
+  UI.maskType.addEventListener('change', (e) => {
+    state.maskType = e.target.value;
+    if (state.maskType === 'luminosity' || state.maskType === 'adaptive-luminosity') {
+      UI.luminositySmoothnessGroup.style.display = 'flex';
+      UI.colorRangeHueGroup.style.display = 'none';
+    } else if (state.maskType === 'color-range') {
+      UI.luminositySmoothnessGroup.style.display = 'none';
+      UI.colorRangeHueGroup.style.display = 'flex';
+    } else {
+      UI.luminositySmoothnessGroup.style.display = 'none';
+      UI.colorRangeHueGroup.style.display = 'none';
+    }
+    ImageProcessor.reprocessAllImagesLayers();
+    ImageProcessor.initializeRenderStack();
+  });
+
+  UI.layerCount.addEventListener('input', (e) => {
+    state.layerCount = parseInt(e.target.value);
+    UI.layerCountVal.innerText = state.layerCount;
+  });
+  UI.layerCount.addEventListener('change', () => {
+    ImageProcessor.reprocessAllImagesLayers();
+    ImageProcessor.initializeRenderStack();
+  });
+
+  UI.maskFeather.addEventListener('input', (e) => {
+    state.maskFeather = parseFloat(e.target.value);
+    UI.maskFeatherVal.innerText = state.maskFeather;
+  });
+  UI.maskFeather.addEventListener('change', () => {
+    ImageProcessor.reprocessAllImagesLayers();
+    ImageProcessor.initializeRenderStack();
+  });
+
+  UI.layerEdgeFade.addEventListener('input', (e) => {
+    state.layerEdgeFade = parseInt(e.target.value);
+    UI.layerEdgeFadeVal.innerText = `${state.layerEdgeFade}%`;
+  });
+  UI.layerEdgeFade.addEventListener('change', () => {
+    ImageProcessor.reprocessAllImagesLayers();
+    ImageProcessor.initializeRenderStack();
+  });
+
+  UI.hueTolerance.addEventListener('input', (e) => {
+    state.hueTolerance = parseInt(e.target.value);
+    UI.hueToleranceVal.innerText = `${state.hueTolerance}°`;
+  });
+  UI.hueTolerance.addEventListener('change', () => {
+    ImageProcessor.reprocessAllImagesLayers();
+    ImageProcessor.initializeRenderStack();
+  });
+
+  UI.btnRegenerateLayers.addEventListener('click', () => {
+    if (state.maskType === 'random') {
+      state.randomBoundaries = [];
+    }
+    ImageProcessor.reprocessAllImagesLayers();
+    ImageProcessor.initializeRenderStack();
+  });
+
+  UI.btnRandomLayersOrder.addEventListener('click', () => {
+    if (state.layers.length > 0) {
+      state.layers.forEach((l) => {
+        l.initialZ = Math.random();
+      });
+      renderFrame(state.time);
+    }
+  });
+
+  UI.layersList.addEventListener('click', (e) => {
+    const thumb = e.target.closest('.layer-thumbnail');
+    if (thumb) {
+      document.querySelectorAll('.layer-thumbnail').forEach((t) => t.classList.remove('active'));
+      thumb.classList.add('active');
+
+      const index = parseInt(thumb.dataset.index);
+      state.selectedInspectorLayer = index;
+      drawInspectorPreview();
+
+      const layer = state.layers[index];
+      if (layer) {
+        ctx.fillStyle = 'rgba(0, 242, 254, 0.4)';
+        ctx.fillRect(0, 0, UI.mainCanvas.width, UI.mainCanvas.height);
+        setTimeout(() => renderFrame(state.time), 120);
+      }
+    }
+  });
+
+  // Viewport Controls
+  UI.btnPlayPause.addEventListener('click', () => {
+    state.isPlaying = !state.isPlaying;
+    if (state.isPlaying) {
+      UI.btnPlayPause.classList.add('active');
+      UI.playPauseIcon.setAttribute('data-lucide', 'pause');
+      state.lastFrameTime = performance.now();
+      state.prevTime = state.time;
+      syncAudioPlayback();
+    } else {
+      UI.btnPlayPause.classList.remove('active');
+      UI.playPauseIcon.setAttribute('data-lucide', 'play');
+      stopAudioSource();
+    }
+    if (state.videoBlocks && state.videoBlocks.length > 0) {
+      syncVideoPlayback();
+    }
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  });
+
+  function stepFrame(direction = 1) {
+    if (state.uploadedImages.length === 0 || state.layers.length === 0) return;
+
+    if (state.isPlaying) {
+      state.isPlaying = false;
+      UI.btnPlayPause.classList.remove('active');
+      UI.playPauseIcon.setAttribute('data-lucide', 'play');
+      stopAudioSource();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    const fps = state.exportFps || 30;
+    const stepDelta = 1 / fps;
+    const dur = getTimelineDuration();
+
+    state.prevTime = state.time;
+    state.time += direction * stepDelta;
+
+    if (state.time >= dur) {
+      state.time = state.time % dur;
+    } else if (state.time < 0) {
+      state.time = (state.time % dur + dur) % dur;
+    }
+
+    if (state.glitchEnabled) {
+      GlitchManager.update(stepDelta);
+    }
+
+    updatePlayhead();
+    renderFrame(state.time);
+    if (state.videoBlocks && state.videoBlocks.length > 0) {
+      syncVideoPlayback();
+    }
+  }
+
+  if (UI.btnStep) {
+    UI.btnStep.addEventListener('click', () => stepFrame(1));
+  }
+  if (UI.btnStepBack) {
+    UI.btnStepBack.addEventListener('click', () => stepFrame(-1));
+  }
+  if (UI.btnTimelineStepForward) {
+    UI.btnTimelineStepForward.addEventListener('click', () => stepFrame(1));
+  }
+  if (UI.btnTimelineStepBack) {
+    UI.btnTimelineStepBack.addEventListener('click', () => stepFrame(-1));
+  }
+  if (UI.btnSnapshotPng) {
+    UI.btnSnapshotPng.addEventListener('click', () => VideoExporter.exportCurrentFramePNG());
+  }
+  if (UI.btnTimelineSnapshotPng) {
+    UI.btnTimelineSnapshotPng.addEventListener('click', () => VideoExporter.exportCurrentFramePNG());
+  }
+  if (UI.btnExportFramePng) {
+    UI.btnExportFramePng.addEventListener('click', () => VideoExporter.exportCurrentFramePNG());
+  }
+
+  UI.btnManualGlitch.addEventListener('click', () => {
+    GlitchManager.triggerGlitch();
+  });
+
+  UI.btnToggleGrid.addEventListener('click', () => {
+    state.gridActive = !state.gridActive;
+    UI.btnToggleGrid.classList.toggle('active', state.gridActive);
+    UI.mainCanvas.parentElement.classList.toggle('composition-grid', state.gridActive);
+  });
+
+  UI.btnResetView.addEventListener('click', () => {
+    state.time = 0;
+    stopAudioSource();
+    if (state.isPlaying) {
+      syncAudioPlayback();
+    }
+    state.cameraAngle = 0;
+    
+    UI.aspectRatio.value = 'original';
+    state.aspectRatio = 'original';
+
+    UI.layerEdgeFade.value = 10;
+    state.layerEdgeFade = 10;
+    UI.layerEdgeFadeVal.innerText = '10%';
+
+    UI.zoomSpeed.value = 0.05;
+    state.zoomSpeed = 0.05;
+    UI.zoomSpeedVal.innerText = '0.05';
+    
+    UI.zoomDepth.value = 4.0;
+    state.zoomDepth = 4.0;
+    UI.zoomDepthVal.innerText = '4.0';
+
+    UI.cameraRotation.value = 0;
+    state.cameraRotation = 0;
+    state.cameraRotationBase = 0;
+    UI.cameraRotationVal.innerText = '0.0°/s';
+
+    UI.cameraDrift.value = 0;
+    state.cameraDrift = 0;
+    UI.cameraDriftVal.innerText = '0.0';
+
+    UI.exportMode.value = 'duration';
+    state.exportMode = 'duration';
+    UI.exportDuration.value = 30;
+    state.exportDuration = 30;
+    UI.exportDurationVal.innerText = '30s';
+    if (UI.timelineDurationSlider) {
+      UI.timelineDurationSlider.value = 30;
+    }
+    if (UI.timelineDurationVal) {
+      UI.timelineDurationVal.innerText = '30s';
+    }
+    if (UI.timelineDurationControl) {
+      UI.timelineDurationControl.classList.remove('disabled');
+    }
+    UI.exportLoops.value = 1;
+    state.exportLoops = 1;
+    UI.exportLoopsVal.innerText = '1';
+    if (UI.exportFormat) {
+      UI.exportFormat.value = 'mp4';
+    }
+    state.exportFormat = 'mp4';
+    updateMp4WarningVisibility();
+    state.timelineZoom = 1.0;
+    UI.exportDurationGroup.style.display = 'flex';
+    UI.exportLoopsGroup.style.display = 'none';
+    updateExportEstimate();
+
+    UI.mirrorMode.value = 'none';
+    state.mirrorMode = 'none';
+    UI.kaleidoscopeSlicesGroup.style.display = 'none';
+
+    UI.rgbSplit.value = 0;
+    state.rgbSplit = 0;
+    UI.rgbSplitVal.innerText = '0 px';
+
+    UI.pixelSort.value = 0;
+    state.pixelSort = 0;
+    UI.pixelSortVal.innerText = '0%';
+
+    UI.depthModulation.value = 0;
+    state.depthModulation = 0;
+    UI.depthModulationVal.innerText = '0%';
+
+    UI.glitchEnabled.checked = false;
+    state.glitchEnabled = false;
+
+    if (UI.glitchMonochrome) {
+      UI.glitchMonochrome.checked = false;
+    }
+    state.glitchMonochrome = false;
+
+    if (UI.glitchStyleRgbSort) UI.glitchStyleRgbSort.checked = true;
+    if (UI.glitchStyleVhs) UI.glitchStyleVhs.checked = false;
+    if (UI.glitchStyleBlock) UI.glitchStyleBlock.checked = false;
+    if (UI.glitchStyleLiquid) UI.glitchStyleLiquid.checked = false;
+    if (UI.glitchStyleRandom) UI.glitchStyleRandom.checked = false;
+    if (UI.glitchStyleFlicker) UI.glitchStyleFlicker.checked = false;
+    if (UI.glitchFlickerHighlights) UI.glitchFlickerHighlights.checked = false;
+    state.glitchStyleRgbSort = true;
+    state.glitchStyleVhs = false;
+    state.glitchStyleBlock = false;
+    state.glitchStyleLiquid = false;
+    state.glitchStyleRandom = false;
+    state.glitchStyleFlicker = false;
+    state.glitchFlickerHighlightsOnly = false;
+    state.activeSpikeStyle = null;
+
+    UI.videoFadeInActive.checked = false;
+    state.videoFadeInActive = false;
+    UI.videoFadeInDurationGroup.style.display = 'none';
+    UI.videoFadeInDuration.value = 0.5;
+    state.videoFadeInDuration = 0.5;
+    UI.videoFadeInDurationVal.innerText = '0.5s';
+
+    UI.videoFadeOutActive.checked = false;
+    state.videoFadeOutActive = false;
+    UI.videoFadeOutDurationGroup.style.display = 'none';
+    UI.videoFadeOutDuration.value = 0.5;
+    state.videoFadeOutDuration = 0.5;
+    UI.videoFadeOutDurationVal.innerText = '0.5s';
+
+    state.selectedTextId = null;
+    selectText(null);
+    state.graphics = [];
+    state.selectedGraphicId = null;
+    selectGraphic(null);
+    updateTimelineRuler();
+    updateTimelineTracks();
+    updatePlayhead();
+
+    renderFrame(0);
+    drawMaskGraph();
+    updateGlitchTriggerButtonState();
+  });
+
+  if (UI.btnInfoModal) {
+    UI.btnInfoModal.addEventListener('click', () => {
+      UI.infoOverlay.classList.remove('hidden');
+    });
+  }
+
+  if (UI.btnCloseInfo) {
+    UI.btnCloseInfo.addEventListener('click', () => {
+      UI.infoOverlay.classList.add('hidden');
+    });
+  }
+
+  if (UI.welcomeOverlay) {
+    const hasSeenWelcome = localStorage.getItem('vilecut_welcomed');
+    if (!hasSeenWelcome) {
+      UI.welcomeOverlay.classList.remove('hidden');
+    }
+
+    const closeWelcome = () => {
+      UI.welcomeOverlay.classList.add('hidden');
+      localStorage.setItem('vilecut_welcomed', 'true');
+    };
+
+    if (UI.btnCloseWelcome) {
+      UI.btnCloseWelcome.addEventListener('click', closeWelcome);
+    }
+    if (UI.btnCloseWelcomeX) {
+      UI.btnCloseWelcomeX.addEventListener('click', closeWelcome);
+    }
+    
+    UI.welcomeOverlay.addEventListener('click', (e) => {
+      if (e.target === UI.welcomeOverlay) {
+        closeWelcome();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !UI.welcomeOverlay.classList.contains('hidden')) {
+        closeWelcome();
+      }
+    });
+  }
+
+  if (UI.infoOverlay) {
+    UI.infoOverlay.addEventListener('click', (e) => {
+      if (e.target === UI.infoOverlay) {
+        UI.infoOverlay.classList.add('hidden');
+      }
+    });
+  }
+  if (UI.btnReloadApp) {
+    UI.btnReloadApp.addEventListener('click', () => {
+      location.reload();
+    });
+  }
+
+  if (UI.btnResetSettingsOnly) {
+    UI.btnResetSettingsOnly.addEventListener('click', () => {
+      // 1. Time & playback state
+      state.time = 0;
+      stopAudioSource();
+      state.cameraAngle = 0;
+      state.isPlaying = true;
+      UI.btnPlayPause.classList.add('active');
+      UI.playPauseIcon.setAttribute('data-lucide', 'pause');
+      state.lastFrameTime = performance.now();
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+
+      // 2. Masking parameters
+      state.maskType = 'adaptive-luminosity';
+      UI.maskType.value = 'adaptive-luminosity';
+      UI.luminositySmoothnessGroup.style.display = 'flex';
+      UI.colorRangeHueGroup.style.display = 'none';
+
+      state.layerCount = 5;
+      UI.layerCount.value = 5;
+      UI.layerCountVal.innerText = '5';
+
+      state.maskFeather = 0.3;
+      UI.maskFeather.value = 0.3;
+      UI.maskFeatherVal.innerText = '0.30';
+
+      state.hueTolerance = 45;
+      UI.hueTolerance.value = 45;
+      UI.hueToleranceVal.innerText = '45°';
+
+      state.layerEdgeFade = 10;
+      UI.layerEdgeFade.value = 10;
+      UI.layerEdgeFadeVal.innerText = '10%';
+
+      state.randomBoundaries = [];
+
+      // 3. Viewport/Motion Parameters
+      state.aspectRatio = 'original';
+      UI.aspectRatio.value = 'original';
+      resizeMainCanvas();
+
+      state.zoomSpeed = 0.05;
+      UI.zoomSpeed.value = 0.05;
+      UI.zoomSpeedVal.innerText = '0.05';
+
+      state.zoomDepth = 4.0;
+      UI.zoomDepth.value = 4.0;
+      UI.zoomDepthVal.innerText = '4.0';
+
+      state.cameraRotation = 0;
+      state.cameraRotationBase = 0;
+      UI.cameraRotation.value = 0;
+      UI.cameraRotationVal.innerText = '0.0°/s';
+
+      state.cameraDrift = 0.0;
+      UI.cameraDrift.value = 0;
+      UI.cameraDriftVal.innerText = '0.0';
+
+      state.mirrorMode = 'none';
+      UI.mirrorMode.value = 'none';
+      UI.kaleidoscopeSlicesGroup.style.display = 'none';
+
+      state.kaleidoscopeSlices = 8;
+      UI.kSlices.value = 8;
+      UI.kSlicesVal.innerText = '8';
+
+      state.gridActive = false;
+      UI.btnToggleGrid.classList.remove('active');
+      UI.mainCanvas.parentElement.classList.remove('composition-grid');
+
+      // 4. Glitch FX
+      state.rgbSplit = 0;
+      UI.rgbSplit.value = 0;
+      UI.rgbSplitVal.innerText = '0 px';
+
+      state.pixelSort = 0;
+      UI.pixelSort.value = 0;
+      UI.pixelSortVal.innerText = '0%';
+
+      state.glitchFrequency = 5;
+      UI.glitchFrequency.value = 5;
+      UI.glitchFrequencyVal.innerText = '5%';
+
+      state.glitchSeverity = 10;
+      UI.glitchSeverity.value = 10;
+      UI.glitchSeverityVal.innerText = '10px';
+
+      state.depthModulation = 0;
+      UI.depthModulation.value = 0;
+      UI.depthModulationVal.innerText = '0%';
+
+      state.glitchEnabled = false;
+      UI.glitchEnabled.checked = false;
+
+      state.glitchMonochrome = false;
+      if (UI.glitchMonochrome) {
+        UI.glitchMonochrome.checked = false;
+      }
+
+      state.glitchStyleRgbSort = true;
+      if (UI.glitchStyleRgbSort) UI.glitchStyleRgbSort.checked = true;
+      state.glitchStyleVhs = false;
+      if (UI.glitchStyleVhs) UI.glitchStyleVhs.checked = false;
+      state.glitchStyleBlock = false;
+      if (UI.glitchStyleBlock) UI.glitchStyleBlock.checked = false;
+      state.glitchStyleLiquid = false;
+      if (UI.glitchStyleLiquid) UI.glitchStyleLiquid.checked = false;
+      state.glitchStyleRandom = false;
+      if (UI.glitchStyleRandom) UI.glitchStyleRandom.checked = false;
+      state.glitchStyleFlicker = false;
+      if (UI.glitchStyleFlicker) UI.glitchStyleFlicker.checked = false;
+      state.glitchFlickerHighlightsOnly = false;
+      if (UI.glitchFlickerHighlights) UI.glitchFlickerHighlights.checked = false;
+      state.activeSpikeStyle = null;
+
+      // 4.5 Geometric FX Reset
+      state.geometricEnabled = false;
+      if (UI.geometricEnabled) UI.geometricEnabled.checked = false;
+      state.geoCurtainActive = false;
+      if (UI.geoCurtainActive) UI.geoCurtainActive.checked = false;
+      const curtainControls = document.getElementById('geo-curtain-controls');
+      if (curtainControls) curtainControls.style.display = 'none';
+      state.geoCurtainLumTrigger = 'all';
+      if (UI.geoCurtainLumTrigger) UI.geoCurtainLumTrigger.value = 'all';
+      if (UI.geoCurtainLumGateGroup) UI.geoCurtainLumGateGroup.style.display = 'none';
+      state.geoCurtainMinLum = 0;
+      if (UI.geoCurtainMinLum) UI.geoCurtainMinLum.value = 0;
+      if (UI.geoCurtainMinLumVal) UI.geoCurtainMinLumVal.innerText = '0%';
+      state.geoCurtainMaxLum = 100;
+      if (UI.geoCurtainMaxLum) UI.geoCurtainMaxLum.value = 100;
+      if (UI.geoCurtainMaxLumVal) UI.geoCurtainMaxLumVal.innerText = '100%';
+      state.geoCurtainColorMode = 'neon';
+      if (UI.geoCurtainColorMode) UI.geoCurtainColorMode.value = 'neon';
+      if (UI.geoCurtainTintGroup) UI.geoCurtainTintGroup.style.display = 'none';
+      state.geoCurtainLumMod = 40;
+      if (UI.geoCurtainLumMod) UI.geoCurtainLumMod.value = 40;
+      if (UI.geoCurtainLumModVal) UI.geoCurtainLumModVal.innerText = '40%';
+      state.geoCurtainOriginDot = true;
+      if (UI.geoCurtainOriginDot) UI.geoCurtainOriginDot.checked = true;
+      state.geoCurtainMultiEdge = false;
+      if (UI.geoCurtainMultiEdge) UI.geoCurtainMultiEdge.checked = false;
+      state.geoNodesActive = false;
+      if (UI.geoNodesActive) UI.geoNodesActive.checked = false;
+      const nodesControls = document.getElementById('geo-nodes-controls');
+      if (nodesControls) nodesControls.style.display = 'none';
+      state.geoContoursActive = false;
+      if (UI.geoContoursActive) UI.geoContoursActive.checked = false;
+      const contourControls = document.getElementById('geo-contours-controls');
+      if (contourControls) contourControls.style.display = 'none';
+
+      // 5. Exporter Settings
+      state.exportFormat = 'mp4';
+      if (UI.exportFormat) {
+        UI.exportFormat.value = 'mp4';
+      }
+      updateMp4WarningVisibility();
+      state.timelineZoom = 1.0;
+
+      state.exportFps = 30;
+      UI.exportFps.value = '30';
+
+      state.exportResolution = 'viewport';
+      UI.exportResolution.value = 'viewport';
+
+      state.exportMode = 'duration';
+      UI.exportMode.value = 'duration';
+
+      state.exportDuration = 30;
+      UI.exportDuration.value = 30;
+      UI.exportDurationVal.innerText = '30s';
+      if (UI.timelineDurationSlider) {
+        UI.timelineDurationSlider.value = 30;
+      }
+      if (UI.timelineDurationVal) {
+        UI.timelineDurationVal.innerText = '30s';
+      }
+      if (UI.timelineDurationControl) {
+        UI.timelineDurationControl.classList.remove('disabled');
+      }
+
+      state.exportLoops = 1;
+      UI.exportLoops.value = 1;
+      UI.exportLoopsVal.innerText = '1';
+
+      UI.exportDurationGroup.style.display = 'flex';
+      UI.exportLoopsGroup.style.display = 'none';
+
+      state.videoFadeInActive = false;
+      UI.videoFadeInActive.checked = false;
+      UI.videoFadeInDurationGroup.style.display = 'none';
+      state.videoFadeInDuration = 0.5;
+      UI.videoFadeInDuration.value = 0.5;
+      UI.videoFadeInDurationVal.innerText = '0.5s';
+
+      state.videoFadeOutActive = false;
+      UI.videoFadeOutActive.checked = false;
+      UI.videoFadeOutDurationGroup.style.display = 'none';
+      state.videoFadeOutDuration = 0.5;
+      UI.videoFadeOutDuration.value = 0.5;
+      UI.videoFadeOutDurationVal.innerText = '0.5s';
+
+      // 6. Overlays (Texts, Graphics, Audio)
+      state.texts = [];
+      state.selectedTextId = null;
+      selectText(null);
+
+      state.graphics = [];
+      state.selectedGraphicId = null;
+      selectGraphic(null);
+
+      state.glitchTriggers = [];
+      state.selectedGlitchTriggerId = null;
+      selectGlitchTrigger(null);
+
+      state.audioTrack = null;
+      selectAudio(false);
+
+      if (state.videoBlocks && state.videoBlocks.length > 0) {
+        state.videoBlocks.forEach(block => {
+          if (block.element) {
+            block.element.pause();
+          }
+          URL.revokeObjectURL(block.url);
+        });
+      }
+      state.videoBlocks = [];
+      state.selectedVideoId = null;
+      selectVideo(null);
+      if (UI.videoFileInput) {
+        UI.videoFileInput.value = '';
+      }
+
+      // 7. Re-process layer stacks to apply default mask settings
+      if (state.uploadedImages.length > 0) {
+        ImageProcessor.reprocessAllImagesLayers();
+        ImageProcessor.initializeRenderStack();
+      }
+
+      // 8. Update timelines and canvas
+      updateExportEstimate();
+      updateTimelineRuler();
+      updateTimelineTracks();
+      updatePlayhead();
+      drawMaskGraph();
+      renderFrame(0);
+
+      // 9. Sync audio
+      syncAudioPlayback();
+      updateGlitchTriggerButtonState();
+    });
+  }
+
+  UI.btnFullscreen.addEventListener('click', () => {
+    const container = UI.mainCanvas.parentElement;
+    if (!document.fullscreenElement) {
+      container.requestFullscreen().then(() => {
+        setTimeout(resizeMainCanvas, 100);
+      }).catch((err) => {
+        alert(`Error enabling fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    setTimeout(() => {
+      resizeMainCanvas();
+      renderFrame(state.time);
+    }, 150);
+  });
+
+  // Sidebar Parameters Bindings
+  UI.aspectRatio.addEventListener('change', (e) => {
+    state.aspectRatio = e.target.value;
+    resizeMainCanvas();
+    renderFrame(state.time);
+  });
+
+  UI.zoomSpeed.addEventListener('input', (e) => {
+    state.zoomSpeed = parseFloat(e.target.value);
+    UI.zoomSpeedVal.innerText = state.zoomSpeed;
+    updateExportEstimate();
+    updateTimelineRuler();
+    updateTimelineTracks();
+    updatePlayhead();
+  });
+
+  UI.zoomDepth.addEventListener('input', (e) => {
+    state.zoomDepth = parseFloat(e.target.value);
+    UI.zoomDepthVal.innerText = state.zoomDepth;
+  });
+
+  UI.cameraRotation.addEventListener('input', (e) => {
+    const oldSpeed = state.cameraRotation;
+    const newSpeed = parseInt(e.target.value);
+    state.cameraRotationBase += (oldSpeed - newSpeed) * state.time * (Math.PI / 180);
+    state.cameraRotation = newSpeed;
+    UI.cameraRotationVal.innerText = `${state.cameraRotation.toFixed(1)}°/s`;
+  });
+
+  UI.btnResetRotation.addEventListener('click', () => {
+    state.cameraRotation = 0;
+    state.cameraRotationBase = 0;
+    state.cameraAngle = 0;
+    UI.cameraRotation.value = 0;
+    UI.cameraRotationVal.innerText = '0.0°/s';
+    renderFrame(state.time);
+  });
+
+  UI.cameraDrift.addEventListener('input', (e) => {
+    state.cameraDrift = parseFloat(e.target.value);
+    UI.cameraDriftVal.innerText = state.cameraDrift.toFixed(1);
+  });
+
+  UI.mirrorMode.addEventListener('change', (e) => {
+    state.mirrorMode = e.target.value;
+    if (state.mirrorMode === 'kaleidoscope') {
+      UI.kaleidoscopeSlicesGroup.style.display = 'flex';
+    } else {
+      UI.kaleidoscopeSlicesGroup.style.display = 'none';
+    }
+    renderFrame(state.time);
+  });
+
+  UI.kSlices.addEventListener('input', (e) => {
+    state.kaleidoscopeSlices = parseInt(e.target.value);
+    UI.kSlicesVal.innerText = state.kaleidoscopeSlices;
+    renderFrame(state.time);
+  });
+
+  UI.rgbSplit.addEventListener('input', (e) => {
+    state.rgbSplit = parseInt(e.target.value);
+    UI.rgbSplitVal.innerText = `${state.rgbSplit} px`;
+    renderFrame(state.time);
+  });
+
+  UI.pixelSort.addEventListener('input', (e) => {
+    state.pixelSort = parseInt(e.target.value);
+    UI.pixelSortVal.innerText = `${state.pixelSort}%`;
+    renderFrame(state.time);
+  });
+
+  UI.glitchFrequency.addEventListener('input', (e) => {
+    state.glitchFrequency = parseInt(e.target.value);
+    UI.glitchFrequencyVal.innerText = `${state.glitchFrequency}%`;
+  });
+
+  UI.glitchSeverity.addEventListener('input', (e) => {
+    state.glitchSeverity = parseInt(e.target.value);
+    UI.glitchSeverityVal.innerText = `${state.glitchSeverity}px`;
+  });
+
+  UI.depthModulation.addEventListener('input', (e) => {
+    state.depthModulation = parseInt(e.target.value);
+    UI.depthModulationVal.innerText = `${state.depthModulation}%`;
+    renderFrame(state.time);
+  });
+
+  // --- Micro-Geometric & Pixel FX Bindings ---
+  if (UI.geometricEnabled) {
+    UI.geometricEnabled.addEventListener('change', (e) => {
+      state.geometricEnabled = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+
+  // Module A: Spectral Edge Curtain
+  const geoCurtainControls = document.getElementById('geo-curtain-controls');
+  if (UI.geoCurtainActive) {
+    UI.geoCurtainActive.addEventListener('change', (e) => {
+      state.geoCurtainActive = e.target.checked;
+      if (geoCurtainControls) geoCurtainControls.style.display = e.target.checked ? 'block' : 'none';
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainDirection) {
+    UI.geoCurtainDirection.addEventListener('change', (e) => {
+      state.geoCurtainDirection = e.target.value;
+      if (UI.geoCurtainAngleGroup) {
+        UI.geoCurtainAngleGroup.style.display = (e.target.value === 'custom') ? 'block' : 'none';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainAngle) {
+    UI.geoCurtainAngle.addEventListener('input', (e) => {
+      state.geoCurtainAngle = parseInt(e.target.value);
+      if (UI.geoCurtainAngleVal) UI.geoCurtainAngleVal.innerText = `${state.geoCurtainAngle}°`;
+      if (UI.geoCurtainDirection && UI.geoCurtainDirection.value !== 'custom') {
+        UI.geoCurtainDirection.value = 'custom';
+        state.geoCurtainDirection = 'custom';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainBidirectional) {
+    UI.geoCurtainBidirectional.addEventListener('change', (e) => {
+      state.geoCurtainBidirectional = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainMultiEdge) {
+    UI.geoCurtainMultiEdge.addEventListener('change', (e) => {
+      state.geoCurtainMultiEdge = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainLumTrigger) {
+    UI.geoCurtainLumTrigger.addEventListener('change', (e) => {
+      state.geoCurtainLumTrigger = e.target.value;
+      if (UI.geoCurtainLumGateGroup) {
+        UI.geoCurtainLumGateGroup.style.display = (e.target.value === 'custom') ? 'block' : 'none';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainMinLum) {
+    UI.geoCurtainMinLum.addEventListener('input', (e) => {
+      state.geoCurtainMinLum = parseInt(e.target.value);
+      if (UI.geoCurtainMinLumVal) UI.geoCurtainMinLumVal.innerText = `${state.geoCurtainMinLum}%`;
+      if (UI.geoCurtainLumTrigger && UI.geoCurtainLumTrigger.value !== 'custom') {
+        UI.geoCurtainLumTrigger.value = 'custom';
+        state.geoCurtainLumTrigger = 'custom';
+        if (UI.geoCurtainLumGateGroup) UI.geoCurtainLumGateGroup.style.display = 'block';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainMaxLum) {
+    UI.geoCurtainMaxLum.addEventListener('input', (e) => {
+      state.geoCurtainMaxLum = parseInt(e.target.value);
+      if (UI.geoCurtainMaxLumVal) UI.geoCurtainMaxLumVal.innerText = `${state.geoCurtainMaxLum}%`;
+      if (UI.geoCurtainLumTrigger && UI.geoCurtainLumTrigger.value !== 'custom') {
+        UI.geoCurtainLumTrigger.value = 'custom';
+        state.geoCurtainLumTrigger = 'custom';
+        if (UI.geoCurtainLumGateGroup) UI.geoCurtainLumGateGroup.style.display = 'block';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainColorMode) {
+    UI.geoCurtainColorMode.addEventListener('change', (e) => {
+      state.geoCurtainColorMode = e.target.value;
+      if (UI.geoCurtainTintGroup) {
+        UI.geoCurtainTintGroup.style.display = (e.target.value === 'tint') ? 'block' : 'none';
+      }
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainTintColor) {
+    UI.geoCurtainTintColor.addEventListener('input', (e) => {
+      state.geoCurtainTintColor = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+  document.querySelectorAll('.geo-curtain-swatch').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const color = e.currentTarget.getAttribute('data-color');
+      state.geoCurtainTintColor = color;
+      if (UI.geoCurtainTintColor) UI.geoCurtainTintColor.value = color;
+      renderFrame(state.time);
+    });
+  });
+  if (UI.geoCurtainLumMod) {
+    UI.geoCurtainLumMod.addEventListener('input', (e) => {
+      state.geoCurtainLumMod = parseInt(e.target.value);
+      if (UI.geoCurtainLumModVal) UI.geoCurtainLumModVal.innerText = `${state.geoCurtainLumMod}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainOriginDot) {
+    UI.geoCurtainOriginDot.addEventListener('change', (e) => {
+      state.geoCurtainOriginDot = e.target.checked;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainLength) {
+    UI.geoCurtainLength.addEventListener('input', (e) => {
+      state.geoCurtainLength = parseInt(e.target.value);
+      if (UI.geoCurtainLengthVal) UI.geoCurtainLengthVal.innerText = `${state.geoCurtainLength}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainDensity) {
+    UI.geoCurtainDensity.addEventListener('input', (e) => {
+      state.geoCurtainDensity = parseInt(e.target.value);
+      if (UI.geoCurtainDensityVal) UI.geoCurtainDensityVal.innerText = `${state.geoCurtainDensity}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainThreshold) {
+    UI.geoCurtainThreshold.addEventListener('input', (e) => {
+      state.geoCurtainThreshold = parseInt(e.target.value);
+      if (UI.geoCurtainThresholdVal) UI.geoCurtainThresholdVal.innerText = `${state.geoCurtainThreshold}`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainFlicker) {
+    UI.geoCurtainFlicker.addEventListener('input', (e) => {
+      state.geoCurtainFlicker = parseInt(e.target.value);
+      if (UI.geoCurtainFlickerVal) UI.geoCurtainFlickerVal.innerText = `${state.geoCurtainFlicker}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainOpacity) {
+    UI.geoCurtainOpacity.addEventListener('input', (e) => {
+      state.geoCurtainOpacity = parseInt(e.target.value);
+      if (UI.geoCurtainOpacityVal) UI.geoCurtainOpacityVal.innerText = `${state.geoCurtainOpacity}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoCurtainBlend) {
+    UI.geoCurtainBlend.addEventListener('change', (e) => {
+      state.geoCurtainBlend = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+
+  // Module B: Micro-HUD Geometry Nodes
+  const geoNodesControls = document.getElementById('geo-nodes-controls');
+  if (UI.geoNodesActive) {
+    UI.geoNodesActive.addEventListener('change', (e) => {
+      state.geoNodesActive = e.target.checked;
+      if (geoNodesControls) geoNodesControls.style.display = e.target.checked ? 'block' : 'none';
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoNodeShape) {
+    UI.geoNodeShape.addEventListener('change', (e) => {
+      state.geoNodeShape = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoNodeDensity) {
+    UI.geoNodeDensity.addEventListener('input', (e) => {
+      state.geoNodeDensity = parseInt(e.target.value);
+      if (UI.geoNodeDensityVal) UI.geoNodeDensityVal.innerText = `${state.geoNodeDensity}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoNodeSize) {
+    UI.geoNodeSize.addEventListener('input', (e) => {
+      state.geoNodeSize = parseInt(e.target.value);
+      if (UI.geoNodeSizeVal) UI.geoNodeSizeVal.innerText = `${state.geoNodeSize}px`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoNodeColor) {
+    UI.geoNodeColor.addEventListener('input', (e) => {
+      state.geoNodeColor = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+  document.querySelectorAll('.geo-node-swatch').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const color = e.currentTarget.getAttribute('data-color');
+      state.geoNodeColor = color;
+      if (UI.geoNodeColor) UI.geoNodeColor.value = color;
+      renderFrame(state.time);
+    });
+  });
+
+  // Module C: Topographic Contours
+  const geoContoursControls = document.getElementById('geo-contours-controls');
+  if (UI.geoContoursActive) {
+    UI.geoContoursActive.addEventListener('change', (e) => {
+      state.geoContoursActive = e.target.checked;
+      if (geoContoursControls) geoContoursControls.style.display = e.target.checked ? 'block' : 'none';
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoContourLevels) {
+    UI.geoContourLevels.addEventListener('input', (e) => {
+      state.geoContourLevels = parseInt(e.target.value);
+      if (UI.geoContourLevelsVal) UI.geoContourLevelsVal.innerText = `${state.geoContourLevels}`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoContourOpacity) {
+    UI.geoContourOpacity.addEventListener('input', (e) => {
+      state.geoContourOpacity = parseInt(e.target.value);
+      if (UI.geoContourOpacityVal) UI.geoContourOpacityVal.innerText = `${state.geoContourOpacity}%`;
+      renderFrame(state.time);
+    });
+  }
+  if (UI.geoContourColor) {
+    UI.geoContourColor.addEventListener('input', (e) => {
+      state.geoContourColor = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+  document.querySelectorAll('.geo-contour-swatch').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const color = e.currentTarget.getAttribute('data-color');
+      state.geoContourColor = color;
+      if (UI.geoContourColor) UI.geoContourColor.value = color;
+      renderFrame(state.time);
+    });
+  });
+
+  // Exporter Parameters Bindings
+  UI.exportMode.addEventListener('change', (e) => {
+    state.exportMode = e.target.value;
+    if (state.exportMode === 'duration') {
+      UI.exportDurationGroup.style.display = 'flex';
+      UI.exportLoopsGroup.style.display = 'none';
+      if (UI.timelineDurationControl) {
+        UI.timelineDurationControl.classList.remove('disabled');
+      }
+    } else {
+      UI.exportDurationGroup.style.display = 'none';
+      UI.exportLoopsGroup.style.display = 'flex';
+      if (UI.timelineDurationControl) {
+        UI.timelineDurationControl.classList.add('disabled');
+      }
+    }
+    updateExportEstimate();
+    updateTimelineRuler();
+    updateTimelineTracks();
+    updatePlayhead();
+  });
+
+  function checkGifLockout() {
+    const isTooLong = state.exportDuration > 30;
+    if (!UI.exportFormat) return;
+    const gifOpt = UI.exportFormat.querySelector('option[value="gif"]');
+    if (gifOpt) {
+      if (isTooLong) {
+        gifOpt.disabled = true;
+        gifOpt.innerText = 'Animated GIF (Disabled: >30s causes Out Of Memory)';
+        if (state.exportFormat === 'gif') {
+          state.exportFormat = 'mp4';
+          UI.exportFormat.value = 'mp4';
+          if (UI.gifTip) UI.gifTip.style.display = 'none';
+        }
+      } else {
+        gifOpt.disabled = false;
+        gifOpt.innerText = 'Animated GIF (Seamless Loop .gif)';
+      }
+    }
+  }
+
+  function setProjectDuration(dur) {
+    state.exportDuration = Math.min(600, Math.max(5, Math.round(dur)));
+    const label = formatDurationLabel(state.exportDuration);
+    const tc = formatTimecode(state.exportDuration);
+
+    if (UI.exportDuration) UI.exportDuration.value = state.exportDuration;
+    if (UI.exportDurationVal) UI.exportDurationVal.innerText = label;
+    if (UI.exportDurationInput && document.activeElement !== UI.exportDurationInput) {
+      UI.exportDurationInput.value = tc;
+    }
+
+    if (UI.timelineDurationSlider) UI.timelineDurationSlider.value = state.exportDuration;
+    if (UI.timelineDurationVal) UI.timelineDurationVal.innerText = `(${state.exportDuration}s)`;
+    if (UI.timelineDurationInput && document.activeElement !== UI.timelineDurationInput) {
+      UI.timelineDurationInput.value = tc;
+    }
+
+    checkGifLockout();
+    updateExportEstimate();
+    updateTimelineRuler();
+    updateTimelineTracks();
+    updatePlayhead();
+    if (state.selectedAudio) {
+      selectAudio(true);
+    }
+  }
+
+  UI.exportDuration.addEventListener('input', (e) => {
+    setProjectDuration(parseInt(e.target.value));
+  });
+
+  UI.timelineDurationSlider.addEventListener('input', (e) => {
+    setProjectDuration(parseInt(e.target.value));
+  });
+
+  if (UI.timelineDurationInput) {
+    const applyTimelineInput = () => {
+      const parsed = parseDurationInput(UI.timelineDurationInput.value);
+      if (parsed) {
+        setProjectDuration(parsed);
+      } else {
+        UI.timelineDurationInput.value = formatTimecode(state.exportDuration);
+      }
+    };
+    UI.timelineDurationInput.addEventListener('change', applyTimelineInput);
+    UI.timelineDurationInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        applyTimelineInput();
+        UI.timelineDurationInput.blur();
+      }
+    });
+  }
+
+  if (UI.exportDurationInput) {
+    const applyExportInput = () => {
+      const parsed = parseDurationInput(UI.exportDurationInput.value);
+      if (parsed) {
+        setProjectDuration(parsed);
+      } else {
+        UI.exportDurationInput.value = formatTimecode(state.exportDuration);
+      }
+    };
+    UI.exportDurationInput.addEventListener('change', applyExportInput);
+    UI.exportDurationInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        applyExportInput();
+        UI.exportDurationInput.blur();
+      }
+    });
+  }
+
+  const matchSongDuration = () => {
+    if (state.audioTrack && state.audioTrack.duration) {
+      setProjectDuration(state.audioTrack.duration);
+    }
+  };
+
+  if (UI.btnMatchSongDuration) {
+    UI.btnMatchSongDuration.addEventListener('click', matchSongDuration);
+  }
+  if (UI.btnExportMatchSong) {
+    UI.btnExportMatchSong.addEventListener('click', matchSongDuration);
+  }
+  if (UI.btnSyncTimelineToAudio) {
+    UI.btnSyncTimelineToAudio.addEventListener('click', matchSongDuration);
+  }
+
+
+  UI.exportLoops.addEventListener('input', (e) => {
+    state.exportLoops = parseInt(e.target.value);
+    UI.exportLoopsVal.innerText = state.exportLoops;
+    updateExportEstimate();
+    updateTimelineRuler();
+    updateTimelineTracks();
+    updatePlayhead();
+  });
+
+  if (UI.exportFormat) {
+    UI.exportFormat.addEventListener('change', (e) => {
+      state.exportFormat = e.target.value;
+      if (state.exportFormat === 'gif') {
+        if (UI.exportFps && UI.exportFps.value === '60') {
+          UI.exportFps.value = '24';
+          state.exportFps = 24;
+        }
+        if (UI.exportResolution && UI.exportResolution.value === '1080') {
+          UI.exportResolution.value = '720';
+        }
+      }
+      updateExportFormatVisibility();
+      updateExportEstimate();
+    });
+  }
+
+  if (UI.exportFps) {
+    UI.exportFps.addEventListener('change', (e) => {
+      state.exportFps = parseInt(e.target.value) || 30;
+      updateExportEstimate();
+    });
+  }
+
+  UI.themeSelect.addEventListener('change', (e) => {
+    const val = e.target.value;
+    document.body.classList.remove('light-theme', 'theme-crimson', 'theme-matrix', 'theme-frozen');
+    if (val === 'high-contrast') {
+      document.body.classList.add('light-theme');
+    } else if (val === 'crimson') {
+      document.body.classList.add('theme-crimson');
+    } else if (val === 'matrix') {
+      document.body.classList.add('theme-matrix');
+    } else if (val === 'frozen') {
+      document.body.classList.add('theme-frozen');
+    }
+  });
+
+  UI.videoFadeInActive.addEventListener('change', (e) => {
+    state.videoFadeInActive = e.target.checked;
+    if (state.videoFadeInActive) {
+      UI.videoFadeInDurationGroup.style.display = 'flex';
+    } else {
+      UI.videoFadeInDurationGroup.style.display = 'none';
+    }
+    renderFrame(state.time);
+  });
+
+  UI.videoFadeInDuration.addEventListener('input', (e) => {
+    state.videoFadeInDuration = parseFloat(e.target.value);
+    UI.videoFadeInDurationVal.innerText = `${state.videoFadeInDuration.toFixed(1)}s`;
+    renderFrame(state.time);
+  });
+
+  UI.videoFadeOutActive.addEventListener('change', (e) => {
+    state.videoFadeOutActive = e.target.checked;
+    if (state.videoFadeOutActive) {
+      UI.videoFadeOutDurationGroup.style.display = 'flex';
+    } else {
+      UI.videoFadeOutDurationGroup.style.display = 'none';
+    }
+    renderFrame(state.time);
+  });
+
+  UI.videoFadeOutDuration.addEventListener('input', (e) => {
+    state.videoFadeOutDuration = parseFloat(e.target.value);
+    UI.videoFadeOutDurationVal.innerText = `${state.videoFadeOutDuration.toFixed(1)}s`;
+    renderFrame(state.time);
+  });
+
+  // Video Export Click Bindings
+  UI.btnExportVideo.addEventListener('click', () => {
+    state.exportFps = parseInt(UI.exportFps.value);
+    VideoExporter.export();
+  });
+
+  UI.btnCancelExport.addEventListener('click', () => {
+    state.exportCancel = true;
+  });
+
+  // --- TEXT OVERLAYS & TIMELINE EVENTS BINDINGS ---
+  UI.btnAddTextNew.addEventListener('click', () => {
+    if (state.texts.length >= 300) {
+      alert("Maximum limit of 300 text overlay blocks reached.");
+      return;
+    }
+    
+    let maxTrackIdx = 0;
+    const allIndices = [
+      ...state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0),
+      ...state.graphics.map(g => g.trackIndex !== undefined ? g.trackIndex : 0),
+      ...state.videoBlocks.map(v => v.trackIndex !== undefined ? v.trackIndex : 0)
+    ];
+    if (allIndices.length > 0) {
+      maxTrackIdx = Math.max(...allIndices);
+    }
+    const targetTrackIdx = maxTrackIdx + 1;
+
+    
+    const duration = getTimelineDuration();
+    const newText = {
+      id: 'txt_' + generateUUID(),
+      text: 'NEW TEXT TRACK',
+      font: 'Outfit',
+      size: 40,
+      color: '#00f2fe',
+      x: 0.0,
+      y: 0.0,
+      angle: 0,
+      idleWobble: 0.0,
+      idleSkew: 0.0,
+      glitchMode: 'none',
+      glitchMono: false,
+      glitchIntensity: 50,
+      flickerIntensity: 0,
+      transitionMode: 'fade-blur',
+      transitionDuration: 0.4,
+      startTime: 0,
+      endTime: duration,
+      trackIndex: targetTrackIdx
+    };
+    
+    state.texts.push(newText);
+    selectText(newText.id);
+    updateTimelineTracks();
+    renderFrame(state.time);
+  });
+
+  UI.btnAddTextSame.addEventListener('click', () => {
+    if (!state.selectedTextId) {
+      alert("Please select an existing text block on the timeline first to add a new block to the same track.");
+      return;
+    }
+    const selectedTxt = state.texts.find(t => t.id === state.selectedTextId);
+    if (!selectedTxt) return;
+    
+    if (state.texts.length >= 300) {
+      alert("Maximum limit of 300 text overlay blocks reached.");
+      return;
+    }
+    
+    const duration = getTimelineDuration();
+    let startTime = state.time;
+    if (startTime >= duration - 0.2) {
+      startTime = Math.max(0, duration - 3.0);
+    }
+    const endTime = Math.min(duration, startTime + 3.0);
+    
+    const targetTrackIdx = selectedTxt.trackIndex !== undefined ? selectedTxt.trackIndex : 0;
+    
+    const newText = {
+      id: 'txt_' + generateUUID(),
+      text: 'NEXT TEXT',
+      font: selectedTxt.font,
+      size: selectedTxt.size,
+      color: selectedTxt.color,
+      x: selectedTxt.x,
+      y: selectedTxt.y,
+      angle: selectedTxt.angle,
+      idleWobble: selectedTxt.idleWobble,
+      idleSkew: selectedTxt.idleSkew,
+      glitchMode: selectedTxt.glitchMode,
+      glitchMono: selectedTxt.glitchMono,
+      glitchIntensity: selectedTxt.glitchIntensity,
+      flickerIntensity: selectedTxt.flickerIntensity !== undefined ? selectedTxt.flickerIntensity : 0,
+      transitionMode: selectedTxt.transitionMode,
+      transitionDuration: selectedTxt.transitionDuration,
+      startTime: startTime,
+      endTime: endTime,
+      trackIndex: targetTrackIdx
+    };
+    
+    state.texts.push(newText);
+    selectText(newText.id);
+    updateTimelineTracks();
+    renderFrame(state.time);
+  });
+
+  UI.btnCopyText.addEventListener('click', () => {
+    if (!state.selectedTextId) return;
+    const selectedTxt = state.texts.find(t => t.id === state.selectedTextId);
+    if (!selectedTxt) return;
+
+    if (state.texts.length >= 300) {
+      alert("Maximum limit of 300 text overlay blocks reached.");
+      return;
+    }
+
+    const duration = getTimelineDuration();
+    let startTime = selectedTxt.endTime;
+    if (startTime >= duration - 0.2) {
+      startTime = 0.0;
+    }
+    const blockDuration = selectedTxt.endTime - selectedTxt.startTime;
+    const endTime = Math.min(duration, startTime + blockDuration);
+
+    const clonedText = {
+      ...selectedTxt,
+      id: 'txt_' + generateUUID(),
+      startTime: startTime,
+      endTime: endTime
+    };
+
+    state.texts.push(clonedText);
+    selectText(clonedText.id);
+    updateTimelineTracks();
+    renderFrame(state.time);
+  });
+
+  UI.btnDeleteText.addEventListener('click', () => {
+    if (!state.selectedTextId) return;
+    const index = state.texts.findIndex(t => t.id === state.selectedTextId);
+    if (index !== -1) {
+      state.texts.splice(index, 1);
+      selectText(null);
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  // --- LYRIC VIDEO GENERATOR BINDINGS ---
+  const DEMO_METAL_LRC = `[ti:Cybernetic Storm]
+[ar:Danger Zone Syndicate]
+[al:VileCut 10-Minute Engine]
+[00:03.00]Systems online, circuits alive
+[00:06.50]Diving through the glitch in forty-five
+[00:10.00]Neon pulses tearing through the wire
+[00:14.20]A digital tempest of crimson and fire
+[00:18.50]Static screams across the frequency
+[00:22.80]Fractured frames in hyper-velocity
+[00:27.00]No safety limits, danger unleashed
+[00:31.50]Ten minutes of render into the beast
+[00:36.00]Bass drop shuddering the screen
+[00:40.50]The darkest cut that you've ever seen`;
+
+  const renderLyricsPreviewList = (blocks) => {
+    if (!UI.lyricsPreviewList || !blocks) return;
+    UI.lyricsPreviewList.innerHTML = '';
+    const previewCount = Math.min(8, blocks.length);
+    for (let i = 0; i < previewCount; i++) {
+      const b = blocks[i];
+      const formatTime = (s) => {
+        const mins = Math.floor(s / 60);
+        const secs = (s % 60).toFixed(1).padStart(4, '0');
+        return `${mins}:${secs}`;
+      };
+      const item = document.createElement('div');
+      item.className = 'lyrics-preview-entry';
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'lyrics-preview-time';
+      timeSpan.textContent = `[${formatTime(b.startTime)} → ${formatTime(b.endTime)}]`;
+
+      const textSpan = document.createElement('span');
+      textSpan.className = 'lyrics-preview-text';
+      textSpan.textContent = b.text;
+
+      item.appendChild(timeSpan);
+      item.appendChild(textSpan);
+      UI.lyricsPreviewList.appendChild(item);
+    }
+
+    if (blocks.length > previewCount) {
+      const more = document.createElement('div');
+      more.className = 'lyrics-preview-entry';
+      more.style.color = '#94a3b8';
+      more.style.fontStyle = 'italic';
+      more.textContent = `... and ${blocks.length - previewCount} more lines`;
+      UI.lyricsPreviewList.appendChild(more);
+    }
+  };
+
+  const loadLyricsContent = (fileName, content) => {
+    try {
+      const result = LyricsManager.parseFile(fileName, content);
+      if (!result.blocks || result.blocks.length === 0) {
+        alert('No valid lyrics or timestamps could be parsed from this file.');
+        return;
+      }
+
+      // Convert to uppercase if ALL CAPS toggle is active
+      if (UI.lyricsUppercase && UI.lyricsUppercase.checked) {
+        result.blocks.forEach(b => { if (b.text) b.text = b.text.toUpperCase(); });
+      }
+
+      LyricsManager.pendingLyrics = result.blocks;
+      LyricsManager.pendingFileName = fileName;
+
+      // Populate summary
+      if (UI.lyricsSummaryText) {
+        UI.lyricsSummaryText.innerText = `Detected ${result.format} format: ${result.blocks.length} lines parsed from "${fileName}".`;
+      }
+
+      // Populate preview list
+      renderLyricsPreviewList(result.blocks);
+
+      // Update live typography preview with the first lyric line
+      if (UI.lyricsStylePreviewSample && result.blocks.length > 0) {
+        UI.lyricsStylePreviewSample.innerText = result.blocks[0].text;
+      }
+      updateLyricsStylePreview();
+
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    } catch (err) {
+      console.error('Error parsing lyrics file:', err);
+      alert('Failed to parse lyrics file: ' + err.message);
+    }
+  };
+
+  // Live Lyrics Typography & Font Preview Updater
+  const updateLyricsStylePreview = () => {
+    if (!UI.lyricsStylePreviewSample) return;
+    const font = UI.lyricsFont ? UI.lyricsFont.value : 'Outfit';
+    const size = UI.lyricsSize ? parseFloat(UI.lyricsSize.value) : 38;
+    const color = UI.lyricsColor ? UI.lyricsColor.value : '#00f2fe';
+    const glitch = UI.lyricsGlitch ? UI.lyricsGlitch.value : 'none';
+    const transition = UI.lyricsTransition ? UI.lyricsTransition.value : 'fade-blur';
+    const position = UI.lyricsPosition ? UI.lyricsPosition.value : 'lower-third';
+
+    // Apply font family
+    UI.lyricsStylePreviewSample.style.fontFamily = `"${font}", sans-serif`;
+
+    // Scale font size proportionally for preview card display
+    const previewPx = Math.max(16, Math.min(46, Math.round(size * 0.82)));
+    UI.lyricsStylePreviewSample.style.fontSize = `${previewPx}px`;
+    UI.lyricsStylePreviewSample.style.color = color;
+
+    // Check uppercase toggle
+    const isCaps = UI.lyricsUppercase ? UI.lyricsUppercase.checked : false;
+    UI.lyricsStylePreviewSample.style.textTransform = isCaps ? 'uppercase' : 'none';
+
+    // Glitch shadow effects based on selected style
+    if (glitch === 'rgb-split') {
+      UI.lyricsStylePreviewSample.style.textShadow = `-3px 0 #ff0055, 3px 0 #00f2fe, 0 0 14px ${color}88, 0 2px 4px #000`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = '0.04em';
+    } else if (glitch === 'flicker') {
+      UI.lyricsStylePreviewSample.style.textShadow = `0 0 22px ${color}, 0 0 8px ${color}, 0 2px 4px #000`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = '0.02em';
+    } else if (glitch === 'scramble') {
+      UI.lyricsStylePreviewSample.style.textShadow = `0 0 10px ${color}aa, 2px 2px 0 #ff0055`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = '0.07em';
+    } else if (glitch === 'chaos') {
+      UI.lyricsStylePreviewSample.style.textShadow = `2px -2px 0 #ffe600, -2px 2px 0 #00f2fe, 0 0 12px ${color}`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = '0.05em';
+    } else {
+      UI.lyricsStylePreviewSample.style.textShadow = `0 0 12px ${color}66, 0 2px 4px rgba(0,0,0,0.9)`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = 'normal';
+    }
+
+    // Update info badge
+    if (UI.lyricsPreviewFontLabel) {
+      UI.lyricsPreviewFontLabel.innerText = `${font} • ${size}px`;
+    }
+    if (UI.lyricsStylePreviewSub) {
+      const posLabel = position === 'lower-third' ? 'Lower Third (+35%)' : position === 'bottom' ? 'Bottom (+42%)' : position === 'center' ? 'Center (0%)' : 'Top (-35%)';
+      const transOption = UI.lyricsTransition?.selectedOptions?.[0]?.text || transition;
+      const glitchOption = UI.lyricsGlitch?.selectedOptions?.[0]?.text || glitch;
+      UI.lyricsStylePreviewSub.innerText = `Position: ${posLabel} • Transition: ${transOption} • FX: ${glitchOption}`;
+    }
+  };
+
+  // Sync available custom fonts between main text inspector and lyrics font dropdown
+  const syncAvailableFontsToLyrics = () => {
+    if (!UI.textFont || !UI.lyricsFont) return;
+    const lyricsValues = new Set(Array.from(UI.lyricsFont.options).map(o => o.value));
+    Array.from(UI.textFont.options).forEach(opt => {
+      if (!lyricsValues.has(opt.value)) {
+        const newOpt = document.createElement('option');
+        newOpt.value = opt.value;
+        newOpt.innerText = opt.innerText;
+        newOpt.style.fontFamily = `"${opt.value}", sans-serif`;
+        UI.lyricsFont.appendChild(newOpt);
+      }
+    });
+  };
+
+  // Clicking "Lyrics" button opens the informative popup modal
+  if (UI.btnImportLyrics) {
+    UI.btnImportLyrics.addEventListener('click', () => {
+      if (UI.lyricsModalOverlay) {
+        syncAvailableFontsToLyrics();
+        updateLyricsStylePreview();
+        UI.lyricsModalOverlay.classList.remove('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    });
+  }
+
+  // Upload Custom Font in Lyrics Modal
+  if (UI.btnUploadLyricsFont && UI.lyricsFontFileInput) {
+    UI.btnUploadLyricsFont.addEventListener('click', () => {
+      UI.lyricsFontFileInput.click();
+    });
+  }
+
+  if (UI.lyricsFontFileInput) {
+    UI.lyricsFontFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const rawName = file.name.replace(/\.[^/.]+$/, '').trim();
+      const fontName = rawName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const fontFace = new FontFace(fontName, arrayBuffer);
+        const loadedFace = await fontFace.load();
+        document.fonts.add(loadedFace);
+
+        // Add to lyrics font dropdown if not already present
+        let exists = false;
+        for (let i = 0; i < UI.lyricsFont.options.length; i++) {
+          if (UI.lyricsFont.options[i].value === fontName) {
+            exists = true;
+            break;
+          }
+        }
+        if (!exists) {
+          const opt = document.createElement('option');
+          opt.value = fontName;
+          opt.innerText = `${fontName} (Uploaded)`;
+          opt.style.fontFamily = `"${fontName}", sans-serif`;
+          UI.lyricsFont.appendChild(opt);
+        }
+        UI.lyricsFont.value = fontName;
+
+        // Also add to main text inspector font select
+        if (UI.textFont) {
+          let textOptExists = false;
+          for (let i = 0; i < UI.textFont.options.length; i++) {
+            if (UI.textFont.options[i].value === fontName) {
+              textOptExists = true;
+              break;
+            }
+          }
+          if (!textOptExists) {
+            const mainOpt = document.createElement('option');
+            mainOpt.value = fontName;
+            mainOpt.innerText = `${fontName} (Uploaded)`;
+            mainOpt.style.fontFamily = `"${fontName}", sans-serif`;
+            UI.textFont.appendChild(mainOpt);
+          }
+        }
+
+        // Show uploaded badge
+        if (UI.lyricsFontUploadedBadge && UI.lyricsFontUploadedName) {
+          UI.lyricsFontUploadedBadge.style.display = 'inline-flex';
+          UI.lyricsFontUploadedName.innerText = `Custom font loaded: ${fontName}`;
+          if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        // Immediately update preview
+        updateLyricsStylePreview();
+      } catch (err) {
+        console.error('Failed to load custom font:', err);
+        alert('Failed to load custom font: ' + err.message);
+      } finally {
+        e.target.value = '';
+      }
+    });
+  }
+
+  // Real-time styling listeners to update live preview
+  if (UI.lyricsFont) {
+    UI.lyricsFont.addEventListener('change', updateLyricsStylePreview);
+  }
+  if (UI.lyricsColor) {
+    UI.lyricsColor.addEventListener('input', updateLyricsStylePreview);
+  }
+  if (UI.lyricsPosition) {
+    UI.lyricsPosition.addEventListener('change', updateLyricsStylePreview);
+  }
+  if (UI.lyricsTransition) {
+    UI.lyricsTransition.addEventListener('change', updateLyricsStylePreview);
+  }
+  if (UI.lyricsGlitch) {
+    UI.lyricsGlitch.addEventListener('change', updateLyricsStylePreview);
+  }
+
+  // Button to transform all pending lyrics into ALL CAPS
+  if (UI.btnLyricsToCaps) {
+    UI.btnLyricsToCaps.addEventListener('click', () => {
+      if (LyricsManager.pendingLyrics && LyricsManager.pendingLyrics.length > 0) {
+        LyricsManager.pendingLyrics.forEach(b => {
+          if (b.text) b.text = b.text.toUpperCase();
+        });
+        renderLyricsPreviewList(LyricsManager.pendingLyrics);
+        if (UI.lyricsStylePreviewSample) {
+          UI.lyricsStylePreviewSample.innerText = (LyricsManager.pendingLyrics[0]?.text || '').toUpperCase();
+        }
+      } else if (UI.lyricsStylePreviewSample) {
+        UI.lyricsStylePreviewSample.innerText = UI.lyricsStylePreviewSample.innerText.toUpperCase();
+      }
+      if (UI.lyricsUppercase) {
+        UI.lyricsUppercase.checked = true;
+      }
+      updateLyricsStylePreview();
+    });
+  }
+
+  // Checkbox to force ALL CAPS on all lines
+  if (UI.lyricsUppercase) {
+    UI.lyricsUppercase.addEventListener('change', () => {
+      if (UI.lyricsUppercase.checked && LyricsManager.pendingLyrics) {
+        LyricsManager.pendingLyrics.forEach(b => { if (b.text) b.text = b.text.toUpperCase(); });
+        renderLyricsPreviewList(LyricsManager.pendingLyrics);
+        if (UI.lyricsStylePreviewSample && LyricsManager.pendingLyrics.length > 0) {
+          UI.lyricsStylePreviewSample.innerText = LyricsManager.pendingLyrics[0].text;
+        }
+      }
+      updateLyricsStylePreview();
+    });
+  }
+
+  // Browse file button inside modal
+  if (UI.btnBrowseLyrics && UI.lyricsFileInput) {
+    UI.btnBrowseLyrics.addEventListener('click', () => {
+      UI.lyricsFileInput.click();
+    });
+  }
+
+  // Load demo metal lyrics
+  if (UI.btnLoadDemoLrc) {
+    UI.btnLoadDemoLrc.addEventListener('click', () => {
+      loadLyricsContent('demo_metal_storm.lrc', DEMO_METAL_LRC);
+    });
+  }
+
+  // Drag and drop onto modal drop area
+  if (UI.lyricsDropArea) {
+    UI.lyricsDropArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      UI.lyricsDropArea.style.borderColor = 'var(--cyan)';
+      UI.lyricsDropArea.style.background = 'rgba(0, 242, 254, 0.08)';
+    });
+    UI.lyricsDropArea.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      UI.lyricsDropArea.style.borderColor = 'rgba(255, 230, 0, 0.35)';
+      UI.lyricsDropArea.style.background = 'rgba(255, 230, 0, 0.03)';
+    });
+    UI.lyricsDropArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      UI.lyricsDropArea.style.borderColor = 'rgba(255, 230, 0, 0.35)';
+      UI.lyricsDropArea.style.background = 'rgba(255, 230, 0, 0.03)';
+      const file = e.dataTransfer?.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          loadLyricsContent(file.name, event.target.result);
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+
+  // File input change handler
+  if (UI.lyricsFileInput) {
+    UI.lyricsFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        loadLyricsContent(file.name, event.target.result);
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+  }
+
+
+  // Lyrics font size slider sync
+  if (UI.lyricsSize && UI.lyricsSizeVal) {
+    UI.lyricsSize.addEventListener('input', () => {
+      UI.lyricsSizeVal.innerText = `${UI.lyricsSize.value}px`;
+      updateLyricsStylePreview();
+    });
+  }
+
+  // Close lyrics modal
+  const closeLyricsModal = () => {
+    if (UI.lyricsModalOverlay) {
+      UI.lyricsModalOverlay.classList.add('hidden');
+    }
+  };
+
+  if (UI.btnCloseLyricsX) {
+    UI.btnCloseLyricsX.addEventListener('click', closeLyricsModal);
+  }
+  if (UI.btnCancelLyrics) {
+    UI.btnCancelLyrics.addEventListener('click', closeLyricsModal);
+  }
+  if (UI.lyricsModalOverlay) {
+    UI.lyricsModalOverlay.addEventListener('click', (e) => {
+      if (e.target === UI.lyricsModalOverlay) {
+        closeLyricsModal();
+      }
+    });
+  }
+
+  // Apply lyrics: Replace existing text layers
+  if (UI.btnApplyLyricsClear) {
+    UI.btnApplyLyricsClear.addEventListener('click', () => {
+      if (!LyricsManager.pendingLyrics || LyricsManager.pendingLyrics.length === 0) return;
+      const options = {
+        clearExisting: true,
+        font: UI.lyricsFont ? UI.lyricsFont.value : 'Outfit',
+        size: UI.lyricsSize ? parseFloat(UI.lyricsSize.value) : 38,
+        color: UI.lyricsColor ? UI.lyricsColor.value : '#00f2fe',
+        position: UI.lyricsPosition ? UI.lyricsPosition.value : 'lower-third',
+        transitionMode: UI.lyricsTransition ? UI.lyricsTransition.value : 'fade-blur',
+        glitchMode: UI.lyricsGlitch ? UI.lyricsGlitch.value : 'none',
+        autoExpandTimeline: UI.lyricsAutoExpand ? UI.lyricsAutoExpand.checked : true,
+        allCaps: UI.lyricsUppercase ? UI.lyricsUppercase.checked : false
+      };
+      LyricsManager.generateLayers(LyricsManager.pendingLyrics, options);
+      closeLyricsModal();
+    });
+  }
+
+  // Apply lyrics: Append to existing tracks
+  if (UI.btnApplyLyricsAppend) {
+    UI.btnApplyLyricsAppend.addEventListener('click', () => {
+      if (!LyricsManager.pendingLyrics || LyricsManager.pendingLyrics.length === 0) return;
+      const options = {
+        clearExisting: false,
+        font: UI.lyricsFont ? UI.lyricsFont.value : 'Outfit',
+        size: UI.lyricsSize ? parseFloat(UI.lyricsSize.value) : 38,
+        color: UI.lyricsColor ? UI.lyricsColor.value : '#00f2fe',
+        position: UI.lyricsPosition ? UI.lyricsPosition.value : 'lower-third',
+        transitionMode: UI.lyricsTransition ? UI.lyricsTransition.value : 'fade-blur',
+        glitchMode: UI.lyricsGlitch ? UI.lyricsGlitch.value : 'none',
+        autoExpandTimeline: UI.lyricsAutoExpand ? UI.lyricsAutoExpand.checked : true,
+        allCaps: UI.lyricsUppercase ? UI.lyricsUppercase.checked : false
+      };
+      LyricsManager.generateLayers(LyricsManager.pendingLyrics, options);
+      closeLyricsModal();
+    });
+  }
+
+
+  // Add Graphic Layer
+  UI.btnAddGraphic.addEventListener('click', () => {
+    if (state.graphics.length >= 5) {
+      alert("Maximum limit of 5 graphic overlay tracks reached.");
+      return;
+    }
+    UI.graphicFileInput.click();
+  });
+
+  UI.graphicFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    UI.canvasLoading.classList.remove('hidden');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const duration = getTimelineDuration();
+        let maxTrackIdx = 0;
+        const allIndices = [
+          ...state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0),
+          ...state.graphics.map(g => g.trackIndex !== undefined ? g.trackIndex : 0),
+          ...state.videoBlocks.map(v => v.trackIndex !== undefined ? v.trackIndex : 0)
+        ];
+        if (allIndices.length > 0) {
+          maxTrackIdx = Math.max(...allIndices);
+        }
+        const targetTrackIdx = maxTrackIdx + 1;
+
+        const newGraphic = {
+          id: 'grp_' + generateUUID(),
+          img: img,
+          fileName: file.name,
+          startTime: 0,
+          endTime: duration,
+          x: 0.0,
+          y: 0.0,
+          scale: 100,
+          glitchFrequency: 10,
+          glitchAmplitude: 20,
+          flickerIntensity: 0,
+          brightness: 100,
+          contrast: 100,
+          glowActive: false,
+          glowRadius: 20,
+          glowColor: '#ff007f',
+          trackIndex: targetTrackIdx
+        };
+
+        state.graphics.push(newGraphic);
+        selectGraphic(newGraphic.id);
+        UI.canvasLoading.classList.add('hidden');
+        renderFrame(state.time);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  UI.btnDeleteGraphic.addEventListener('click', () => {
+    if (!state.selectedGraphicId) return;
+    const index = state.graphics.findIndex(g => g.id === state.selectedGraphicId);
+    if (index !== -1) {
+      state.graphics.splice(index, 1);
+      selectGraphic(null);
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  // Graphic Settings bindings
+  UI.graphicTimelineStart.addEventListener('input', (e) => {
+    if (!state.selectedGraphicId) return;
+    const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+    if (grp) {
+      const val = parseFloat(e.target.value);
+      grp.startTime = Math.min(grp.endTime - 0.2, val);
+      UI.graphicTimelineStartVal.innerText = `${grp.startTime.toFixed(1)}s`;
+      e.target.value = grp.startTime;
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  UI.graphicTimelineEnd.addEventListener('input', (e) => {
+    if (!state.selectedGraphicId) return;
+    const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+    if (grp) {
+      const val = parseFloat(e.target.value);
+      const duration = getTimelineDuration();
+      grp.endTime = Math.max(grp.startTime + 0.2, Math.min(duration, val));
+      UI.graphicTimelineEndVal.innerText = `${grp.endTime.toFixed(1)}s`;
+      e.target.value = grp.endTime;
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  UI.graphicPosX.addEventListener('input', (e) => {
+    if (!state.selectedGraphicId) return;
+    const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+    if (grp) {
+      grp.x = parseInt(e.target.value) / 100;
+      UI.graphicPosXVal.innerText = `${e.target.value}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.graphicPosY.addEventListener('input', (e) => {
+    if (!state.selectedGraphicId) return;
+    const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+    if (grp) {
+      grp.y = parseInt(e.target.value) / 100;
+      UI.graphicPosYVal.innerText = `${e.target.value}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.graphicScale.addEventListener('input', (e) => {
+    if (!state.selectedGraphicId) return;
+    const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+    if (grp) {
+      grp.scale = parseInt(e.target.value);
+      UI.graphicScaleVal.innerText = `${grp.scale}%`;
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  UI.graphicGlitchFrequency.addEventListener('input', (e) => {
+    if (!state.selectedGraphicId) return;
+    const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+    if (grp) {
+      grp.glitchFrequency = parseInt(e.target.value);
+      UI.graphicGlitchFrequencyVal.innerText = `${grp.glitchFrequency}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.graphicGlitchAmplitude.addEventListener('input', (e) => {
+    if (!state.selectedGraphicId) return;
+    const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+    if (grp) {
+      grp.glitchAmplitude = parseInt(e.target.value);
+      UI.graphicGlitchAmplitudeVal.innerText = `${grp.glitchAmplitude}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.graphicFlickerIntensity.addEventListener('input', (e) => {
+    if (!state.selectedGraphicId) return;
+    const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+    if (grp) {
+      grp.flickerIntensity = parseInt(e.target.value);
+      UI.graphicFlickerIntensityVal.innerText = `${grp.flickerIntensity}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  if (UI.graphicBrightness) {
+    UI.graphicBrightness.addEventListener('input', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.brightness = parseInt(e.target.value);
+        if (UI.graphicBrightnessVal) {
+          UI.graphicBrightnessVal.innerText = `${grp.brightness}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.graphicContrast) {
+    UI.graphicContrast.addEventListener('input', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.contrast = parseInt(e.target.value);
+        if (UI.graphicContrastVal) {
+          UI.graphicContrastVal.innerText = `${grp.contrast}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.graphicGlowActive) {
+    UI.graphicGlowActive.addEventListener('change', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.glowActive = e.target.checked;
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.graphicGlowRadius) {
+    UI.graphicGlowRadius.addEventListener('input', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.glowRadius = parseInt(e.target.value);
+        if (UI.graphicGlowRadiusVal) {
+          UI.graphicGlowRadiusVal.innerText = `${grp.glowRadius}px`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.graphicGlowColor) {
+    UI.graphicGlowColor.addEventListener('input', (e) => {
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        grp.glowColor = e.target.value;
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  document.querySelectorAll('.graphic-glow-swatch-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!state.selectedGraphicId) return;
+      const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (grp) {
+        const color = e.currentTarget.getAttribute('data-color');
+        grp.glowColor = color;
+        UI.graphicGlowColor.value = color;
+        renderFrame(state.time);
+      }
+    });
+  });
+
+
+
+  // Timeline Navigation Jump Bindings
+  UI.btnTimelineStart.addEventListener('click', () => {
+    state.time = 0.0;
+    updatePlayhead();
+    renderFrame(state.time);
+    syncAudioPlayback();
+  });
+
+  UI.btnTimelineEnd.addEventListener('click', () => {
+    const dur = getTimelineDuration();
+    state.time = dur;
+    updatePlayhead();
+    renderFrame(state.time);
+    syncAudioPlayback();
+  });
+
+  // --- AUDIO TIMELINE EVENTS & BINDINGS ---
+  UI.btnAddAudio.addEventListener('click', () => {
+    UI.audioFileInput.click();
+  });
+
+  UI.audioFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    UI.canvasLoading.classList.remove('hidden');
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const ctxAudio = getAudioContext();
+        const audioBuffer = await ctxAudio.decodeAudioData(event.target.result);
+        
+        const channelData = audioBuffer.getChannelData(0);
+        const numPeaks = 1000;
+        const step = Math.ceil(channelData.length / numPeaks);
+        const peaks = [];
+        let maxPeak = 0;
+        for (let i = 0; i < numPeaks; i++) {
+          let maxVal = 0;
+          for (let j = 0; j < step; j++) {
+            const idx = i * step + j;
+            if (idx >= channelData.length) break;
+            const val = Math.abs(channelData[idx]);
+            if (val > maxVal) maxVal = val;
+          }
+          peaks.push(maxVal);
+          if (maxVal > maxPeak) maxPeak = maxVal;
+        }
+        if (maxPeak > 0) {
+          for (let i = 0; i < peaks.length; i++) {
+            peaks[i] /= maxPeak;
+          }
+        }
+        
+        state.audioTrack = {
+          fileName: file.name,
+          buffer: audioBuffer,
+          timelineStart: 0.0,
+          sourceOffset: 0.0,
+          duration: audioBuffer.duration,
+          volume: 0.8,
+          fadeInDuration: 0.0,
+          fadeOutDuration: 0.0,
+          peaks: peaks
+        };
+        
+        // Automatically scale timeline to match the loaded song's duration!
+        const songDur = Math.min(600, Math.max(5, Math.ceil(audioBuffer.duration)));
+        setProjectDuration(songDur);
+
+        // Update match song badges and reveal buttons
+        const songTc = formatTimecode(audioBuffer.duration);
+        if (UI.songDurBadge) UI.songDurBadge.innerText = songTc;
+        if (UI.exportSongDurBadge) UI.exportSongDurBadge.innerText = songTc;
+        if (UI.btnMatchSongDuration) UI.btnMatchSongDuration.style.display = 'inline-flex';
+        if (UI.btnExportMatchSong) UI.btnExportMatchSong.style.display = 'inline-flex';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        selectAudio(true);
+        if (state.isPlaying) {
+          syncAudioPlayback();
+        }
+
+      } catch (err) {
+        console.error("Error decoding audio data:", err);
+        alert("Could not decode audio file. Please try a standard MP3 or WAV file.");
+      } finally {
+        UI.canvasLoading.classList.add('hidden');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  UI.audioTimelineStart.addEventListener('input', (e) => {
+    if (!state.audioTrack) return;
+    state.audioTrack.timelineStart = parseFloat(e.target.value);
+    UI.audioTimelineStartVal.innerText = `${state.audioTrack.timelineStart.toFixed(1)}s`;
+    updateTimelineTracks();
+    if (state.isPlaying) {
+      syncAudioPlayback();
+    }
+  });
+
+  UI.audioVolume.addEventListener('input', (e) => {
+    if (!state.audioTrack) return;
+    const vol = parseInt(e.target.value) / 100;
+    state.audioTrack.volume = vol;
+    UI.audioVolumeVal.innerText = `${e.target.value}%`;
+    if (activeAudioGain) {
+      activeAudioGain.gain.value = vol;
+    }
+  });
+
+  UI.audioVolume.addEventListener('change', () => {
+    if (state.isPlaying) {
+      syncAudioPlayback();
+    }
+  });
+
+  UI.audioFadeIn.addEventListener('input', (e) => {
+    if (!state.audioTrack) return;
+    state.audioTrack.fadeInDuration = parseFloat(e.target.value);
+    UI.audioFadeInVal.innerText = `${state.audioTrack.fadeInDuration.toFixed(1)}s`;
+  });
+
+  UI.audioFadeIn.addEventListener('change', () => {
+    if (state.isPlaying) {
+      syncAudioPlayback();
+    }
+  });
+
+  UI.audioFadeOut.addEventListener('input', (e) => {
+    if (!state.audioTrack) return;
+    state.audioTrack.fadeOutDuration = parseFloat(e.target.value);
+    UI.audioFadeOutVal.innerText = `${state.audioTrack.fadeOutDuration.toFixed(1)}s`;
+  });
+
+  UI.audioFadeOut.addEventListener('change', () => {
+    if (state.isPlaying) {
+      syncAudioPlayback();
+    }
+  });
+
+  UI.btnDeleteAudio.addEventListener('click', () => {
+    stopAudioSource();
+    state.audioTrack = null;
+    selectAudio(false);
+    if (UI.btnMatchSongDuration) UI.btnMatchSongDuration.style.display = 'none';
+    if (UI.btnExportMatchSong) UI.btnExportMatchSong.style.display = 'none';
+    updateTimelineTracks();
+  });
+
+
+  // --- VIDEO TIMELINE EVENTS & BINDINGS ---
+  if (UI.btnAddVideo) {
+    UI.btnAddVideo.addEventListener('click', () => {
+      UI.videoFileInput.click();
+    });
+  }
+
+  if (UI.videoFileInput) {
+    UI.videoFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      UI.canvasLoading.classList.remove('hidden');
+
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.src = url;
+      video.muted = true;
+      video.playsInline = true;
+      video.loop = false;
+
+      video.addEventListener('loadedmetadata', () => {
+        const dur = getTimelineDuration();
+        
+        let startTime = state.time;
+        if (startTime >= dur - 0.2) {
+          startTime = Math.max(0, dur - video.duration);
+        }
+        
+        const newBlock = {
+          id: 'vid_' + generateUUID(),
+          fileName: file.name,
+          file: file,
+          url: url,
+          element: video,
+          duration: video.duration,
+          startTime: startTime,
+          endTime: Math.min(dur, startTime + video.duration),
+          monochrome: false,
+          mirrorMode: 'none',
+          kaleidoscopeSlices: 8,
+          brightness: 100,
+          contrast: 100,
+          x: 0.0,
+          y: 0.0,
+          edgeFade: 0,
+          fadeInDuration: 0.0,
+          fadeOutDuration: 0.0,
+          trackIndex: 0
+        };
+
+        state.videoBlocks.push(newBlock);
+        selectVideo(newBlock.id);
+        UI.canvasLoading.classList.add('hidden');
+        renderFrame(state.time);
+      });
+
+      video.addEventListener('error', (err) => {
+        console.error("Video load error:", err);
+        alert("Failed to load video file. Please check format compatibility.");
+        UI.canvasLoading.classList.add('hidden');
+      });
+      e.target.value = '';
+    });
+  }
+
+  if (UI.btnDeleteVideo) {
+    UI.btnDeleteVideo.addEventListener('click', () => {
+      if (!state.selectedVideoId) return;
+      const index = state.videoBlocks.findIndex(v => v.id === state.selectedVideoId);
+      if (index !== -1) {
+        const block = state.videoBlocks[index];
+        if (block.element) {
+          block.element.pause();
+        }
+        
+        // Revoke Object URL if no other block is using it
+        const isUrlUsedElsewhere = state.videoBlocks.some((v, idx) => idx !== index && v.url === block.url);
+        if (!isUrlUsedElsewhere) {
+          URL.revokeObjectURL(block.url);
+        }
+        
+        state.videoBlocks.splice(index, 1);
+        selectVideo(null);
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.btnDuplicateVideo) {
+    UI.btnDuplicateVideo.addEventListener('click', () => {
+      if (!state.selectedVideoId) return;
+      const selectedBlock = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (!selectedBlock) return;
+      
+      const dur = getTimelineDuration();
+      let startTime = state.time;
+      const blockDuration = selectedBlock.endTime - selectedBlock.startTime;
+      if (startTime >= dur - 0.2) startTime = Math.max(0, dur - blockDuration);
+      const endTime = Math.min(dur, startTime + blockDuration);
+      
+      const clonedVideo = document.createElement('video');
+      clonedVideo.src = selectedBlock.url;
+      clonedVideo.muted = true;
+      clonedVideo.playsInline = true;
+      clonedVideo.loop = false;
+      
+      clonedVideo.addEventListener('loadedmetadata', () => {
+        const newBlock = {
+          ...selectedBlock,
+          id: 'vid_' + generateUUID(),
+          element: clonedVideo,
+          startTime: startTime,
+          endTime: endTime
+        };
+        state.videoBlocks.push(newBlock);
+        selectVideo(newBlock.id);
+        renderFrame(state.time);
+      });
+    });
+  }
+  // Layer Move Up / Down Event Listeners with track swapping
+  if (UI.btnVideoMoveUp) {
+    UI.btnVideoMoveUp.addEventListener('click', () => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        const newTrack = oldTrack + 1;
+        if (oldTrack === 0) {
+          block.trackIndex = 1;
+        } else {
+          swapTracks(oldTrack, newTrack);
+        }
+        normalizeTracks();
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.btnVideoMoveDown) {
+    UI.btnVideoMoveDown.addEventListener('click', () => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        if (oldTrack > 0) {
+          const newTrack = oldTrack - 1;
+          if (newTrack === 0) {
+            block.trackIndex = 0;
+          } else {
+            swapTracks(oldTrack, newTrack);
+          }
+          normalizeTracks();
+          updateTimelineTracks();
+          renderFrame(state.time);
+        }
+      }
+    });
+  }
+
+  if (UI.btnTextMoveUp) {
+    UI.btnTextMoveUp.addEventListener('click', () => {
+      if (!state.selectedTextId) return;
+      const block = state.texts.find(t => t.id === state.selectedTextId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        const newTrack = oldTrack + 1;
+        const siblings = [
+          ...state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === oldTrack),
+          ...state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === oldTrack),
+          ...(state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === oldTrack) : [])
+        ];
+        if (siblings.length > 1) {
+          block.trackIndex = newTrack;
+        } else {
+          swapTracks(oldTrack, newTrack);
+        }
+        normalizeTracks();
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.btnTextMoveDown) {
+    UI.btnTextMoveDown.addEventListener('click', () => {
+      if (!state.selectedTextId) return;
+      const block = state.texts.find(t => t.id === state.selectedTextId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        if (oldTrack > 1) {
+          const newTrack = oldTrack - 1;
+          const siblings = [
+            ...state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === oldTrack),
+            ...state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === oldTrack),
+            ...(state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === oldTrack) : [])
+          ];
+          if (siblings.length > 1) {
+            block.trackIndex = newTrack;
+          } else {
+            swapTracks(oldTrack, newTrack);
+          }
+          normalizeTracks();
+          updateTimelineTracks();
+          renderFrame(state.time);
+        }
+      }
+    });
+  }
+
+  if (UI.btnGraphicMoveUp) {
+    UI.btnGraphicMoveUp.addEventListener('click', () => {
+      if (!state.selectedGraphicId) return;
+      const block = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        const newTrack = oldTrack + 1;
+        const siblings = [
+          ...state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === oldTrack),
+          ...state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === oldTrack),
+          ...(state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === oldTrack) : [])
+        ];
+        if (siblings.length > 1) {
+          block.trackIndex = newTrack;
+        } else {
+          swapTracks(oldTrack, newTrack);
+        }
+        normalizeTracks();
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.btnGraphicMoveDown) {
+    UI.btnGraphicMoveDown.addEventListener('click', () => {
+      if (!state.selectedGraphicId) return;
+      const block = state.graphics.find(g => g.id === state.selectedGraphicId);
+      if (block) {
+        const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
+        if (oldTrack > 1) {
+          const newTrack = oldTrack - 1;
+          const siblings = [
+            ...state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === oldTrack),
+            ...state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === oldTrack),
+            ...(state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === oldTrack) : [])
+          ];
+          if (siblings.length > 1) {
+            block.trackIndex = newTrack;
+          } else {
+            swapTracks(oldTrack, newTrack);
+          }
+          normalizeTracks();
+          updateTimelineTracks();
+          renderFrame(state.time);
+        }
+      }
+    });
+  }
+
+  if (UI.videoTimelineStart) {
+    UI.videoTimelineStart.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        const val = parseFloat(e.target.value);
+        const loopDur = getTimelineDuration();
+        const blockLen = block.endTime - block.startTime;
+        
+        block.startTime = Math.min(loopDur - 0.2, val);
+        block.endTime = Math.min(loopDur, block.startTime + blockLen);
+        
+        if (UI.videoTimelineStartVal) {
+          UI.videoTimelineStartVal.innerText = `${block.startTime.toFixed(1)}s`;
+        }
+        e.target.value = block.startTime;
+        
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoMonochrome) {
+    UI.videoMonochrome.addEventListener('change', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.monochrome = e.target.checked;
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoMirrorMode) {
+    UI.videoMirrorMode.addEventListener('change', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.mirrorMode = e.target.value;
+        if (UI.videoKaleidoscopeSlicesGroup) {
+          UI.videoKaleidoscopeSlicesGroup.style.display = (block.mirrorMode === 'kaleidoscope') ? 'flex' : 'none';
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoKSlices) {
+    UI.videoKSlices.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.kaleidoscopeSlices = parseInt(e.target.value);
+        if (UI.videoKSlicesVal) {
+          UI.videoKSlicesVal.innerText = block.kaleidoscopeSlices;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoBrightness) {
+    UI.videoBrightness.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.brightness = parseInt(e.target.value);
+        if (UI.videoBrightnessVal) {
+          UI.videoBrightnessVal.innerText = `${block.brightness}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoContrast) {
+    UI.videoContrast.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.contrast = parseInt(e.target.value);
+        if (UI.videoContrastVal) {
+          UI.videoContrastVal.innerText = `${block.contrast}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoPosX) {
+    UI.videoPosX.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.x = parseFloat(e.target.value);
+        if (UI.videoPosXVal) {
+          UI.videoPosXVal.innerText = `${Math.round(block.x * 100)}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoPosY) {
+    UI.videoPosY.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.y = parseFloat(e.target.value);
+        if (UI.videoPosYVal) {
+          UI.videoPosYVal.innerText = `${Math.round(block.y * 100)}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoEdgeFade) {
+    UI.videoEdgeFade.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.edgeFade = parseInt(e.target.value);
+        if (UI.videoEdgeFadeVal) {
+          UI.videoEdgeFadeVal.innerText = `${block.edgeFade}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoFadeIn) {
+    UI.videoFadeIn.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.fadeInDuration = parseFloat(e.target.value);
+        if (UI.videoFadeInVal) {
+          UI.videoFadeInVal.innerText = `${block.fadeInDuration.toFixed(1)}s`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.videoFadeOut) {
+    UI.videoFadeOut.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.fadeOutDuration = parseFloat(e.target.value);
+        if (UI.videoFadeOutVal) {
+          UI.videoFadeOutVal.innerText = `${block.fadeOutDuration.toFixed(1)}s`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+
+
+  // Text Inputs updates
+  UI.textContent.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.text = e.target.value;
+      updateTimelineTracks();
+      renderFrame(state.time);
+    }
+  });
+
+  if (UI.btnTextToCaps) {
+    UI.btnTextToCaps.addEventListener('click', () => {
+      if (!state.selectedTextId) return;
+      const txt = state.texts.find(t => t.id === state.selectedTextId);
+      if (txt) {
+        txt.text = (txt.text || '').toUpperCase();
+        UI.textContent.value = txt.text;
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.btnAllTextsToCaps) {
+    UI.btnAllTextsToCaps.addEventListener('click', () => {
+      if (state.texts.length === 0) return;
+      state.texts.forEach(t => {
+        if (t.text) t.text = t.text.toUpperCase();
+      });
+      state.texts = [...state.texts];
+      if (state.selectedTextId) {
+        const cur = state.texts.find(t => t.id === state.selectedTextId);
+        if (cur) UI.textContent.value = cur.text;
+      }
+      updateTimelineTracks();
+      renderFrame(state.time);
+    });
+  }
+
+  UI.textFont.addEventListener('change', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.font = e.target.value;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textSize.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.size = parseInt(e.target.value);
+      UI.textSizeVal.innerText = `${txt.size}px`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textColor.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.color = e.target.value;
+      renderFrame(state.time);
+    }
+  });
+
+  document.querySelectorAll('.palette-swatches .swatch-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!state.selectedTextId) return;
+      const txt = state.texts.find(t => t.id === state.selectedTextId);
+      if (txt) {
+        const color = e.currentTarget.getAttribute('data-color');
+        txt.color = color;
+        UI.textColor.value = color;
+        renderFrame(state.time);
+      }
+    });
+  });
+
+  UI.textPosX.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.x = parseFloat(e.target.value);
+      UI.textPosXVal.innerText = `${Math.round(txt.x * 100)}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textPosY.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.y = parseFloat(e.target.value);
+      UI.textPosYVal.innerText = `${Math.round(txt.y * 100)}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textAngle.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.angle = parseInt(e.target.value);
+      UI.textAngleVal.innerText = `${txt.angle}°`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textIdleWobble.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.idleWobble = parseFloat(e.target.value);
+      UI.textIdleWobbleVal.innerText = `${txt.idleWobble.toFixed(1)}px`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textIdleSkew.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.idleSkew = parseFloat(e.target.value) / 100;
+      UI.textIdleSkewVal.innerText = `${Math.round(txt.idleSkew * 100)}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textGlitchMode.addEventListener('change', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.glitchMode = e.target.value;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textGlitchIntensity.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.glitchIntensity = parseInt(e.target.value);
+      UI.textGlitchIntensityVal.innerText = `${txt.glitchIntensity}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textFlickerIntensity.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.flickerIntensity = parseInt(e.target.value);
+      UI.textFlickerIntensityVal.innerText = `${txt.flickerIntensity}%`;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textGlitchMono.addEventListener('change', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.glitchMono = e.target.checked;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textTransition.addEventListener('change', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.transitionMode = e.target.value;
+      renderFrame(state.time);
+    }
+  });
+
+  UI.textTransitionDuration.addEventListener('input', (e) => {
+    if (!state.selectedTextId) return;
+    const txt = state.texts.find(t => t.id === state.selectedTextId);
+    if (txt) {
+      txt.transitionDuration = parseFloat(e.target.value);
+      UI.textTransitionDurationVal.innerText = `${txt.transitionDuration.toFixed(1)}s`;
+      renderFrame(state.time);
+    }
+  });
+
+  // Custom Font uploading logic
+  UI.btnLoadFont.addEventListener('click', (e) => {
+    e.preventDefault();
+    UI.fontFileInput.click();
+  });
+
+  UI.fontFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const fontName = file.name.split('.')[0].replace(/[^a-zA-Z0-9]/g, '_');
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const arrayBuffer = evt.target.result;
+      const fontFace = new FontFace(fontName, arrayBuffer);
+      fontFace.load().then((loadedFace) => {
+        document.fonts.add(loadedFace);
+        
+        const option = document.createElement('option');
+        option.value = fontName;
+        option.innerText = fontName + " (Custom)";
+        UI.textFont.appendChild(option);
+        UI.textFont.value = fontName;
+        
+        if (state.selectedTextId) {
+          const txt = state.texts.find(t => t.id === state.selectedTextId);
+          if (txt) {
+            txt.font = fontName;
+            renderFrame(state.time);
+          }
+        }
+        alert(`Loaded custom font: ${fontName}`);
+      }).catch(err => {
+        alert("Failed to load font: " + err.message);
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // Initial draw and helper triggers
+  drawMaskGraph();
+  if (UI.exportFormat) {
+    state.exportFormat = UI.exportFormat.value;
+  }
+  updateMp4WarningVisibility();
+  if (UI.glitchMonochrome) {
+    state.glitchMonochrome = UI.glitchMonochrome.checked;
+  }
+  if (UI.glitchStyleRgbSort) state.glitchStyleRgbSort = UI.glitchStyleRgbSort.checked;
+  if (UI.glitchStyleVhs) state.glitchStyleVhs = UI.glitchStyleVhs.checked;
+  if (UI.glitchStyleBlock) state.glitchStyleBlock = UI.glitchStyleBlock.checked;
+  if (UI.glitchStyleLiquid) state.glitchStyleLiquid = UI.glitchStyleLiquid.checked;
+  if (UI.glitchStyleRandom) state.glitchStyleRandom = UI.glitchStyleRandom.checked;
+  if (UI.glitchStyleFlicker) state.glitchStyleFlicker = UI.glitchStyleFlicker.checked;
+  if (UI.glitchFlickerHighlights) state.glitchFlickerHighlightsOnly = UI.glitchFlickerHighlights.checked;
+  // Glitch Trigger bindings
+  if (UI.btnAddGlitchTrigger) {
+    UI.btnAddGlitchTrigger.addEventListener('click', () => {
+      if (state.glitchTriggers.length >= 10) {
+        alert("Maximum limit of 10 glitch trigger points reached.");
+        return;
+      }
+      const newTrigger = {
+        id: 'gt_' + generateUUID(),
+        time: state.time,
+        duration: 0.35,
+        severity: 10
+      };
+      state.glitchTriggers.push(newTrigger);
+      selectGlitchTrigger(newTrigger.id);
+      updateTimelineTracks();
+      renderFrame(state.time);
+    });
+  }
+
+  if (UI.btnDeleteGlitchTrigger) {
+    UI.btnDeleteGlitchTrigger.addEventListener('click', () => {
+      if (!state.selectedGlitchTriggerId) return;
+      const index = state.glitchTriggers.findIndex(t => t.id === state.selectedGlitchTriggerId);
+      if (index !== -1) {
+        state.glitchTriggers.splice(index, 1);
+        selectGlitchTrigger(null);
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.glitchTriggerTime) {
+    UI.glitchTriggerTime.addEventListener('input', (e) => {
+      if (!state.selectedGlitchTriggerId) return;
+      const trigger = state.glitchTriggers.find(t => t.id === state.selectedGlitchTriggerId);
+      if (trigger) {
+        trigger.time = parseFloat(e.target.value);
+        if (UI.glitchTriggerTimeVal) {
+          UI.glitchTriggerTimeVal.innerText = `${trigger.time.toFixed(2)}s`;
+        }
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.glitchTriggerDuration) {
+    UI.glitchTriggerDuration.addEventListener('input', (e) => {
+      if (!state.selectedGlitchTriggerId) return;
+      const trigger = state.glitchTriggers.find(t => t.id === state.selectedGlitchTriggerId);
+      if (trigger) {
+        trigger.duration = parseFloat(e.target.value);
+        if (UI.glitchTriggerDurationVal) {
+          UI.glitchTriggerDurationVal.innerText = `${trigger.duration.toFixed(2)}s`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.glitchTriggerSeverity) {
+    UI.glitchTriggerSeverity.addEventListener('input', (e) => {
+      if (!state.selectedGlitchTriggerId) return;
+      const trigger = state.glitchTriggers.find(t => t.id === state.selectedGlitchTriggerId);
+      if (trigger) {
+        trigger.severity = parseInt(e.target.value);
+        if (UI.glitchTriggerSeverityVal) {
+          UI.glitchTriggerSeverityVal.innerText = `${trigger.severity}px`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  updateExportEstimate();
+  updateTimelineRuler();
+  updateTimelineTracks();
+  updatePlayhead();
+  initTimelineEvents();
+  loadConfiguredFonts();
+  updateGlitchTriggerButtonState();
+
+  // Handle keyboard shortcuts (Spacebar for play/pause, Delete/Backspace for timeline item deletion)
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      const activeEl = document.activeElement;
+      
+      // Determine if the user is typing inside an editable text input or textarea
+      const isTypingText = activeEl && (
+        activeEl.tagName === 'TEXTAREA' ||
+        (activeEl.tagName === 'INPUT' && (
+          activeEl.type === 'text' ||
+          activeEl.type === 'search' ||
+          activeEl.type === 'url' ||
+          activeEl.type === 'email' ||
+          activeEl.type === 'password' ||
+          activeEl.type === 'number' ||
+          !activeEl.type
+        )) ||
+        (activeEl.isContentEditable && activeEl.id !== 'lyrics-style-preview-sample')
+      );
+
+      // If actively typing in a text field, preserve natural typing space
+      // unless Ctrl, Alt, or Meta is held (allowing hotkey play/pause override)
+      if (isTypingText && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        return;
+      }
+
+      e.preventDefault();
+      if (UI.btnPlayPause) {
+        UI.btnPlayPause.click();
+      }
+    } else if (e.key === ',' || (e.code === 'ArrowLeft' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey)) {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        return;
+      }
+      e.preventDefault();
+      stepFrame(-1);
+    } else if (e.key === '.' || (e.code === 'ArrowRight' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey)) {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        return;
+      }
+      e.preventDefault();
+      stepFrame(1);
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.isContentEditable
+      )) {
+        return;
+      }
+      
+      let deleted = false;
+      if (state.selectedTextId && UI.btnDeleteText) {
+        UI.btnDeleteText.click();
+        deleted = true;
+      } else if (state.selectedGraphicId && UI.btnDeleteGraphic) {
+        UI.btnDeleteGraphic.click();
+        deleted = true;
+      } else if (state.selectedVideoId && UI.btnDeleteVideo) {
+        UI.btnDeleteVideo.click();
+        deleted = true;
+      } else if (state.selectedGlitchTriggerId && UI.btnDeleteGlitchTrigger) {
+        UI.btnDeleteGlitchTrigger.click();
+        deleted = true;
+      } else if (state.selectedAudio && UI.btnDeleteAudio) {
+        UI.btnDeleteAudio.click();
+        deleted = true;
+      }
+      
+      if (deleted) {
+        e.preventDefault();
+      }
+    } else if (e.key === 'Escape') {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        activeEl.blur();
+      }
+    }
+  });
+
+  // Handle browser window resize events
+  window.addEventListener('resize', () => {
+    resizeMainCanvas();
+    renderFrame(state.time);
+  });
+});

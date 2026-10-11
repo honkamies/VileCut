@@ -1744,3 +1744,37 @@ select:focus, select:hover {
   transform: scale(1.25);
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
+
+/* Danger Zone Entrance Button in Header */
+.danger-entrance-btn {
+  text-decoration: none !important;
+  background: linear-gradient(135deg, rgba(255, 230, 0, 0.16) 0%, rgba(255, 51, 68, 0.16) 100%) !important;
+  border: 1px solid rgba(255, 230, 0, 0.5) !important;
+  color: #ffe600 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 10px rgba(255, 230, 0, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  animation: danger-pulse-glow 3s infinite ease-in-out;
+}
+
+.danger-entrance-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 230, 0, 0.32) 0%, rgba(255, 51, 68, 0.32) 100%) !important;
+  border-color: #ffe600 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 18px rgba(255, 230, 0, 0.65);
+  transform: translateY(-1px);
+}
+
+.danger-entrance-btn svg,
+.danger-entrance-btn i {
+  color: #ffe600 !important;
+}
+
+@keyframes danger-pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 230, 0, 0.25); border-color: rgba(255, 230, 0, 0.45); }
+  50% { box-shadow: 0 0 16px rgba(255, 230, 0, 0.6); border-color: rgba(255, 230, 0, 0.85); }
+}
+

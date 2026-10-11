@@ -1,0 +1,168 @@
+class Store {
+  constructor(initialState) {
+    this.listeners = new Map();
+    this.state = new Proxy(initialState, {
+      set: (target, property, value) => {
+        if (target[property] === value) return true;
+        target[property] = value;
+        this.notify(property, value);
+        return true;
+      }
+    });
+  }
+
+  subscribe(property, callback) {
+    if (!this.listeners.has(property)) {
+      this.listeners.set(property, new Set());
+    }
+    this.listeners.get(property).add(callback);
+    return () => this.listeners.get(property).delete(callback);
+  }
+
+  notify(property, value) {
+    if (this.listeners.has(property)) {
+      for (const callback of this.listeners.get(property)) {
+        callback(value, this.state);
+      }
+    }
+  }
+}
+
+export const storeInstance = new Store({
+  // Media & Image Elements
+  uploadedImages: [], // Array of { id, name, img, layers: [] }
+  activeImageIndex: -1,
+  imageLoaded: false,
+  layers: [], // Stack of active rendering layers: { canvas, index, initialZ, lastWrapCount, sourceImageId }
+  
+  // Core Layer Settings
+  maskType: 'adaptive-luminosity',
+  layerCount: 5,
+  maskFeather: 0.3,
+  hueTolerance: 45, // in degrees
+  randomBoundaries: [], // boundary points for random mode
+  layerEdgeFade: 10, // border fade out percentage (0-50%)
+  aspectRatio: 'original',
+  // Toggle FX Switches
+  glitchEnabled: false,
+
+  // Layer Inspector settings
+  selectedInspectorLayer: 0,
+  inspectorBgMode: 'checkerboard',
+
+  // Text Overlays
+  texts: [],
+  selectedTextId: null,
+
+  // Audio Track
+  audioTrack: null,
+  selectedAudio: false,
+
+  // Video Background Track
+  videoBlocks: [],
+  selectedVideoId: null,
+
+  // Glitch Triggers on Timeline
+  glitchTriggers: [],
+  selectedGlitchTriggerId: null,
+  prevTime: 0,
+
+
+  // Graphic Overlays
+  graphics: [],
+  selectedGraphicId: null,
+
+  // Motion parameters
+  timelineZoom: 1.0,
+  isPlaying: true,
+  time: 0,
+  lastFrameTime: 0,
+  fps: 0,
+  zoomSpeed: 0.05,
+  zoomDepth: 4.0,
+  cameraRotation: 0, // deg/sec
+  cameraRotationBase: 0, // base angle to prevent rotation jumps
+  cameraDrift: 0.0,  // drift multiplier
+  gridActive: false,
+
+  // Symmetries
+  mirrorMode: 'none',
+  kaleidoscopeSlices: 8,
+
+  // Glitches
+  glitchStyleRgbSort: true,
+  glitchStyleVhs: false,
+  glitchStyleBlock: false,
+  glitchStyleLiquid: false,
+  glitchStyleRandom: false,
+  glitchStyleFlicker: false,
+  glitchFlickerHighlightsOnly: false,
+  activeSpikeStyle: null,
+  rgbSplit: 0,
+  pixelSort: 0,
+  glitchFrequency: 5, // % probability
+  glitchSeverity: 10,  // px displacement
+  depthModulation: 0,
+  glitchMonochrome: false,
+  glitchActive: false,
+  glitchTimer: 0,
+  shakeX: 0,
+  shakeY: 0,
+  shakeRot: 0,
+
+  // Micro-Geometric & Pixel FX
+  geometricEnabled: false,
+
+  // Spectral Edge Curtain
+  geoCurtainActive: false,
+  geoCurtainDirection: 'down',
+  geoCurtainAngle: 0,
+  geoCurtainBidirectional: false,
+  geoCurtainLength: 50,
+  geoCurtainDensity: 60,
+  geoCurtainThreshold: 35,
+  geoCurtainFlicker: 25,
+  geoCurtainOpacity: 75,
+  geoCurtainBlend: 'screen',
+  geoCurtainLumTrigger: 'all',
+  geoCurtainMinLum: 0,
+  geoCurtainMaxLum: 100,
+  geoCurtainColorMode: 'neon',
+  geoCurtainTintColor: '#00f2fe',
+  geoCurtainLumMod: 40,
+  geoCurtainOriginDot: true,
+  geoCurtainMultiEdge: false,
+
+  // Micro-HUD Geometry Nodes
+  geoNodesActive: false,
+  geoNodeShape: 'bracket',
+  geoNodeDensity: 35,
+  geoNodeSize: 8,
+  geoNodeStroke: 1,
+  geoNodeColor: '#00f2fe',
+
+  // Topographic Contours
+  geoContoursActive: false,
+  geoContourLevels: 12,
+  geoContourOpacity: 70,
+  geoContourColor: '#39ff14',
+
+  isExporting: false,
+  isDangerZone: true,
+  exportFormat: 'mp4',
+  exportRecorder: null,
+  exportChunks: [],
+  exportFps: 30,
+  exportDuration: 30,
+  exportLoops: 1,
+  exportMode: 'duration',
+  videoFadeInActive: false,
+  videoFadeInDuration: 0.5,
+  videoFadeOutActive: false,
+  videoFadeOutDuration: 0.5,
+  exportResolution: '1080',
+  exportCancel: false
+});
+
+export const state = storeInstance.state;
+export const subscribe = storeInstance.subscribe.bind(storeInstance);
