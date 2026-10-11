@@ -51,6 +51,13 @@
   <link rel="stylesheet" href="danger.css">
   <!-- Lucide Icons -->
   <script src="js/lucide.min.js"></script>
+  <script>
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => { if (window.lucide && window.lucide.createIcons) window.lucide.createIcons(); });
+    } else {
+      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+    }
+  </script>
 </head>
 <body>
   <div class="app-container">

@@ -220,8 +220,6 @@ export function renderFrame(renderTime) {
   // Draw Track 0 Text Overlays on offscreenCtx (behind zooming layers)
   drawTextOverlays(offscreenCtx, bw, bh, renderTime, 0);
 
-
-  const dur = getTimelineDuration();
   const speed = getAdjustedZoomSpeed(dur);
 
   const layerDepths = state.layers.map(layer => {

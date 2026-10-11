@@ -13,6 +13,10 @@ All notable changes to the VileCut application will be documented in this file.
   - **Screen WakeLock Integration**: Automatically requests `navigator.wakeLock` during active renders to prevent OS/display sleep.
   - **Live Encoding Telemetry**: Real-time render metrics displaying processing speed (FPS), accurate ETA countdown, and stream target mode (Direct Disk vs RAM Buffer).
 
+### Fixed
+- **Danger Zone Module SyntaxError**: Removed duplicate declaration of `const dur` in `danger/js/renderer.js` that caused module compilation failure on page load, rendering buttons unresponsive and icon placeholders blank.
+- **Resilient App Initialization**: Added readyState checking in `danger/js/app.js` and immediate Lucide icon hydration in `danger/index.html` to ensure icons and listeners bind reliably.
+
 ## [1.16.0] - 2026-10-04
 
 ### Added

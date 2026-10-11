@@ -26,7 +26,7 @@ import { LyricsManager } from './lyrics.js';
 
 
 // Run on application load
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
   // --- COLLAPSIBLE PANEL SECTIONS ---
   document.querySelectorAll('.panel-section').forEach((section) => {
     const header = section.querySelector('.section-title-row') || section.querySelector('.section-title');
@@ -3435,4 +3435,10 @@ document.addEventListener('DOMContentLoaded', () => {
     resizeMainCanvas();
     renderFrame(state.time);
   });
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
