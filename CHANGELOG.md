@@ -2,6 +2,15 @@
 
 All notable changes to the VileCut application will be documented in this file.
 
+## [1.17.2] - 2026-10-11
+
+### Fixed
+- **Timeline Duration Squeeze Protection**:
+  - Prevented project duration from shrinking smaller than the latest placed timeline item (`texts`, `graphics`, `videoBlocks`, `glitchTriggers`), completely eliminating accidental destructive truncation and squeezing.
+  - Dynamically calculates `getMinimumRequiredTimelineDuration()` based on the maximum block end time.
+  - Constrains duration adjustments across sliders, timecode input boxes, and preset fit handlers to never fall below the minimum required duration.
+  - Synchronizes slider `min` boundaries dynamically so timeline blocks cannot be crushed even during rapid drag gestures.
+
 ## [1.17.0] - 2026-10-11
 
 ### Added

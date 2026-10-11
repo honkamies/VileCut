@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { UI } from './ui.js';
-import { getPseudoRandom, loadConfiguredFonts, getTimelineDuration, generateUUID, formatDurationLabel, formatTimecode, parseDurationInput } from './utils.js';
+import { getPseudoRandom, loadConfiguredFonts, getTimelineDuration, generateUUID, formatDurationLabel, formatTimecode, parseDurationInput, getMinimumRequiredTimelineDuration } from './utils.js';
 
 import { ImageProcessor, drawInspectorPreview, drawMaskGraph } from './masking.js';
 import { GlitchManager } from './glitch.js';
@@ -1462,17 +1462,27 @@ function initApp() {
   }
 
   function setProjectDuration(dur) {
-    state.exportDuration = Math.min(600, Math.max(5, Math.round(dur)));
+    const minRequired = getMinimumRequiredTimelineDuration();
+    state.exportDuration = Math.min(600, Math.max(minRequired, Math.round(dur)));
     const label = formatDurationLabel(state.exportDuration);
     const tc = formatTimecode(state.exportDuration);
 
-    if (UI.exportDuration) UI.exportDuration.value = state.exportDuration;
+    if (UI.exportDuration) {
+      UI.exportDuration.min = minRequired;
+      UI.exportDuration.value = state.exportDuration;
+    }
     if (UI.exportDurationVal) UI.exportDurationVal.innerText = label;
     if (UI.exportDurationInput && document.activeElement !== UI.exportDurationInput) {
       UI.exportDurationInput.value = tc;
     }
 
-    if (UI.timelineDurationSlider) UI.timelineDurationSlider.value = state.exportDuration;
+    if (UI.timelineDurationSlider) {
+      UI.timelineDurationSlider.min = minRequired;
+      UI.timelineDurationSlider.value = state.exportDuration;
+      UI.timelineDurationSlider.title = minRequired > 5 
+        ? `Timeline duration (${minRequired}s - 600s). Minimum locked by timeline elements.`
+        : `Drag to adjust duration (5s - 10m)`;
+    }
     if (UI.timelineDurationVal) UI.timelineDurationVal.innerText = `(${state.exportDuration}s)`;
     if (UI.timelineDurationInput && document.activeElement !== UI.timelineDurationInput) {
       UI.timelineDurationInput.value = tc;
@@ -1501,9 +1511,8 @@ function initApp() {
       const parsed = parseDurationInput(UI.timelineDurationInput.value);
       if (parsed) {
         setProjectDuration(parsed);
-      } else {
-        UI.timelineDurationInput.value = formatTimecode(state.exportDuration);
       }
+      UI.timelineDurationInput.value = formatTimecode(state.exportDuration);
     };
     UI.timelineDurationInput.addEventListener('change', applyTimelineInput);
     UI.timelineDurationInput.addEventListener('keydown', (e) => {
@@ -1519,9 +1528,8 @@ function initApp() {
       const parsed = parseDurationInput(UI.exportDurationInput.value);
       if (parsed) {
         setProjectDuration(parsed);
-      } else {
-        UI.exportDurationInput.value = formatTimecode(state.exportDuration);
       }
+      UI.exportDurationInput.value = formatTimecode(state.exportDuration);
     };
     UI.exportDurationInput.addEventListener('change', applyExportInput);
     UI.exportDurationInput.addEventListener('keydown', (e) => {

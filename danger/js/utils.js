@@ -108,16 +108,60 @@ export function parseDurationInput(raw) {
 }
 
 
+export function getMinimumRequiredTimelineDuration() {
+  let maxEndTime = 0;
+  if (state.texts && state.texts.length > 0) {
+    for (const t of state.texts) {
+      if (typeof t.endTime === 'number' && t.endTime > maxEndTime) {
+        maxEndTime = t.endTime;
+      } else if (typeof t.startTime === 'number' && t.startTime > maxEndTime) {
+        maxEndTime = t.startTime;
+      }
+    }
+  }
+  if (state.graphics && state.graphics.length > 0) {
+    for (const g of state.graphics) {
+      if (typeof g.endTime === 'number' && g.endTime > maxEndTime) {
+        maxEndTime = g.endTime;
+      } else if (typeof g.startTime === 'number' && g.startTime > maxEndTime) {
+        maxEndTime = g.startTime;
+      }
+    }
+  }
+  if (state.videoBlocks && state.videoBlocks.length > 0) {
+    for (const v of state.videoBlocks) {
+      if (typeof v.endTime === 'number' && v.endTime > maxEndTime) {
+        maxEndTime = v.endTime;
+      } else if (typeof v.startTime === 'number' && v.startTime > maxEndTime) {
+        maxEndTime = v.startTime;
+      }
+    }
+  }
+  if (state.glitchTriggers && state.glitchTriggers.length > 0) {
+    for (const gt of state.glitchTriggers) {
+      const end = (gt.time || 0) + (gt.duration || 0.2);
+      if (end > maxEndTime) {
+        maxEndTime = end;
+      }
+    }
+  }
+  const baseMin = state.isDangerZone ? 5 : 1;
+  return Math.max(baseMin, Math.ceil(maxEndTime));
+}
+
+
 export function getTimelineDuration() {
+  const minRequired = getMinimumRequiredTimelineDuration();
+  let dur = 5.0;
   if (state.exportMode === 'duration') {
-    return state.exportDuration;
+    dur = state.exportDuration;
   } else {
     const absSpeed = Math.abs(state.zoomSpeed);
     if (absSpeed > 0.0001) {
-      return state.exportLoops / absSpeed;
+      dur = state.exportLoops / absSpeed;
     }
-    return 5.0; // fallback
   }
+  return Math.max(minRequired, dur);
 }
 
 

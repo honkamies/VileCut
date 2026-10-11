@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { UI } from './ui.js';
-import { getTimelineDuration, formatDurationLabel, formatTimecode } from './utils.js';
+import { getTimelineDuration, formatDurationLabel, formatTimecode, getMinimumRequiredTimelineDuration } from './utils.js';
 import { stopAudioSource, syncAudioPlayback, activeAudioGain } from './audio.js';
 
 
@@ -491,14 +491,25 @@ export function updateTimelineTracks() {
     
     UI.timelineTracks.appendChild(row);
   }
+
+  updateTimelineRuler();
 }
 
 export function updateTimelineRuler() {
   if (!UI.timelineRuler) return;
   const dur = getTimelineDuration();
+  const minRequired = getMinimumRequiredTimelineDuration();
   
   if (UI.timelineDurationSlider) {
+    UI.timelineDurationSlider.min = minRequired;
     UI.timelineDurationSlider.value = Math.round(dur);
+    UI.timelineDurationSlider.title = minRequired > 5 
+      ? `Timeline duration (${minRequired}s - 600s). Minimum locked by timeline elements.`
+      : `Drag to adjust duration (5s - 10m)`;
+  }
+  if (UI.exportDuration) {
+    UI.exportDuration.min = minRequired;
+    UI.exportDuration.value = Math.round(dur);
   }
   if (UI.timelineDurationVal) {
     UI.timelineDurationVal.innerText = `(${Math.round(dur)}s)`;

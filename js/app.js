@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { UI } from './ui.js';
-import { getPseudoRandom, loadConfiguredFonts, getTimelineDuration, generateUUID } from './utils.js';
+import { getPseudoRandom, loadConfiguredFonts, getTimelineDuration, generateUUID, getMinimumRequiredTimelineDuration } from './utils.js';
 import { ImageProcessor, drawInspectorPreview, drawMaskGraph } from './masking.js';
 import { GlitchManager } from './glitch.js';
 import { stopAudioSource, syncAudioPlayback, getAudioContext, activeAudioGain, activeAudioSource } from './audio.js';
@@ -1432,15 +1432,29 @@ document.addEventListener('DOMContentLoaded', () => {
     updatePlayhead();
   });
 
-  UI.exportDuration.addEventListener('input', (e) => {
-    state.exportDuration = parseInt(e.target.value);
-    UI.exportDurationVal.innerText = `${state.exportDuration}s`;
+  function setProjectDuration(dur) {
+    const minRequired = getMinimumRequiredTimelineDuration();
+    state.exportDuration = Math.min(60, Math.max(minRequired, Math.round(dur)));
+
+    if (UI.exportDuration) {
+      UI.exportDuration.min = minRequired;
+      UI.exportDuration.value = state.exportDuration;
+    }
+    if (UI.exportDurationVal) {
+      UI.exportDurationVal.innerText = `${state.exportDuration}s`;
+    }
+
     if (UI.timelineDurationSlider) {
+      UI.timelineDurationSlider.min = minRequired;
       UI.timelineDurationSlider.value = state.exportDuration;
+      UI.timelineDurationSlider.title = minRequired > 1 
+        ? `Timeline duration (${minRequired}s - 60s). Minimum locked by timeline elements.`
+        : `Drag to adjust loop duration (1s - 60s)`;
     }
     if (UI.timelineDurationVal) {
       UI.timelineDurationVal.innerText = `${state.exportDuration}s`;
     }
+
     updateExportEstimate();
     updateTimelineRuler();
     updateTimelineTracks();
@@ -1448,20 +1462,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.selectedAudio) {
       selectAudio(true);
     }
+  }
+
+  UI.exportDuration.addEventListener('input', (e) => {
+    setProjectDuration(parseInt(e.target.value));
   });
 
   UI.timelineDurationSlider.addEventListener('input', (e) => {
-    state.exportDuration = parseInt(e.target.value);
-    UI.exportDuration.value = state.exportDuration;
-    UI.exportDurationVal.innerText = `${state.exportDuration}s`;
-    UI.timelineDurationVal.innerText = `${state.exportDuration}s`;
-    updateExportEstimate();
-    updateTimelineRuler();
-    updateTimelineTracks();
-    updatePlayhead();
-    if (state.selectedAudio) {
-      selectAudio(true);
-    }
+    setProjectDuration(parseInt(e.target.value));
   });
 
   UI.exportLoops.addEventListener('input', (e) => {
