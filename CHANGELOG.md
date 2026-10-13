@@ -2,6 +2,20 @@
 
 All notable changes to the VileCut application will be documented in this file.
 
+## [1.17.3] - 2026-10-13
+
+### Added
+- **Danger Zone MP4/WebM Export Quality & Bitrate Controls**:
+  - Adjustable video bitrate slider ranging from 6 Mbps to 50 Mbps with responsive fidelity badging (`Standard`, `High Quality`, `Ultra Crisp`, `Master Studio`).
+  - Quick-preset buttons for 1-click selection: `12M Standard`, `24M Ultra Rec` (Recommended default, 4x increase over legacy 6 Mbps default), and `36M Master`.
+  - Context-aware UI visibility: slider automatically hidden when exporting palette-quantized animated GIFs.
+  - Live `BITRATE` metric display added to the rendering HUD overlay alongside Render Speed, ETA, and Stream Target.
+- **H.264 High Profile & Variable Bitrate (VBR) Encoding**:
+  - Automatic feature detection for H.264 High Profile Level 4.2 (`avc1.64002a`) with 8x8 DCT transforms via WebCodecs `VideoEncoder.isConfigSupported()`, drastically cutting down compression macroblocking and ringing artifacts on high-frequency glitch/zoom textures.
+  - Configured `bitrateMode: 'variable'` and `latencyMode: 'quality'` for dynamic bandwidth allocation during motion bursts.
+  - Upgraded AAC and Opus audio encoding from 128 kbps to 192 kbps for studio-grade audio clarity.
+  - Dynamic bitrate applied across both WebCodecs WebM and real-time MediaRecorder fallback export pipelines.
+
 ## [1.17.2] - 2026-10-11
 
 ### Fixed

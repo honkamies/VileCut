@@ -257,6 +257,9 @@ function initApp() {
     if (UI.gifTip) {
       UI.gifTip.style.display = isGif ? 'flex' : 'none';
     }
+    if (UI.exportBitrateGroup) {
+      UI.exportBitrateGroup.style.display = isGif ? 'none' : 'flex';
+    }
     if (UI.mp4Warning) {
       const hasWebCodecs = typeof window.VideoEncoder !== 'undefined';
       if (state.exportFormat === 'mp4' && !hasWebCodecs) {
@@ -268,6 +271,44 @@ function initApp() {
     if (UI.btnExportVideo) {
       UI.btnExportVideo.innerHTML = isGif ? '<i data-lucide="download"></i> Begin GIF Export' : '<i data-lucide="download"></i> Begin Video Export';
       if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+    }
+  }
+
+  function updateBitrateDisplay(mbps) {
+    if (!UI.exportBitrateVal) return;
+    let label = 'Ultra Crisp (Recommended)';
+    let color = 'var(--danger-primary)';
+    if (mbps <= 8) {
+      label = 'Standard (Smaller File)';
+      color = '#94a3b8';
+    } else if (mbps <= 16) {
+      label = 'High Quality';
+      color = 'var(--cyan)';
+    } else if (mbps <= 28) {
+      label = 'Ultra Crisp (Zero Artifacts)';
+      color = 'var(--danger-primary)';
+    } else {
+      label = 'Master Studio (Pristine)';
+      color = '#39ff14';
+    }
+    UI.exportBitrateVal.innerText = `${mbps} Mbps (${label})`;
+    UI.exportBitrateVal.style.color = color;
+
+    if (UI.btnBitratePresets) {
+      UI.btnBitratePresets.forEach(btn => {
+        const bVal = parseInt(btn.dataset.bitrate, 10);
+        if (bVal === mbps) {
+          btn.style.background = 'rgba(255,230,0,0.15)';
+          btn.style.borderColor = 'var(--danger-primary)';
+          btn.style.color = 'var(--danger-primary)';
+          btn.style.fontWeight = '700';
+        } else {
+          btn.style.background = 'rgba(255,255,255,0.06)';
+          btn.style.borderColor = 'rgba(255,255,255,0.15)';
+          btn.style.color = '#94a3b8';
+          btn.style.fontWeight = '400';
+        }
+      });
     }
   }
 
@@ -1635,6 +1676,26 @@ function initApp() {
     UI.videoFadeOutDurationVal.innerText = `${state.videoFadeOutDuration.toFixed(1)}s`;
     renderFrame(state.time);
   });
+
+  // Video Export Bitrate & Quality Bindings
+  if (UI.exportBitrate) {
+    UI.exportBitrate.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      state.exportBitrateMbps = val;
+      updateBitrateDisplay(val);
+    });
+  }
+
+  if (UI.btnBitratePresets) {
+    UI.btnBitratePresets.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseInt(btn.dataset.bitrate, 10);
+        if (UI.exportBitrate) UI.exportBitrate.value = val;
+        state.exportBitrateMbps = val;
+        updateBitrateDisplay(val);
+      });
+    });
+  }
 
   // Video Export Click Bindings
   UI.btnExportVideo.addEventListener('click', () => {
@@ -3261,6 +3322,7 @@ function initApp() {
     state.exportFormat = UI.exportFormat.value;
   }
   updateMp4WarningVisibility();
+  updateBitrateDisplay(state.exportBitrateMbps || 24);
   if (UI.glitchMonochrome) {
     state.glitchMonochrome = UI.glitchMonochrome.checked;
   }

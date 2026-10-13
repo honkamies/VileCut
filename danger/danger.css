@@ -139,8 +139,8 @@
 /* Export Overlay Danger Metrics */
 .export-danger-metrics {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(75px, 1fr));
+  gap: 8px;
   margin: 14px 0 16px 0;
   width: 100%;
 }

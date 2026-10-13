@@ -161,6 +161,7 @@ export const storeInstance = new Store({
   videoFadeOutActive: false,
   videoFadeOutDuration: 0.5,
   exportResolution: '1080',
+  exportBitrateMbps: 24,
   exportCancel: false
 });
 

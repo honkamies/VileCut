@@ -38,10 +38,13 @@ export class VideoExporter {
     if (titleEl) {
       if (state.exportFormat === 'gif') {
         titleEl.innerText = 'Rendering Animated GIF';
+        if (UI.exportBitrateMetric) UI.exportBitrateMetric.innerText = 'N/A';
       } else if (state.exportFormat === 'webm') {
         titleEl.innerText = 'Rendering WebM Video Sequence (VP9/Opus)';
+        if (UI.exportBitrateMetric) UI.exportBitrateMetric.innerText = `${state.exportBitrateMbps || 24} Mbps`;
       } else {
         titleEl.innerText = 'Rendering Extended Video Sequence (MP4/H.264)';
+        if (UI.exportBitrateMetric) UI.exportBitrateMetric.innerText = `${state.exportBitrateMbps || 24} Mbps`;
       }
     }
 
@@ -196,6 +199,12 @@ export class VideoExporter {
       UI.exportStreamMode.className = `metric-val ${isDirectDisk ? 'text-green' : 'text-yellow'}`;
     }
 
+    const bitrateMbps = state.exportBitrateMbps || 24;
+    const targetBitrateBps = bitrateMbps * 1000000;
+    if (UI.exportBitrateMetric) {
+      UI.exportBitrateMetric.innerText = `${bitrateMbps} Mbps`;
+    }
+
     const muxer = new Muxer({
       target: target,
       video: {
@@ -215,6 +224,25 @@ export class VideoExporter {
     let videoEncoder = null;
     let audioEncoder = null;
 
+    // Detect highest supported H.264 profile (High Profile Level 4.2 reduces macroblocking artifacts with 8x8 transform)
+    let selectedCodec = 'avc1.64002a'; // High Profile Level 4.2
+    if (typeof VideoEncoder.isConfigSupported === 'function') {
+      try {
+        const supportHigh = await VideoEncoder.isConfigSupported({
+          codec: 'avc1.64002a',
+          width: resW,
+          height: resH,
+          bitrate: targetBitrateBps,
+          framerate: fps
+        });
+        if (!supportHigh || !supportHigh.supported) {
+          selectedCodec = 'avc1.4d002a'; // Main Profile Level 4.2 fallback
+        }
+      } catch (e) {
+        selectedCodec = 'avc1.4d002a';
+      }
+    }
+
     try {
       videoEncoder = new VideoEncoder({
         output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
@@ -224,16 +252,30 @@ export class VideoExporter {
         }
       });
       videoEncoder.configure({
-        codec: 'avc1.4d002a', // H.264 Main Profile, Level 4.2
+        codec: selectedCodec,
         width: resW,
         height: resH,
-        bitrate: 6000000,
+        bitrate: targetBitrateBps,
+        bitrateMode: 'variable',
         framerate: fps,
         latencyMode: 'quality'
       });
     } catch (e) {
-      console.error("VideoEncoder configuration failed:", e);
-      throw new Error("Could not configure VideoEncoder. H.264 profile avc1.4d002a may not be supported by this browser.");
+      console.warn(`VideoEncoder failed with ${selectedCodec}, trying avc1.4d002a fallback:`, e);
+      try {
+        videoEncoder.configure({
+          codec: 'avc1.4d002a',
+          width: resW,
+          height: resH,
+          bitrate: targetBitrateBps,
+          bitrateMode: 'variable',
+          framerate: fps,
+          latencyMode: 'quality'
+        });
+      } catch (fallbackErr) {
+        console.error("VideoEncoder configuration failed:", fallbackErr);
+        throw new Error("Could not configure VideoEncoder. H.264 profile may not be supported by this browser.");
+      }
     }
 
     const tempPlaying = state.isPlaying;
@@ -342,7 +384,7 @@ export class VideoExporter {
           codec: 'mp4a.40.2', // AAC-LC
           numberOfChannels: 2,
           sampleRate: sampleRate,
-          bitrate: 128000
+          bitrate: 192000
         });
 
         // Encode audio in chunks of 1024 frames
@@ -720,6 +762,12 @@ export class VideoExporter {
       UI.exportStreamMode.className = `metric-val ${isDirectDisk ? 'text-green' : 'text-yellow'}`;
     }
 
+    const bitrateMbps = state.exportBitrateMbps || 24;
+    const targetBitrateBps = bitrateMbps * 1000000;
+    if (UI.exportBitrateMetric) {
+      UI.exportBitrateMetric.innerText = `${bitrateMbps} Mbps`;
+    }
+
     // Check VP9 vs VP8 support
     let videoCodecString = 'vp09.00.10.08';
     let muxerCodecString = 'V_VP9';
@@ -730,7 +778,7 @@ export class VideoExporter {
           codec: 'vp09.00.10.08',
           width: resW,
           height: resH,
-          bitrate: 6000000,
+          bitrate: targetBitrateBps,
           framerate: fps
         });
         if (!vp9Support || !vp9Support.supported) {
@@ -774,7 +822,8 @@ export class VideoExporter {
         codec: videoCodecString,
         width: resW,
         height: resH,
-        bitrate: 6000000,
+        bitrate: targetBitrateBps,
+        bitrateMode: 'variable',
         framerate: fps,
         latencyMode: 'quality'
       });
@@ -786,7 +835,8 @@ export class VideoExporter {
           codec: 'vp8',
           width: resW,
           height: resH,
-          bitrate: 6000000,
+          bitrate: targetBitrateBps,
+          bitrateMode: 'variable',
           framerate: fps,
           latencyMode: 'quality'
         });
@@ -901,7 +951,7 @@ export class VideoExporter {
           codec: 'opus',
           numberOfChannels: 2,
           sampleRate: sampleRate,
-          bitrate: 128000
+          bitrate: 192000
         });
 
         // Encode audio in chunks of 960 frames (20ms at 48kHz is standard Opus packet size)
@@ -1140,11 +1190,17 @@ export class VideoExporter {
       mimeType = 'video/webm';
     }
 
+    const bitrateMbps = state.exportBitrateMbps || 24;
+    const targetBitrateBps = bitrateMbps * 1000000;
+    if (UI.exportBitrateMetric) {
+      UI.exportBitrateMetric.innerText = `${bitrateMbps} Mbps`;
+    }
+
     state.exportChunks = [];
     try {
       state.exportRecorder = new MediaRecorder(combinedStream, {
         mimeType: mimeType,
-        videoBitsPerSecond: 6000000
+        videoBitsPerSecond: targetBitrateBps
       });
     } catch (err) {
       if (wakeLock) {

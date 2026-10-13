@@ -66,7 +66,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VILECUT</h1>
-        <span class="version-tag">v1.17.2</span>
+        <span class="version-tag">v1.17.3</span>
         <div class="danger-header-badge">
           <span class="danger-pulse"></span>
           <span class="danger-title">⚠️ DANGER ZONE // 10-MIN ENGINE</span>
@@ -1461,6 +1461,25 @@
             </div>
           </div>
 
+          <div class="control-group" id="export-bitrate-group">
+            <div class="slider-header">
+              <label for="export-bitrate"><i data-lucide="gauge" style="width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px;"></i>Video Bitrate & Quality</label>
+              <span id="export-bitrate-val" class="slider-val" style="color: var(--danger-primary); font-weight: 700;">24 Mbps (Ultra Crisp)</span>
+            </div>
+            <input type="range" id="export-bitrate" min="6" max="50" step="1" value="24">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 4px;">
+              <span style="font-size: 0.68rem; color: #64748b;">Range: 6 - 50 Mbps</span>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" class="btn-bitrate-preset small-text-btn" data-bitrate="12" style="font-size: 0.68rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; cursor: pointer;">12M (Standard)</button>
+                <button type="button" class="btn-bitrate-preset small-text-btn active" data-bitrate="24" style="font-size: 0.68rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,230,0,0.15); border: 1px solid var(--danger-primary); color: var(--danger-primary); cursor: pointer; font-weight: 700;">24M (Ultra Rec)</button>
+                <button type="button" class="btn-bitrate-preset small-text-btn" data-bitrate="36" style="font-size: 0.68rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; cursor: pointer;">36M (Master)</button>
+              </div>
+            </div>
+            <div id="export-bitrate-hint" style="font-size: 0.68rem; color: #94a3b8; margin-top: 5px; line-height: 1.3;">
+              Controls H.264 / VP9 compression bitrate. 20–36 Mbps eliminates macroblocking and compression artifacts on fast zooms, glitches, and fine textures.
+            </div>
+          </div>
+
           <div class="control-group-switch" style="margin-top: 10px;">
             <label class="switch-label" for="video-fade-in-active">Global Fade In</label>
             <input type="checkbox" id="video-fade-in-active">
@@ -1785,6 +1804,10 @@
           <div class="metric-item">
             <span class="metric-label">STREAM TARGET</span>
             <span id="export-stream-mode" class="metric-val text-yellow">Direct Disk</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">BITRATE</span>
+            <span id="export-bitrate-metric" class="metric-val text-cyan">24 Mbps</span>
           </div>
         </div>
         <button id="btn-cancel-export" class="btn secondary">Cancel Export</button>
