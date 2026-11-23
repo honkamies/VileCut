@@ -1,8 +1,9 @@
 import { state } from './state.js';
 
-// Reusable scratch canvas to avoid garbage collection stutter
+// Reusable scratch canvas and ImageData to avoid garbage collection stutter
 let geoCanvas = null;
 let geoCtx = null;
+let contourImgData = null;
 
 function getGeoContext(w, h) {
   if (!geoCanvas) {
@@ -16,6 +17,15 @@ function getGeoContext(w, h) {
   return { canvas: geoCanvas, ctx: geoCtx };
 }
 
+function getContourImageData(ctx, w, h) {
+  if (!contourImgData || contourImgData.width !== w || contourImgData.height !== h) {
+    contourImgData = ctx.createImageData(w, h);
+  } else {
+    contourImgData.data.fill(0);
+  }
+  return contourImgData;
+}
+
 export class GeometricFxManager {
   /**
    * Main entry point called by renderer.js on offscreenCtx
@@ -23,33 +33,37 @@ export class GeometricFxManager {
   static apply(renderCtx, w, h) {
     if (!state.geometricEnabled) return;
 
+    const doCurtain = state.geoCurtainActive && state.geoCurtainOpacity > 0;
+    const doContours = state.geoContoursActive && state.geoContourOpacity > 0;
+    const doNodes = !!state.geoNodesActive;
+
+    if (!doCurtain && !doContours && !doNodes) return;
+
+    // Single shared GPU -> CPU pixel readback across all 3 geometric FX passes
+    const srcImgData = renderCtx.getImageData(0, 0, w, h);
+    const srcData = srcImgData.data;
+
     // 1. SPECTRAL EDGE CURTAIN (Extrusions, arbitrary angles, bidirectional, flicker)
-    if (state.geoCurtainActive && state.geoCurtainOpacity > 0) {
-      this.applySpectralCurtain(renderCtx, w, h);
+    if (doCurtain) {
+      this.applySpectralCurtain(renderCtx, w, h, srcData);
     }
 
     // 2. TOPOGRAPHIC CONTOUR ISOLINES (Luminance elevation steps)
-    if (state.geoContoursActive && state.geoContourOpacity > 0) {
-      this.applyContours(renderCtx, w, h);
+    if (doContours) {
+      this.applyContours(renderCtx, w, h, srcData);
     }
 
     // 3. MICRO-HUD GEOMETRY NODES (Contour tangent brackets, crosshairs, diamonds)
-    if (state.geoNodesActive) {
-      this.applyGeometryNodes(renderCtx, w, h);
+    if (doNodes) {
+      this.applyGeometryNodes(renderCtx, w, h, srcData);
     }
   }
 
   /**
    * Enhanced Spectral Edge Curtain
-   * Supports:
-   * - Luminance Trigger Gating: All, Highlights (>50%), Super-Highlights (>75%), Shadows (<40%), Midtones, Custom Range
-   * - Energy Dynamics: scales reach & intensity based on detected pixel brightness
-   * - Color Styling: Source Colors, Neon Boost, Pure Laser White, Custom Tint
-   * - Laser Anchor Beads: radiant micro-dots on detected pixel boundaries
-   * - Directions: Down, Up, Right, Left, 0-360° Angle Degrees
-   * - Bidirectional Extrusion & Analog Shimmer/Flicker
    */
-  static applySpectralCurtain(renderCtx, w, h) {
+  static applySpectralCurtain(renderCtx, w, h, sharedSrcData) {
+    const resScale = w / 1024;
     const directionMode = state.geoCurtainDirection || 'down';
     let angleDeg = 0;
 
@@ -110,13 +124,13 @@ export class GeometricFxManager {
     const { canvas: fxCanvas, ctx: fxCtx } = getGeoContext(w, h);
     fxCtx.clearRect(0, 0, w, h);
 
-    const srcImgData = renderCtx.getImageData(0, 0, w, h);
-    const srcData = srcImgData.data;
+    const srcData = sharedSrcData || renderCtx.getImageData(0, 0, w, h).data;
 
-    // Step spacing based on density slider
-    const step = Math.max(2, Math.round(9 * (1.12 - density)));
+    // Step spacing based on density slider, scaled to canvas resolution
+    const step = Math.max(2, Math.round(9 * (1.12 - density) * resScale));
     const baseLength = Math.max(w, h) * curtainLenRatio;
-    const beamWidth = Math.max(1.5, step * 0.95);
+    const beamWidth = Math.max(1.5 * resScale, step * 0.95);
+    const minPeakDist = Math.round(28 * resScale);
 
     fxCtx.save();
     fxCtx.lineWidth = beamWidth;
@@ -148,7 +162,6 @@ export class GeometricFxManager {
             const minSideLum = Math.min(lumTop, lumBot);
             const edgeLum = (lumTop + lumBot) * 0.5;
 
-            // Check if boundary falls within target brightness gate
             const qualifies = (maxSideLum >= floorLum && minSideLum <= ceilLum);
 
             if (qualifies) {
@@ -164,7 +177,7 @@ export class GeometricFxManager {
               }
 
               if (multiEdge) {
-                const isDistant = foundPeaks.every(p => Math.abs(p.y - y) > 28);
+                const isDistant = foundPeaks.every(p => Math.abs(p.y - y) > minPeakDist);
                 if (isDistant && foundPeaks.length < 2) {
                   foundPeaks.push({ y, idx: sampleIdx, lum: effectiveLum });
                 }
@@ -197,7 +210,7 @@ export class GeometricFxManager {
         }
       }
     } else {
-      // Scan row by row when the angle is horizontally dominant (Right, Left, gentle slopes)
+      // Scan row by row when the angle is horizontally dominant
       for (let y = 2; y < h - 2; y += step) {
         beamIndex++;
         let maxGrad = 0;
@@ -235,7 +248,7 @@ export class GeometricFxManager {
               }
 
               if (multiEdge) {
-                const isDistant = foundPeaks.every(p => Math.abs(p.x - x) > 28);
+                const isDistant = foundPeaks.every(p => Math.abs(p.x - x) > minPeakDist);
                 if (isDistant && foundPeaks.length < 2) {
                   foundPeaks.push({ x, idx: sampleIdx, lum: effectiveLum });
                 }
@@ -279,8 +292,7 @@ export class GeometricFxManager {
   }
 
   /**
-   * Helper to draw a single linear gradient curtain beam with optional bidirectional flow,
-   * brightness dynamics, color styling, and laser anchor beads
+   * Helper to draw a single linear gradient curtain beam
    */
   static drawCurtainBeam(
     ctx, x0, y0, dx, dy, baseLength,
@@ -372,7 +384,7 @@ export class GeometricFxManager {
     ctx.lineTo(xEnd, yEnd);
     ctx.stroke();
 
-    // 4. Origin Anchor Bead (Laser Bead anchored on detected edge point)
+    // 4. Origin Anchor Bead
     if (originDot) {
       const beadRadius = Math.max(1.8, beamWidth * 0.65);
       ctx.save();
@@ -389,18 +401,15 @@ export class GeometricFxManager {
   /**
    * Topographic Luminance Contours
    */
-  static applyContours(renderCtx, w, h) {
+  static applyContours(renderCtx, w, h, sharedSrcData) {
     const levels = Math.max(4, Math.min(32, state.geoContourLevels || 12));
     const opacity = (state.geoContourOpacity || 70) / 100;
     const color = state.geoContourColor || '#39ff14';
 
     const { canvas: fxCanvas, ctx: fxCtx } = getGeoContext(w, h);
-    fxCtx.clearRect(0, 0, w, h);
+    const srcData = sharedSrcData || renderCtx.getImageData(0, 0, w, h).data;
 
-    const srcImgData = renderCtx.getImageData(0, 0, w, h);
-    const srcData = srcImgData.data;
-
-    const outImgData = fxCtx.createImageData(w, h);
+    const outImgData = getContourImageData(fxCtx, w, h);
     const outData = outImgData.data;
 
     const rgb = hexToRgb(color);
@@ -454,17 +463,17 @@ export class GeometricFxManager {
   /**
    * Micro-HUD Geometry Nodes
    */
-  static applyGeometryNodes(renderCtx, w, h) {
+  static applyGeometryNodes(renderCtx, w, h, sharedSrcData) {
+    const resScale = w / 1024;
     const density = (state.geoNodeDensity !== undefined ? state.geoNodeDensity : 35) / 100;
-    const size = Math.max(3, Math.min(24, state.geoNodeSize || 8));
-    const strokeWidth = Math.max(0.5, Math.min(3, state.geoNodeStroke || 1));
+    const size = Math.max(3, Math.min(24, state.geoNodeSize || 8)) * resScale;
+    const strokeWidth = Math.max(0.5, Math.min(3, state.geoNodeStroke || 1)) * resScale;
     const shape = state.geoNodeShape || 'bracket';
     const color = state.geoNodeColor || '#00f2fe';
 
-    const srcImgData = renderCtx.getImageData(0, 0, w, h);
-    const src = srcImgData.data;
+    const src = sharedSrcData || renderCtx.getImageData(0, 0, w, h).data;
 
-    const step = Math.max(8, Math.round(28 * (1.15 - density)));
+    const step = Math.max(8, Math.round(28 * (1.15 - density) * resScale));
     const edgeThreshold = 55;
 
     renderCtx.save();

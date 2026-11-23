@@ -1,6 +1,6 @@
-import { state } from './state.js';
+import { state, HistoryManager } from './state.js';
 import { UI } from './ui.js';
-import { getTimelineDuration, getMinimumRequiredTimelineDuration } from './utils.js';
+import { getTimelineDuration, formatDurationLabel, formatTimecode, getMinimumRequiredTimelineDuration } from './utils.js';
 import { stopAudioSource, syncAudioPlayback, activeAudioGain } from './audio.js';
 import { renderFrame } from './renderer.js';
 
@@ -9,32 +9,50 @@ function createTimelineLabel(startS, middleText, endS, icon = '') {
   cleanLabel.style.pointerEvents = 'none';
   
   const t1 = document.createElement('span');
-  t1.className = 'time-sig';
+  t1.className = 'time-sig time-sig-start';
   t1.textContent = `[${startS.toFixed(1)}s]`;
   
   const mid = document.createTextNode(icon ? ` ${icon} ${middleText} ` : ` ${middleText} `);
   
   const t2 = document.createElement('span');
-  t2.className = 'time-sig';
+  t2.className = 'time-sig time-sig-end';
   t2.textContent = `[${endS.toFixed(1)}s]`;
   
   cleanLabel.append(t1, mid, t2);
   return cleanLabel;
 }
 
+function updateBlockElementInPlace(blockId, startTime, endTime, dur) {
+  if (!UI.timelineTracks) return false;
+  const blockEl = UI.timelineTracks.querySelector(`.timeline-block[data-id="${blockId}"]`);
+  if (!blockEl) return false;
+
+  const startPct = (startTime / dur) * 100;
+  const widthPct = ((endTime - startTime) / dur) * 100;
+  blockEl.style.left = `${startPct}%`;
+  blockEl.style.width = `${widthPct}%`;
+
+  const t1 = blockEl.querySelector('.time-sig-start');
+  const t2 = blockEl.querySelector('.time-sig-end');
+  if (t1) t1.textContent = `[${startTime.toFixed(1)}s]`;
+  if (t2) t2.textContent = `[${endTime.toFixed(1)}s]`;
+  return true;
+}
+
 // drag text id is global
 let dragMode = null; // 'seek', 'move', 'resize-left', 'resize-right'
 let dragTextId = null;
+let hasDragged = false;
 let dragStartMouseX = 0;
 let dragStartMouseY = 0;
 let lastDragTrackY = 0;
 let dragStartBlockStart = 0;
 let dragStartBlockEnd = 0;
+let dragStartSourceOffset = 0;
 
 let isZoomDragging = false;
 let zoomDragStartX = 0;
 let zoomDragStartZoom = 1.0;
-
 
 function clampTextIntervals() {
   const dur = getTimelineDuration();
@@ -84,9 +102,10 @@ function clampVideoIntervals() {
       vid.endTime = dur;
     }
     
-    // Prevent video block from being longer than the source file duration
-    if (vid.endTime - vid.startTime > vid.duration) {
-      vid.endTime = vid.startTime + vid.duration;
+    // Prevent video block from being longer than the remaining source file duration
+    const remainingSourceDur = Math.max(0.2, vid.duration - (vid.sourceOffset || 0));
+    if (vid.endTime - vid.startTime > remainingSourceDur) {
+      vid.endTime = vid.startTime + remainingSourceDur;
     }
     
     if (vid.endTime - vid.startTime < 0.2) {
@@ -127,46 +146,50 @@ export function swapTracks(trackIndexA, trackIndexB) {
 }
 
 export function normalizeTracks() {
-  const foregroundBlocks = [];
-  
+  // Collect all unique foreground track indices (>= 1) currently in use
+  const usedTracks = new Set();
   state.texts.forEach(t => {
     const trk = t.trackIndex !== undefined ? t.trackIndex : 0;
-    if (trk >= 1) {
-      foregroundBlocks.push({ type: 'text', ref: t });
-    }
+    if (trk >= 1) usedTracks.add(trk);
   });
-
   state.graphics.forEach(g => {
     const trk = g.trackIndex !== undefined ? g.trackIndex : 0;
-    if (trk >= 1) {
-      foregroundBlocks.push({ type: 'graphic', ref: g });
-    }
+    if (trk >= 1) usedTracks.add(trk);
   });
-
   if (state.videoBlocks) {
     state.videoBlocks.forEach(v => {
       const trk = v.trackIndex !== undefined ? v.trackIndex : 0;
-      if (trk >= 1) {
-        foregroundBlocks.push({ type: 'video', ref: v });
-      }
+      if (trk >= 1) usedTracks.add(trk);
     });
   }
 
-  // Sort foreground blocks: preserve relative order, use selected block and startTime as tie-breakers
-  foregroundBlocks.sort((a, b) => {
-    const trackDiff = (a.ref.trackIndex || 0) - (b.ref.trackIndex || 0);
-    if (trackDiff !== 0) return trackDiff;
-    const aSelected = a.ref.id === state.selectedTextId || a.ref.id === state.selectedGraphicId || a.ref.id === state.selectedVideoId;
-    const bSelected = b.ref.id === state.selectedTextId || b.ref.id === state.selectedGraphicId || b.ref.id === state.selectedVideoId;
-    if (aSelected && !bSelected) return 1;
-    if (!aSelected && bSelected) return -1;
-    return a.ref.startTime - b.ref.startTime;
+  // Map existing distinct track indices to 1-indexed contiguous track numbers
+  const sortedTracks = Array.from(usedTracks).sort((a, b) => a - b);
+  const trackMap = new Map();
+  sortedTracks.forEach((oldIdx, i) => {
+    trackMap.set(oldIdx, i + 1);
   });
 
-  // Assign clean, consecutive, unique track indices starting from 1
-  foregroundBlocks.forEach((blockItem, index) => {
-    blockItem.ref.trackIndex = index + 1;
+  state.texts.forEach(t => {
+    const trk = t.trackIndex !== undefined ? t.trackIndex : 0;
+    if (trk >= 1 && trackMap.has(trk)) {
+      t.trackIndex = trackMap.get(trk);
+    }
   });
+  state.graphics.forEach(g => {
+    const trk = g.trackIndex !== undefined ? g.trackIndex : 0;
+    if (trk >= 1 && trackMap.has(trk)) {
+      g.trackIndex = trackMap.get(trk);
+    }
+  });
+  if (state.videoBlocks) {
+    state.videoBlocks.forEach(v => {
+      const trk = v.trackIndex !== undefined ? v.trackIndex : 0;
+      if (trk >= 1 && trackMap.has(trk)) {
+        v.trackIndex = trackMap.get(trk);
+      }
+    });
+  }
 
   // Force re-trigger of state proxy setters
   state.texts = [...state.texts];
@@ -174,6 +197,42 @@ export function normalizeTracks() {
   if (state.videoBlocks) {
     state.videoBlocks = [...state.videoBlocks];
   }
+}
+
+function getOrCreateAudioWaveformCanvas(track) {
+  if (track._waveformCanvas) return track._waveformCanvas;
+  if (!track.peaks) return null;
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'audio-waveform-canvas';
+  canvas.width = 1000;
+  canvas.height = 40;
+  const wCtx = canvas.getContext('2d');
+  wCtx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  const grad = wCtx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, 'rgba(0, 242, 254, 0.55)');
+  grad.addColorStop(0.5, 'rgba(155, 81, 224, 0.4)');
+  grad.addColorStop(1, 'rgba(0, 242, 254, 0.55)');
+  
+  wCtx.fillStyle = grad;
+  
+  const barWidth = 2;
+  const gap = 1;
+  const totalBars = Math.floor(canvas.width / (barWidth + gap));
+  const peakStep = track.peaks.length / totalBars;
+  
+  for (let i = 0; i < totalBars; i++) {
+    const peakIdx = Math.floor(i * peakStep);
+    const peak = track.peaks[peakIdx] || 0;
+    const barHeight = peak * canvas.height * 0.85;
+    const x = i * (barWidth + gap);
+    const y = (canvas.height - barHeight) / 2;
+    wCtx.fillRect(x, y, barWidth, Math.max(1.5, barHeight));
+  }
+
+  track._waveformCanvas = canvas;
+  return canvas;
 }
 
 export function updateTimelineTracks() {
@@ -202,13 +261,11 @@ export function updateTimelineTracks() {
 
   // 1. Render Visual Tracks (Highest index at top, lowest at bottom)
   for (let trackIdx = maxTrackIdx; trackIdx >= 0; trackIdx--) {
-    // Find blocks on this track index
     const trackTexts = state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === trackIdx);
     const trackGraphics = state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === trackIdx);
     const trackVideos = state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === trackIdx) : [];
 
     if (trackTexts.length === 0 && trackGraphics.length === 0 && trackVideos.length === 0) {
-      // Skip empty tracks to keep timeline clean
       continue;
     }
 
@@ -410,35 +467,9 @@ export function updateTimelineTracks() {
     const cleanLabel = createTimelineLabel(track.timelineStart, track.fileName || 'Audio', track.timelineStart + track.duration, '🎵');
     block.appendChild(cleanLabel);
     
-    if (track.peaks) {
-      const canvas = document.createElement('canvas');
-      canvas.className = 'audio-waveform-canvas';
-      canvas.width = 1000;
-      canvas.height = 40;
-      const wCtx = canvas.getContext('2d');
-      wCtx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      const grad = wCtx.createLinearGradient(0, 0, 0, canvas.height);
-      grad.addColorStop(0, 'rgba(0, 242, 254, 0.55)');
-      grad.addColorStop(0.5, 'rgba(155, 81, 224, 0.4)');
-      grad.addColorStop(1, 'rgba(0, 242, 254, 0.55)');
-      
-      wCtx.fillStyle = grad;
-      
-      const barWidth = 2;
-      const gap = 1;
-      const totalBars = Math.floor(canvas.width / (barWidth + gap));
-      const peakStep = track.peaks.length / totalBars;
-      
-      for (let i = 0; i < totalBars; i++) {
-        const peakIdx = Math.floor(i * peakStep);
-        const peak = track.peaks[peakIdx] || 0;
-        const barHeight = peak * canvas.height * 0.85;
-        const x = i * (barWidth + gap);
-        const y = (canvas.height - barHeight) / 2;
-        wCtx.fillRect(x, y, barWidth, Math.max(1.5, barHeight));
-      }
-      block.appendChild(canvas);
+    const wfCanvas = getOrCreateAudioWaveformCanvas(track);
+    if (wfCanvas) {
+      block.appendChild(wfCanvas);
     }
     
     row.appendChild(block);
@@ -491,23 +522,33 @@ export function updateTimelineRuler() {
   if (!UI.timelineRuler) return;
   const dur = getTimelineDuration();
   const minRequired = getMinimumRequiredTimelineDuration();
+  const maxAllowed = state.isDangerZone ? 600 : 60;
+  const sliderMin = state.isDangerZone ? 5 : 1;
   
   if (UI.timelineDurationSlider) {
-    UI.timelineDurationSlider.min = minRequired;
-    UI.timelineDurationSlider.value = Math.round(dur);
-    UI.timelineDurationSlider.title = minRequired > 1 
-      ? `Timeline duration (${minRequired}s - 60s). Minimum locked by timeline elements.`
-      : `Drag to adjust loop duration (1s - 60s)`;
+    UI.timelineDurationSlider.min = sliderMin;
+    UI.timelineDurationSlider.max = maxAllowed;
+    UI.timelineDurationSlider.value = Math.min(maxAllowed, Math.round(dur));
+    UI.timelineDurationSlider.title = minRequired > sliderMin
+      ? `Timeline duration (${minRequired}s - ${maxAllowed}s). Minimum locked by timeline elements.`
+      : `Drag to adjust duration`;
   }
   if (UI.exportDuration) {
-    UI.exportDuration.min = minRequired;
-    UI.exportDuration.value = Math.round(dur);
+    UI.exportDuration.min = sliderMin;
+    UI.exportDuration.max = maxAllowed;
+    UI.exportDuration.value = Math.min(maxAllowed, Math.round(dur));
   }
   if (UI.timelineDurationVal) {
-    UI.timelineDurationVal.innerText = `${dur.toFixed(1)}s`;
+    UI.timelineDurationVal.innerText = state.isDangerZone ? `(${Math.round(dur)}s)` : `${Math.round(dur)}s`;
   }
-  
-  const pixelsPerSecond = 30 * state.timelineZoom;
+  if (UI.timelineDurationInput && document.activeElement !== UI.timelineDurationInput) {
+    UI.timelineDurationInput.value = formatTimecode(dur);
+  }
+  if (UI.exportDurationInput && document.activeElement !== UI.exportDurationInput) {
+    UI.exportDurationInput.value = formatTimecode(dur);
+  }
+
+  const pixelsPerSecond = (state.isDangerZone ? 30 : 120) * state.timelineZoom;
   const wrapper = UI.timelinePlayhead?.closest('.timeline-body-wrapper');
   const minWidth = wrapper ? wrapper.clientWidth : 700;
   const widthPx = Math.max(minWidth, Math.round(dur * pixelsPerSecond));
@@ -534,7 +575,6 @@ export function updateTimelineRuler() {
   for (let t = 0; t <= dur; t += interval) {
     const percent = (t / dur) * 100;
     const tick = document.createElement('div');
-    // For 0.1s intervals, major ticks are at whole seconds
     const isMajor = interval < 1.0 ? (Math.abs(t - Math.round(t)) < 0.01) : (t % 1 === 0);
     tick.className = 'ruler-tick' + (isMajor ? ' major' : '');
     tick.style.left = `${percent}%`;
@@ -566,6 +606,34 @@ export function updatePlayhead() {
   }
 }
 
+export function resetInspectorOrders() {
+  const sections = [
+    UI.textSettingsSection,
+    UI.audioSettingsSection,
+    UI.videoSettingsSection,
+    UI.graphicSettingsSection,
+    UI.glitchTriggerSettingsSection
+  ];
+  sections.forEach(s => {
+    if (s) {
+      s.style.order = '';
+      s.classList.remove('inspector-hoisted');
+    }
+  });
+}
+
+export function hoistInspectorSection(section) {
+  resetInspectorOrders();
+  if (section) {
+    section.style.order = '-1';
+    section.classList.add('inspector-hoisted');
+    const leftPanel = section.closest('.left-panel') || document.querySelector('.left-panel');
+    if (leftPanel) {
+      leftPanel.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+}
+
 export function selectText(id) {
   state.selectedTextId = id;
   state.selectedAudio = false;
@@ -579,11 +647,13 @@ export function selectText(id) {
 
   if (id === null) {
     UI.textSettingsSection.style.display = 'none';
+    resetInspectorOrders();
   } else {
     const txt = state.texts.find(t => t.id === id);
     if (txt) {
       UI.textSettingsSection.style.display = 'flex';
       UI.textSettingsSection.classList.remove('collapsed');
+      hoistInspectorSection(UI.textSettingsSection);
       UI.textContent.value = txt.text;
       UI.textFont.value = txt.font;
       UI.textSize.value = txt.size;
@@ -628,10 +698,14 @@ export function selectAudio(isSelected) {
   
   if (!isSelected || !state.audioTrack) {
     UI.audioSettingsSection.style.display = 'none';
+    if (!state.selectedTextId && !state.selectedVideoId && !state.selectedGraphicId && !state.selectedGlitchTriggerId) {
+      resetInspectorOrders();
+    }
   } else {
     const track = state.audioTrack;
     UI.audioSettingsSection.style.display = 'flex';
     UI.audioSettingsSection.classList.remove('collapsed');
+    hoistInspectorSection(UI.audioSettingsSection);
     UI.audioFileName.innerText = track.fileName;
     UI.audioFileDuration.innerText = `Length: ${track.buffer.duration.toFixed(1)}s`;
     
@@ -669,11 +743,15 @@ export function selectVideo(id) {
 
   if (id === null) {
     UI.videoSettingsSection.style.display = 'none';
+    if (!state.selectedTextId && !state.selectedAudio && !state.selectedGraphicId && !state.selectedGlitchTriggerId) {
+      resetInspectorOrders();
+    }
   } else {
     const block = state.videoBlocks.find(v => v.id === id);
     if (block) {
       UI.videoSettingsSection.style.display = 'flex';
       UI.videoSettingsSection.classList.remove('collapsed');
+      hoistInspectorSection(UI.videoSettingsSection);
       UI.videoFileName.innerText = block.fileName;
       if (UI.videoFileDuration) {
         UI.videoFileDuration.innerText = `Length: ${block.duration.toFixed(1)}s`;
@@ -725,6 +803,13 @@ export function selectVideo(id) {
           UI.videoPosYVal.innerText = `${Math.round((block.y !== undefined ? block.y : 0.0) * 100)}%`;
         }
       }
+      if (UI.videoScale) {
+        const sc = block.scale !== undefined ? block.scale : 100;
+        UI.videoScale.value = sc;
+        if (UI.videoScaleVal) {
+          UI.videoScaleVal.innerText = `${sc}%`;
+        }
+      }
       if (UI.videoEdgeFade) {
         UI.videoEdgeFade.value = block.edgeFade !== undefined ? block.edgeFade : 0;
         if (UI.videoEdgeFadeVal) {
@@ -755,26 +840,30 @@ export function selectGlitchTrigger(triggerId) {
   state.selectedGraphicId = null;
   state.selectedGlitchTriggerId = triggerId;
 
-  // Clear selections on other blocks in UI
   document.querySelectorAll('.timeline-block').forEach(b => b.classList.remove('selected'));
   if (triggerId) {
     const activeBlock = document.querySelector(`.timeline-block[data-id="${triggerId}"]`);
     if (activeBlock) activeBlock.classList.add('selected');
   }
 
-  // Update sidebar panel visibility
   UI.textSettingsSection.style.display = 'none';
   UI.audioSettingsSection.style.display = 'none';
   UI.videoSettingsSection.style.display = 'none';
   UI.graphicSettingsSection.style.display = 'none';
 
   if (!triggerId || !state.glitchTriggers) {
-    if (UI.glitchTriggerSettingsSection) UI.glitchTriggerSettingsSection.style.display = 'none';
+    if (UI.glitchTriggerSettingsSection) {
+      UI.glitchTriggerSettingsSection.style.display = 'none';
+      if (!state.selectedTextId && !state.selectedAudio && !state.selectedVideoId && !state.selectedGraphicId) {
+        resetInspectorOrders();
+      }
+    }
   } else {
     const trigger = state.glitchTriggers.find(t => t.id === triggerId);
     if (trigger && UI.glitchTriggerSettingsSection) {
       UI.glitchTriggerSettingsSection.style.display = 'flex';
       UI.glitchTriggerSettingsSection.classList.remove('collapsed');
+      hoistInspectorSection(UI.glitchTriggerSettingsSection);
       
       if (UI.glitchTriggerTime) {
         UI.glitchTriggerTime.value = trigger.time;
@@ -807,11 +896,15 @@ export function selectGraphic(id) {
 
   if (id === null) {
     UI.graphicSettingsSection.style.display = 'none';
+    if (!state.selectedTextId && !state.selectedAudio && !state.selectedVideoId && !state.selectedGlitchTriggerId) {
+      resetInspectorOrders();
+    }
   } else {
     const grp = state.graphics.find(g => g.id === id);
     if (grp) {
       UI.graphicSettingsSection.style.display = 'flex';
       UI.graphicSettingsSection.classList.remove('collapsed');
+      hoistInspectorSection(UI.graphicSettingsSection);
       
       UI.graphicFileName.innerText = grp.fileName || 'Loaded Graphic';
       UI.graphicTimelineStart.value = grp.startTime;
@@ -896,12 +989,13 @@ export function initTimelineEvents() {
     }
     
     if (dragMode && dragTextId) {
+      dragStartMouseX = e.clientX;
       dragStartMouseY = e.clientY;
       lastDragTrackY = e.clientY;
+      hasDragged = false;
       if (dragTextId === 'audio') {
         const track = state.audioTrack;
         if (track) {
-          dragStartMouseX = e.clientX;
           dragStartBlockStart = track.timelineStart;
           dragStartBlockEnd = track.timelineStart + track.duration;
         }
@@ -911,6 +1005,7 @@ export function initTimelineEvents() {
           dragStartMouseX = e.clientX;
           dragStartBlockStart = vid.startTime;
           dragStartBlockEnd = vid.endTime;
+          dragStartSourceOffset = vid.sourceOffset || 0;
         }
       } else if (dragTextId.startsWith('grp_')) {
         const grp = state.graphics.find(g => g.id === dragTextId);
@@ -936,7 +1031,6 @@ export function initTimelineEvents() {
     }
   });
 
-
   window.addEventListener('mousemove', (e) => {
     if (isZoomDragging) {
       const dx = e.clientX - zoomDragStartX;
@@ -960,6 +1054,15 @@ export function initTimelineEvents() {
       renderFrame(state.time);
       syncAudioPlayback();
     } else {
+      const moveDist = Math.hypot(e.clientX - dragStartMouseX, e.clientY - dragStartMouseY);
+      if (!hasDragged && moveDist < 4) {
+        return;
+      }
+      if (!hasDragged) {
+        HistoryManager.pushState();
+        hasDragged = true;
+      }
+
       const dxSec = ((e.clientX - dragStartMouseX) / rect.width) * duration;
       
       if (dragTextId === 'audio') {
@@ -982,11 +1085,14 @@ export function initTimelineEvents() {
           if (state.isPlaying) {
             syncAudioPlayback();
           }
-          updateTimelineTracks();
+          if (!updateBlockElementInPlace('audio', track.timelineStart, track.timelineStart + track.duration, duration)) {
+            updateTimelineTracks();
+          }
         }
       } else if (dragTextId.startsWith('vid_')) {
         const vid = state.videoBlocks.find(v => v.id === dragTextId);
         if (vid) {
+          let trackChanged = false;
           if (dragMode === 'move') {
             let newStart = dragStartBlockStart + dxSec;
             const blockLen = dragStartBlockEnd - dragStartBlockStart;
@@ -1004,25 +1110,32 @@ export function initTimelineEvents() {
             vid.startTime = newStart;
             vid.endTime = newEnd;
 
-            // Vertical drag track re-ordering (unified)
             const dy = e.clientY - lastDragTrackY;
             if (Math.abs(dy) > 24) {
               const currentTrackIdx = vid.trackIndex !== undefined ? vid.trackIndex : 0;
               if (dy > 0 && currentTrackIdx > 0) {
                 vid.trackIndex = currentTrackIdx - 1;
                 lastDragTrackY = e.clientY;
+                trackChanged = true;
               } else if (dy < 0) {
                 vid.trackIndex = currentTrackIdx + 1;
                 lastDragTrackY = e.clientY;
+                trackChanged = true;
               }
             }
           } else if (dragMode === 'resize-left') {
-            let newStart = dragStartBlockStart + dxSec;
-            newStart = Math.max(0, Math.min(vid.endTime - 0.2, newStart));
-            vid.startTime = newStart;
+            // True NLE trim: moving left edge right cuts/skips the hidden beginning via sourceOffset
+            const minDelta = Math.max(-dragStartBlockStart, -dragStartSourceOffset);
+            const maxDelta = (vid.endTime - 0.2) - dragStartBlockStart;
+            const delta = Math.max(minDelta, Math.min(maxDelta, dxSec));
+            vid.startTime = dragStartBlockStart + delta;
+            vid.sourceOffset = Math.max(0, dragStartSourceOffset + delta);
           } else if (dragMode === 'resize-right') {
+            // True NLE trim: moving right edge left cuts the end; extending stops at remaining source length
+            const remainingSource = Math.max(0.2, vid.duration - (vid.sourceOffset || 0));
+            const maxEnd = Math.min(duration, vid.startTime + remainingSource);
             let newEnd = dragStartBlockEnd + dxSec;
-            newEnd = Math.min(duration, Math.max(vid.startTime + 0.2, newEnd));
+            newEnd = Math.min(maxEnd, Math.max(vid.startTime + 0.2, newEnd));
             vid.endTime = newEnd;
           }
           
@@ -1033,12 +1146,18 @@ export function initTimelineEvents() {
             }
           }
           
-          updateTimelineTracks();
+          if (trackChanged || !updateBlockElementInPlace(vid.id, vid.startTime, vid.endTime, duration)) {
+            updateTimelineTracks();
+          }
+          if (typeof window.syncVideoPlayback === 'function') {
+            window.syncVideoPlayback();
+          }
           renderFrame(state.time);
         }
       } else if (dragTextId.startsWith('grp_')) {
         const grp = state.graphics.find(g => g.id === dragTextId);
         if (grp) {
+          let trackChanged = false;
           if (dragMode === 'move') {
             let newStart = dragStartBlockStart + dxSec;
             let newEnd = dragStartBlockEnd + dxSec;
@@ -1056,16 +1175,17 @@ export function initTimelineEvents() {
             grp.startTime = newStart;
             grp.endTime = newEnd;
 
-            // Vertical drag track re-ordering (unified)
             const dy = e.clientY - lastDragTrackY;
             if (Math.abs(dy) > 24) {
               const currentTrackIdx = grp.trackIndex !== undefined ? grp.trackIndex : 0;
-              if (dy > 0 && currentTrackIdx > 0) {
+              if (dy > 0 && currentTrackIdx > 1) {
                 grp.trackIndex = currentTrackIdx - 1;
                 lastDragTrackY = e.clientY;
+                trackChanged = true;
               } else if (dy < 0) {
                 grp.trackIndex = currentTrackIdx + 1;
                 lastDragTrackY = e.clientY;
+                trackChanged = true;
               }
             }
           } else if (dragMode === 'resize-left') {
@@ -1085,7 +1205,9 @@ export function initTimelineEvents() {
             UI.graphicTimelineEndVal.innerText = `${grp.endTime.toFixed(1)}s`;
           }
           
-          updateTimelineTracks();
+          if (trackChanged || !updateBlockElementInPlace(grp.id, grp.startTime, grp.endTime, duration)) {
+            updateTimelineTracks();
+          }
           renderFrame(state.time);
         }
       } else if (dragTextId.startsWith('gt_')) {
@@ -1099,12 +1221,18 @@ export function initTimelineEvents() {
             UI.glitchTriggerTime.value = trigger.time;
             UI.glitchTriggerTimeVal.innerText = `${trigger.time.toFixed(2)}s`;
           }
-          updateTimelineTracks();
+          const triggerEl = UI.timelineTracks?.querySelector(`.timeline-block[data-id="${trigger.id}"]`);
+          if (triggerEl) {
+            triggerEl.style.left = `${(trigger.time / duration) * 100}%`;
+          } else {
+            updateTimelineTracks();
+          }
           renderFrame(state.time);
         }
       } else {
         const txt = state.texts.find(t => t.id === dragTextId);
         if (txt) {
+          let trackChanged = false;
           if (dragMode === 'move') {
             let newStart = dragStartBlockStart + dxSec;
             let newEnd = dragStartBlockEnd + dxSec;
@@ -1122,16 +1250,17 @@ export function initTimelineEvents() {
             txt.startTime = newStart;
             txt.endTime = newEnd;
 
-            // Vertical drag track re-ordering (unified)
             const dy = e.clientY - lastDragTrackY;
             if (Math.abs(dy) > 24) {
               const currentTrackIdx = txt.trackIndex !== undefined ? txt.trackIndex : 0;
-              if (dy > 0 && currentTrackIdx > 0) {
+              if (dy > 0 && currentTrackIdx > 1) {
                 txt.trackIndex = currentTrackIdx - 1;
                 lastDragTrackY = e.clientY;
+                trackChanged = true;
               } else if (dy < 0) {
                 txt.trackIndex = currentTrackIdx + 1;
                 lastDragTrackY = e.clientY;
+                trackChanged = true;
               }
             }
           } else if (dragMode === 'resize-left') {
@@ -1144,7 +1273,9 @@ export function initTimelineEvents() {
             txt.endTime = newEnd;
           }
           
-          updateTimelineTracks();
+          if (trackChanged || !updateBlockElementInPlace(txt.id, txt.startTime, txt.endTime, duration)) {
+            updateTimelineTracks();
+          }
           renderFrame(state.time);
         }
       }
@@ -1157,12 +1288,24 @@ export function initTimelineEvents() {
       document.body.style.cursor = '';
     }
     if (dragMode === 'move') {
-      normalizeTracks();
+      if (hasDragged) {
+        normalizeTracks();
+        HistoryManager.pushState();
+      }
       updateTimelineTracks();
       renderFrame(state.time);
+    } else if (dragMode === 'resize-left' || dragMode === 'resize-right') {
+      if (hasDragged) {
+        HistoryManager.pushState();
+      }
+      updateTimelineTracks();
+      renderFrame(state.time);
+    } else if (dragMode) {
+      updateTimelineTracks();
     }
     dragMode = null;
     dragTextId = null;
+    hasDragged = false;
   });
 
   if (UI.btnTimelineZoom) {
@@ -1185,8 +1328,9 @@ export function initTimelineEvents() {
       if (wrapper) {
         const dur = getTimelineDuration();
         const wrapperWidth = wrapper.clientWidth - 8;
+        const basePps = state.isDangerZone ? 30 : 120;
         const targetPps = Math.max(10, wrapperWidth / dur);
-        state.timelineZoom = targetPps / 30;
+        state.timelineZoom = targetPps / basePps;
         updateTimelineRuler();
         updateTimelineTracks();
         updatePlayhead();

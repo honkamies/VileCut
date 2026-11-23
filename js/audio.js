@@ -79,7 +79,7 @@ function scheduleVolumeEnvelope(gainNode, ctx, track, loopTime, dur) {
 export function syncAudioPlayback() {
   stopAudioSource();
 
-  if (!state.isPlaying || !state.audioTrack || !state.imageLoaded || state.isExporting) {
+  if (!state.isPlaying || !state.audioTrack || state.isExporting) {
     return;
   }
 

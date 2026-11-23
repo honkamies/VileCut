@@ -36,11 +36,22 @@ export const UI = {
   btnInfoModal: document.getElementById('btn-info-modal'),
   infoOverlay: document.getElementById('info-overlay'),
   btnCloseInfo: document.getElementById('btn-close-info'),
-  welcomeOverlay: document.getElementById('welcome-overlay'),
-  btnCloseWelcome: document.getElementById('btn-close-welcome'),
-  btnCloseWelcomeX: document.getElementById('btn-close-welcome-x'),
   btnResetSettingsOnly: document.getElementById('btn-reset-settings-only'),
   btnReloadApp: document.getElementById('btn-reload-app'),
+
+  // Step-by-Step Creation Wizard
+  btnOpenWizard: document.getElementById('btn-open-wizard'),
+  projectWizardOverlay: document.getElementById('project-wizard-overlay'),
+  btnWizardCloseX: document.getElementById('btn-wizard-close-x'),
+  btnWizardSkipAll: document.getElementById('btn-wizard-skip-all'),
+  btnWizardLaunchStudio: document.getElementById('btn-wizard-launch-studio'),
+
+  // Undo / Redo & Project Save / Load
+  btnUndo: document.getElementById('btn-undo'),
+  btnRedo: document.getElementById('btn-redo'),
+  btnSaveProject: document.getElementById('btn-save-project'),
+  btnLoadProject: document.getElementById('btn-load-project'),
+  projectFileInput: document.getElementById('project-file-input'),
 
   btnStepBack: document.getElementById('btn-step-back'),
   btnPlayPause: document.getElementById('btn-play-pause'),
@@ -141,6 +152,35 @@ export const UI = {
   geoContourOpacityVal: document.getElementById('geo-contour-opacity-val'),
   geoContourColor: document.getElementById('geo-contour-color'),
 
+  // Vintage VHS & Analog Camcorder FX
+  vhsEnabled: document.getElementById('vhs-enabled'),
+  vhsPreset: document.getElementById('vhs-preset'),
+  vhsScope: document.getElementById('vhs-scope'),
+  vhsVerticalJump: document.getElementById('vhs-vertical-jump'),
+  vhsVerticalJumpVal: document.getElementById('vhs-vertical-jump-val'),
+  vhsDegradationBlur: document.getElementById('vhs-degradation-blur'),
+  vhsDegradationBlurVal: document.getElementById('vhs-degradation-blur-val'),
+  vhsDegradationOpacity: document.getElementById('vhs-degradation-opacity'),
+  vhsDegradationOpacityVal: document.getElementById('vhs-degradation-opacity-val'),
+  vhsTrackingNoise: document.getElementById('vhs-tracking-noise'),
+  vhsTrackingNoiseVal: document.getElementById('vhs-tracking-noise-val'),
+  vhsTapeCrease: document.getElementById('vhs-tape-crease'),
+  vhsTapeCreaseVal: document.getElementById('vhs-tape-crease-val'),
+  vhsWobble: document.getElementById('vhs-wobble'),
+  vhsWobbleVal: document.getElementById('vhs-wobble-val'),
+  vhsGrain: document.getElementById('vhs-grain'),
+  vhsGrainVal: document.getElementById('vhs-grain-val'),
+  vhsSoftness: document.getElementById('vhs-softness'),
+  vhsSoftnessVal: document.getElementById('vhs-softness-val'),
+  vhsChromaBleed: document.getElementById('vhs-chroma-bleed'),
+  vhsChromaBleedVal: document.getElementById('vhs-chroma-bleed-val'),
+  vhsColorDecay: document.getElementById('vhs-color-decay'),
+  vhsColorDecayVal: document.getElementById('vhs-color-decay-val'),
+  vhsScanlines: document.getElementById('vhs-scanlines'),
+  vhsScanlinesVal: document.getElementById('vhs-scanlines-val'),
+  vhsScanlineBlur: document.getElementById('vhs-scanline-blur'),
+  vhsScanlineBlurVal: document.getElementById('vhs-scanline-blur-val'),
+
   exportMode: document.getElementById('export-mode'),
   exportDuration: document.getElementById('export-duration'),
   exportDurationVal: document.getElementById('export-duration-val'),
@@ -154,13 +194,26 @@ export const UI = {
   gifTip: document.getElementById('gif-tip'),
   exportFps: document.getElementById('export-fps'),
   exportResolution: document.getElementById('export-resolution'),
+  exportBitrateGroup: document.getElementById('export-bitrate-group'),
+  exportBitrate: document.getElementById('export-bitrate'),
+  exportBitrateVal: document.getElementById('export-bitrate-val'),
+  btnBitratePresets: document.querySelectorAll('.btn-bitrate-preset'),
+  exportBitrateMetric: document.getElementById('export-bitrate-metric'),
   btnExportVideo: document.getElementById('btn-export-video'),
   btnExportFramePng: document.getElementById('btn-export-frame-png'),
   exportOverlay: document.getElementById('export-overlay'),
   exportProgressBar: document.getElementById('export-progress-bar'),
   exportFrameCount: document.getElementById('export-frame-count'),
   exportPercent: document.getElementById('export-percent'),
+  exportSpeed: document.getElementById('export-speed'),
+  exportEta: document.getElementById('export-eta'),
+  exportStreamMode: document.getElementById('export-stream-mode'),
+  exportDurationInput: document.getElementById('export-duration-input'),
+  btnExportMatchSong: document.getElementById('btn-export-match-song'),
+  exportSongDurBadge: document.getElementById('export-song-dur-badge'),
+  durationPresets: document.querySelectorAll('.btn-preset'),
   btnCancelExport: document.getElementById('btn-cancel-export'),
+
   videoFadeInActive: document.getElementById('video-fade-in-active'),
   videoFadeInDurationGroup: document.getElementById('video-fade-in-duration-group'),
   videoFadeInDuration: document.getElementById('video-fade-in-duration'),
@@ -173,6 +226,8 @@ export const UI = {
   // Text Settings Section References
   textSettingsSection: document.getElementById('text-settings-section'),
   textContent: document.getElementById('text-content'),
+  btnTextToCaps: document.getElementById('btn-text-to-caps'),
+  btnAllTextsToCaps: document.getElementById('btn-all-texts-to-caps'),
   textFont: document.getElementById('text-font'),
   btnLoadFont: document.getElementById('btn-load-font'),
   fontFileInput: document.getElementById('font-file-input'),
@@ -216,6 +271,7 @@ export const UI = {
   audioFadeOut: document.getElementById('audio-fade-out'),
   audioFadeOutVal: document.getElementById('audio-fade-out-val'),
   btnDeleteAudio: document.getElementById('btn-delete-audio'),
+  btnSyncTimelineToAudio: document.getElementById('btn-sync-timeline-to-audio'),
 
   // Video Settings Section References
   videoSettingsSection: document.getElementById('video-settings-section'),
@@ -251,7 +307,6 @@ export const UI = {
   videoFadeOut: document.getElementById('video-fade-out'),
   videoFadeOutVal: document.getElementById('video-fade-out-val'),
 
-
   // Graphic Settings Section References
   graphicSettingsSection: document.getElementById('graphic-settings-section'),
   graphicFileName: document.getElementById('graphic-file-name'),
@@ -283,8 +338,6 @@ export const UI = {
   graphicGlowRadiusVal: document.getElementById('graphic-glow-radius-val'),
   graphicGlowColor: document.getElementById('graphic-glow-color'),
 
-
-
   // Timeline Panel References
   btnAddTextNew: document.getElementById('btn-add-text-new'),
   btnAddTextSame: document.getElementById('btn-add-text-same'),
@@ -299,9 +352,13 @@ export const UI = {
   btnTimelineEnd: document.getElementById('btn-timeline-end'),
   btnTimelineSnapshotPng: document.getElementById('btn-timeline-snapshot-png'),
   timelineDurationControl: document.getElementById('timeline-duration-control'),
+  timelineDurationInput: document.getElementById('timeline-duration-input'),
   timelineDurationSlider: document.getElementById('timeline-duration-slider'),
   timelineDurationVal: document.getElementById('timeline-duration-val'),
+  btnMatchSongDuration: document.getElementById('btn-match-song-duration'),
+  songDurBadge: document.getElementById('song-dur-badge'),
   timelineRuler: document.getElementById('timeline-ruler'),
+
   timelineTracks: document.getElementById('timeline-tracks'),
   timelinePlayhead: document.getElementById('timeline-playhead'),
   timelineTracksContainer: document.getElementById('timeline-tracks-container'),
@@ -319,9 +376,41 @@ export const UI = {
   glitchTriggerSeverity: document.getElementById('glitch-trigger-severity'),
   glitchTriggerSeverityVal: document.getElementById('glitch-trigger-severity-val'),
   btnDeleteGlitchTrigger: document.getElementById('btn-delete-glitch-trigger'),
-  
+
   // Dynamic Auto-Expand Panel References
   layerIsolationSection: document.getElementById('layer-isolation-section'),
   extractedLayersSection: document.getElementById('extracted-layers-section'),
-  infiniteMotionSection: document.getElementById('infinite-motion-section')
+  infiniteMotionSection: document.getElementById('infinite-motion-section'),
+
+  // Lyrics Generator References
+  btnImportLyrics: document.getElementById('btn-import-lyrics'),
+  lyricsFileInput: document.getElementById('lyrics-file-input'),
+  lyricsModalOverlay: document.getElementById('lyrics-modal-overlay'),
+  btnCloseLyricsX: document.getElementById('btn-close-lyrics-x'),
+  lyricsSummaryText: document.getElementById('lyrics-summary-text'),
+  lyricsFont: document.getElementById('lyrics-font'),
+  lyricsPosition: document.getElementById('lyrics-position'),
+  lyricsTransition: document.getElementById('lyrics-transition'),
+  lyricsGlitch: document.getElementById('lyrics-glitch'),
+  lyricsColor: document.getElementById('lyrics-color'),
+  lyricsSize: document.getElementById('lyrics-size'),
+  lyricsSizeVal: document.getElementById('lyrics-size-val'),
+  lyricsAutoExpand: document.getElementById('lyrics-auto-expand'),
+  lyricsPreviewList: document.getElementById('lyrics-preview-list'),
+  btnApplyLyricsClear: document.getElementById('btn-apply-lyrics-clear'),
+  btnApplyLyricsAppend: document.getElementById('btn-apply-lyrics-append'),
+  btnCancelLyrics: document.getElementById('btn-cancel-lyrics'),
+  btnBrowseLyrics: document.getElementById('btn-browse-lyrics'),
+  btnLoadDemoLrc: document.getElementById('btn-load-demo-lrc'),
+  lyricsDropArea: document.getElementById('lyrics-drop-area'),
+  btnUploadLyricsFont: document.getElementById('btn-upload-lyrics-font'),
+  lyricsFontFileInput: document.getElementById('lyrics-font-file-input'),
+  lyricsFontUploadedBadge: document.getElementById('lyrics-font-uploaded-badge'),
+  lyricsFontUploadedName: document.getElementById('lyrics-font-uploaded-name'),
+  lyricsStylePreviewContainer: document.getElementById('lyrics-style-preview-container'),
+  lyricsStylePreviewSample: document.getElementById('lyrics-style-preview-sample'),
+  lyricsStylePreviewSub: document.getElementById('lyrics-style-preview-sub'),
+  lyricsPreviewFontLabel: document.getElementById('lyrics-preview-font-label'),
+  btnLyricsToCaps: document.getElementById('btn-lyrics-to-caps'),
+  lyricsUppercase: document.getElementById('lyrics-uppercase')
 };

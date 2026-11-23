@@ -28,7 +28,10 @@ export function rgbToHsl(r, g, b) {
 
 export async function loadConfiguredFonts() {
   try {
-    const response = await fetch('fonts/fonts.json');
+    let response = await fetch('fonts/fonts.json');
+    if (!response.ok && state.isDangerZone) {
+      response = await fetch('../fonts/fonts.json');
+    }
     if (!response.ok) return;
     
     const fontList = await response.json();
@@ -45,21 +48,65 @@ export async function loadConfiguredFonts() {
           const loadedFace = await fontFace.load();
           document.fonts.add(loadedFace);
 
-          // Add option to select menu
           const option = document.createElement('option');
           option.value = font.name;
           option.innerText = font.name + " (Custom)";
-          UI.textFont.appendChild(option);
-          
-          console.log("Successfully loaded custom font from config: " + font.name);
+          if (UI.textFont) UI.textFont.appendChild(option);
         } catch (err) {
           console.error("Failed to load font from config: " + font.name, err);
         }
       }
     }
   } catch (err) {
-    console.log("No custom fonts configuration found in fonts/fonts.json");
+    // Custom fonts configuration is optional
   }
+}
+
+export function formatDurationLabel(sec) {
+  if (sec < 60) return `${Math.round(sec)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return s > 0 ? `${m}m ${s}s (${Math.round(sec)}s)` : `${m}m (${Math.round(sec)}s)`;
+}
+
+export function formatTimecode(sec) {
+  if (typeof sec !== 'number' || isNaN(sec)) return '0:00';
+  const totalSecs = Math.max(0, Math.round(sec));
+  const m = Math.floor(totalSecs / 60);
+  const s = (totalSecs % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+export function parseDurationInput(raw) {
+  if (raw === null || raw === undefined) return null;
+  const str = String(raw).trim();
+  if (!str) return null;
+  const maxDur = state.isDangerZone ? 600 : 15;
+  const minDur = state.isDangerZone ? 5 : 1;
+  
+  if (str.includes(':')) {
+    const parts = str.split(':').map(p => parseFloat(p));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      return Math.min(maxDur, Math.max(minDur, Math.round(parts[0] * 60 + parts[1])));
+    }
+    if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+      return Math.min(maxDur, Math.max(minDur, Math.round(parts[0] * 3600 + parts[1] * 60 + parts[2])));
+    }
+  }
+  
+  const mMatch = str.match(/(\d+)\s*m/i);
+  const sMatch = str.match(/(\d+)\s*s/i);
+  if (mMatch || sMatch) {
+    const m = mMatch ? parseInt(mMatch[1], 10) : 0;
+    const s = sMatch ? parseInt(sMatch[1], 10) : 0;
+    return Math.min(maxDur, Math.max(minDur, m * 60 + s));
+  }
+  
+  const num = parseFloat(str);
+  if (!isNaN(num) && num > 0) {
+    return Math.min(maxDur, Math.max(minDur, Math.round(num)));
+  }
+  return null;
 }
 
 export function getMinimumRequiredTimelineDuration() {
@@ -103,10 +150,9 @@ export function getMinimumRequiredTimelineDuration() {
   return Math.max(baseMin, Math.ceil(maxEndTime));
 }
 
-
 export function getTimelineDuration() {
   const minRequired = getMinimumRequiredTimelineDuration();
-  let dur = 5.0;
+  let dur = state.isDangerZone ? 30.0 : 5.0;
   if (state.exportMode === 'duration') {
     dur = state.exportDuration;
   } else {
@@ -121,10 +167,7 @@ export function getTimelineDuration() {
 export function getAdjustedZoomSpeed(dur) {
   const rawSpeed = state.zoomSpeed;
   if (Math.abs(rawSpeed) < 0.0001) return 0;
-  const rawCycles = dur * Math.abs(rawSpeed);
-  const cycles = Math.max(1, Math.round(rawCycles));
-  const direction = rawSpeed >= 0 ? 1 : -1;
-  return direction * (cycles / dur);
+  return rawSpeed;
 }
 
 const fadeMaskCanvas = document.createElement('canvas');
@@ -193,4 +236,3 @@ export function generateUUID() {
     return v.toString(16);
   });
 }
-

@@ -2,6 +2,102 @@
 
 All notable changes to the VileCut application will be documented in this file.
 
+## [1.20.0] - 2026-11-23
+
+### Added
+- **Step-by-Step New Project Wizard**: Guided 7-step creation workflow (Introduction, Aspect Ratio & Duration, Multi-Image Camera Tunnel with real-time preview, Graphic Overlays with canvas drag placement, Audio import, Typography, and Review & Launch).
+- **Viewport Backdrop Brightness Slider**: Minimalist sun brightness control in the viewport toolbar to shift the surrounding studio matte from black to grey (with transparent `.canvas-container` and crisp `#main-canvas` border) for clear framing on dark videos without affecting exports.
+- **VHS Scanline Blur & Tape Degradation Blur/Opacity**: Added Gaussian-blurred CRT phosphor scanlines (`#vhs-scanline-blur`, default `50%`) and dedicated Tape Degradation Blur (`40%`) + Opacity (`75%`) controls for RF static bursts, V-Hold bars, and tape crease flare.
+- **True NLE Video Trimming (`sourceOffset`)**: Trimming the start or end handle of a video clip on the timeline now cleanly cuts/hides the trimmed portion across live playback, scrubbing, Undo/Redo, and all export pipelines.
+
+### Changed
+- **Removed Old Welcome Modal & Retro OSD Display**: Entering the editor from the wizard now goes straight into the studio paused (`IDLE`) with no legacy welcome popup, and the Retro OSD HUD has been removed from VHS FX.
+- **Unified Infinite Zoom Speed**: Aligned wizard and editor Diving Speed sliders (`-0.5` to `0.5`, continuous speed with zero loop-quantization lock and smooth phase accumulation).
+- **Full Audio Track Import from Wizard**: Preserves full `audioBuffer.duration`, fade controls, and song duration badges so wizard-imported audio can be freely dragged and repositioned on the timeline.
+
+### Fixed
+- **App Initialization & HistoryManager**: Fixed syntax error in `app.js` and added `canUndo()`, `canRedo()`, and `onChange` notifications to `HistoryManager` in `state.js`.
+- **Video Scale**: Wired `#video-scale` slider and applied `scale` across Track 0 background and Track 1+ foreground video rendering.
+- **Save & Load Project (`.vilecut.json`)**: Fixed double-JSON-stringification bug, embedded tunnel deck images & graphic overlays as Data URLs, added backward-compatible unwrapping for previously saved files, and added media manifest notices for large external audio/video files.
+- **Timeline Duration Slider Stability**: Aligned Basic mode max duration to `60s` and kept slider `.min` stable to eliminate jumpy thumb movement.
+- **Smooth Video Exports & 9× Faster VHS FX**: Eliminated per-frame `seeked` stalls in real-time `MediaRecorder` export, added explicit CFR frame `duration` to WebCodecs `VideoFrame`s, and downscaled the internal VHS CPU pixel pass to max `640px` on the long edge.
+
+## [1.19.1] - 2026-11-20
+
+### Fixed
+- **Resolved Studio Initialization Freeze & Dead Canvas on Arrival**:
+  - Fixed root cause where skipping the wizard via "Skip to Full studio view" left `state.imageLoaded = false`, `state.uploadedImages = []`, and the engine stopped, causing the editor to appear completely stuck and frozen with a blank canvas.
+  - Implemented `launchDefaultStudio()` in `WizardManager`: Clicking "Skip to Full studio view" or closing the wizard now instantly boots the studio with the default Cyber Sigil sample, pre-configured graphic overlay, and "VILECUT // STUDIO" typography title, with active 60 FPS playback running immediately.
+  - Initialized `resizeMainCanvas()` and `engine.start()` in `initApp()`, ensuring the background playback loop runs from application load.
+  - Removed restrictive `if (state.uploadedImages.length === 0 || state.layers.length === 0) return;` block in `renderer.js`: `renderFrame()` now gracefully renders standalone video blocks, graphic overlays, text layers, and VHS effects even when no tunnel image is present.
+  - Updated `resizeMainCanvas()` to properly size the container and offscreen buffers based on `state.aspectRatio` without requiring an uploaded image.
+  - Synchronized `updateImagesDeckUI()` invocation upon wizard launch so deck thumbnails and layer controls immediately unhide and reflect active images.
+- **Fixed Video Background & Video Block Playback**:
+  - Removed `&& state.imageLoaded` requirement in `syncVideoPlayback()` and `engine.subscribe`: Video playback now starts and syncs smoothly with the playhead clock whether a tunnel image is loaded or not.
+  - Relaxed drift tolerance threshold to `0.25s` to eliminate micro-jitter seeking in HTML5 video elements during playback.
+  - Automatically call `updateTimelineTracks()`, `resizeMainCanvas()`, and `renderFrame()` upon loading a video via the timeline video file input.
+- **Enhanced Main Studio Canvas Click-and-Drag for Overlays**:
+  - Removed `!state.imageLoaded` check on `mainCanvas` `mousedown` and `touchstart` event listeners.
+  - Added a generous hit-testing margin (`hitMargin = Math.max(24, Math.round(cw * 0.04))`) in `findOverlayAtCoords` for graphics, text, and videos, making canvas elements easy to grab.
+  - Enabled active-overlay and single-overlay fallback: Clicking anywhere on the canvas when a graphic or text is selected directly drags that overlay, matching the intuitive behavior of the wizard preview.
+  - Ensured `renderFrame(state.time)` is called continuously on every mousemove and touchmove during dragging for 60 FPS zero-lag pointer tracking.
+  - Synchronized coordinate sliders (`UI.graphicPosX`, `UI.graphicPosY`, etc.) and percentage labels in real time during canvas dragging.
+
+## [1.19.0] - 2026-11-20
+
+### Security & Infrastructure
+- **Upgraded NGINX Base Image to `nginx/1.31.9` (`nginx:alpine`)**:
+  - Fully remediated the critical November 18, 2026 "nginx2root" vulnerability collection:
+    - **CVE-2026-123007**: HTTP/2 flow control integer overflow/underflow (CVSS 9.2).
+    - **CVE-2026-123633**: HTTP/2 upstream proxying use-after-free (CVSS 9.2).
+    - **CVE-2026-121810**: HTTP/3 QUIC upstream proxying use-after-free.
+    - **CVE-2026-123634**: DNS resolver and request-mirror use-after-free.
+    - **CVE-2026-113425**: Mail proxy memory corruption.
+  - Upgraded base image from `nginx:1.27-alpine` (`1.27.5`) to official mainline `nginx:alpine` (`1.31.9`).
+  - Added `absolute_redirect off;` and regex rewrite in `nginx.conf` (`location ~* ^(/.+?)\.+$ { return 301 $1; }`) to automatically redirect accidental trailing periods (e.g. from copy-pasting URLs ending with sentence periods: `/vilecut.html.` -> `/vilecut.html`), preserving client port `:8090`.
+  - Configured `index vilecut.html index.html;` so accessing root `/` directly loads the modular VileCut studio.
+
+### Added
+- **Expanded 7-Step Project Creation Wizard ("Lähestymistapa" Workflow - `js/wizard.js`)**:
+  - A guided, highly intuitive 7-step onboarding and project setup workflow that welcomes users and walks them through project construction sequentially before opening the complex multi-panel studio:
+    - **Step 1: Introduction, Capabilities & Client-Side Privacy**:
+      - Educational welcome hero introducing VileCut as the Chaotic Motion Machine / underground visual loop laboratory.
+      - **What Is VileCut?**: Highlighting 2D raster luminosity slicing into recursive infinite-zoom camera tunnels and live glitch synthesis.
+      - **What You Can Achieve**: Showcasing social-media vertical visuals (TikTok, Reels, Shorts), cinematic stage visuals (16:9, 21:9), album art loops, cybernetic title cards, and analog VHS tape decays.
+      - **Security & Total Privacy (100% In-Browser)**: Clearly informing users that VileCut runs entirely client-side using WebCodecs and Canvas 2D on their own GPU/CPU—media files, music, and exports never leave their machine or touch an external server.
+      - Navigation options: "Start Project: Choose Framing ->" or "Skip to Full studio view" (top redundant skip removed for cleaner UI).
+    - **Step 2: Welcome & Project Framing**: Aspect ratio selection cards (`9:16 Vertical` for TikTok/Reels/Shorts, `16:9 Landscape` for YouTube/Cinema, `1:1 Square` for Instagram Feed/Album Art, `4:5 Portrait`, `21:9 Ultrawide`) with visual aspect previews, and duration presets (3s, 5s standard loop, 10s, 15s, 30s).
+    - **Step 3: Camera Tunnel Core Graphic**: Multi-image batch selection enabled (`<input multiple>`) matching the main application's Source Images Deck capabilities. Users can select multiple images via browser file dialog or multi-file drag-and-drop. Features instant procedural "Cyber Sigil" celestial mandala generator (enabling immediate 1-click preview without local files), real-time offscreen 60 FPS deterministic tunnel loop preview canvas with live controls for layer depth (3–16 depth bands), zoom speed (0.1x–2.0x), and edge feather/fade (0–40%). Automatically adapts dimensions to match the selected aspect ratio and commits the full deck to studio timeline.
+    - **Step 4: Overlays, Logos & Canvas Placement**: Live camera tunnel renders in the background by default across the chosen aspect ratio canvas. Supports transparent PNG logos, stickers, or badges with real-time interactive **click-and-drag manual positioning** on the canvas, corner drag handles, dashed bounding box, preset placement buttons (Top Header, Direct Center, Bottom Footer, Bottom-Right Bug), dedicated **Horizontal (X) and Vertical (Y) coordinate offset sliders** (-50% to +50%), scale slider (20%–150%), and blend modes (`normal`, `screen`, `multiply`, `overlay`, `color-dodge`). Includes in-app notification that unlimited additional graphic and video layers can be added in the main studio timeline.
+    - **Step 5: Music & Soundtrack**: Audio upload (MP3, WAV, OGG, AAC) with live waveform analyzer canvas rendering peaks in real time, and auto-match project duration toggle to adapt timeline length to audio length. Optional step.
+    - **Step 6: Typography & Title Card**: Live camera tunnel renders in the background of the typography canvas matching the chosen aspect ratio. Features direct **Custom Font Upload** (`.ttf`, `.otf`, `.woff`, `.woff2`) via `FontFace` API with studio persistence, **Text / Lyrics File Import** (`.lrc`, `.txt`), **Font Size slider** (20px–80px), **Cyber Glow Radius slider** (0px–50px), cyberpunk neon glow style presets (`Neon Cyan`, `Hot Pink`, `Pure White`), placement (Top, Center, Bottom), and font family selection. Includes in-app callout that unlimited text and lyrics tracks can be added in the main studio timeline.
+    - **Step 7: Review & Launch**: Dynamic summary overview of all configured elements (aspect ratio, duration, tunnel layers/speed, exact overlay coordinates/scale, audio, text font/size) and a prominent "Launch VileCut Studio & Start Playing" action button that commits all state, isolated layer slices, graphics, audio, and typography directly to the timeline, opens the canvas, and begins 60 FPS playback.
+  - **Dynamic Aspect Ratio Synchronization**: Preview canvases across Step 3, Step 4, and Step 6 dynamically rescale their internal buffer and CSS aspect-ratio according to the user's selected platform format (`9:16`, `16:9`, `1:1`, `4:5`, `21:9`).
+  - **Interactive Stepper Navigation**: Clickable stepper indicators (1 through 7) for immediate jumping between steps.
+  - **Studio Canvas Interaction**: Main studio preview canvas (`UI.mainCanvas`) interactive click-and-drag positioning for graphics, text, and videos with grab/grabbing cursor and hit-testing.
+  - Quick-access button in top navigation bar (`#btn-open-wizard`) with subtle pulsing glow.
+  - Automatic launch on first visit or query parameter trigger (`?wizard=1` or `?mode=wizard`), with `sessionStorage` dismissal memory and `Skip Wizard (Open Studio)` option.
+  - Full keyboard accessibility (Escape to dismiss, back/next navigation).
+  - Mirroring and re-export in `danger/js/wizard.js` for Danger Zone integration.
+
+
+## [1.18.0] - 2026-11-18
+
+### Added
+- **Vintage VHS & Analog Camcorder FX Simulation Engine (`js/vhs_fx.js`)**:
+  - High-performance, zero-allocation 60 FPS analog tape and video camera simulation pipeline integrated seamlessly into real-time canvas preview and offline WebCodecs MP4/WebM/GIF exports.
+  - **Vertical Jump & V-Hold Slip**: 60Hz micro-jitter simulating mechanical tape guide tolerances and intermittent vertical frame rolls exposing the Vertical Blanking Interval (VBI) bar with sync pulses and head-switch fuzz.
+  - **Tracking Noise & RF Static**: Bottom head-switching static bar and wandering RF static bands with horizontal scanline tearing and salt-and-pepper noise.
+  - **Tape Crease / Wrinkle**: Swept horizontal warped bend distortion with localized shear and high-intensity RF loss luma halo flare.
+  - **Wobble & TBC Instability**: Capstan motor sinusoidal flutter, scanline micro-jitter, and top-of-screen "flag waving" curvature.
+  - **1D Bandwidth Softness**: Authentic ~240-line horizontal luma roll-off while maintaining sharp vertical scanlines via GPU-accelerated horizontal downsampling and bilinear reconstruction.
+  - **Chroma Bleed & Color Decays**: NTSC 629kHz color-under down-conversion with horizontal red/blue channel displacement, NTSC 7.5 IRE lifted milky blacks, and vintage cathode phosphor tint.
+  - **CRT Scanlines**: Alternating scanline dimming (`y % 2 === 1`) simulating CRT phosphorus raster lines.
+  - **Retro On-Screen Display (OSD HUD)**: Monospace HUD with drop shadow supporting Camcorder (`REC ●` with pulsing red dot, battery indicator, date, timecode), VCR Playback (`PLAY ▶`, `SP`, tape counter), Security CCTV (`CAM 04`, clock), and custom text.
+  - **Curated Presets**: Quick 1-click presets: *Camcorder 1994 (Handheld Nostalgia)*, *Worn VHS 1988 (Rental Cassette)*, *Damaged Rental Tape (Heavy Static & Crease)*, *Subtle Analog (Warmth & Fine Grain)*, and *Security CCTV 1991 (Scanlines & HUD)*.
+  - **Scope Control**: Switchable processing scope between *Full Composite* (entire video + text/graphic overlays) and *Tunnel Buffer* (processes tunnel before symmetry mirroring).
+  - Full Undo/Redo (`HistoryManager`) and project state serialization support.
+
 ## [1.17.3] - 2026-10-13
 
 ### Added

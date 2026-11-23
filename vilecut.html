@@ -58,12 +58,15 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VILECUT</h1>
-        <span class="version-tag">v1.17.3</span>
+        <span class="version-tag">v1.20.0</span>
       </div>
       <div class="header-actions">
         <a href="danger/" class="btn-header danger-entrance-btn" title="Open Danger Zone Extended 10-Minute Engine">
           <i data-lucide="alert-triangle" class="theme-select-icon"></i> Dangerzone longvideo
         </a>
+        <button id="btn-open-wizard" class="btn-header wizard-entrance-btn" title="Open Step-by-Step Creation Wizard">
+          <i data-lucide="wand-2" class="theme-select-icon"></i> New Project Wizard
+        </button>
         <div id="fps-monitor" class="monitor-badge">
           <span class="label">FPS:</span>
           <span id="fps-value" class="value text-cyan">--</span>
@@ -78,6 +81,19 @@
             <option value="frozen">Frozen Odyssey (Icy Blue)</option>
           </select>
         </div>
+        <button id="btn-undo" class="btn-header" title="Undo (Ctrl+Z)" disabled>
+          <i data-lucide="undo-2" class="theme-select-icon"></i>
+        </button>
+        <button id="btn-redo" class="btn-header" title="Redo (Ctrl+Y)" disabled>
+          <i data-lucide="redo-2" class="theme-select-icon"></i>
+        </button>
+        <button id="btn-save-project" class="btn-header" title="Save Project (.vilecut.json)">
+          <i data-lucide="save" class="theme-select-icon"></i> Save
+        </button>
+        <button id="btn-load-project" class="btn-header" title="Load Project (.vilecut.json)">
+          <i data-lucide="folder-open" class="theme-select-icon"></i> Load
+        </button>
+        <input type="file" id="project-file-input" accept=".json,.vilecut.json" style="display: none;">
         <button id="btn-info-modal" class="btn-header" title="About & Feedback">
           <i data-lucide="info" class="theme-select-icon"></i> Info
         </button>
@@ -741,8 +757,8 @@
             <button id="btn-step-back" class="viewport-btn" title="Step 1 Frame Backward (Left Arrow / ,)">
               <i data-lucide="step-back"></i>
             </button>
-            <button id="btn-play-pause" class="viewport-btn active" title="Play / Pause Animation (Space)">
-              <i data-lucide="pause" id="play-pause-icon"></i>
+            <button id="btn-play-pause" class="viewport-btn" title="Play / Pause Animation (Space)">
+              <i data-lucide="play" id="play-pause-icon"></i>
             </button>
             <button id="btn-step" class="viewport-btn" title="Step 1 Frame Forward (Right Arrow / .)">
               <i data-lucide="step-forward"></i>
@@ -758,6 +774,10 @@
             <button id="btn-toggle-grid" class="viewport-btn" title="Toggle Composition Grid">
               <i data-lucide="grid"></i>
             </button>
+            <div class="viewport-bg-control" title="Viewport Background Brightness (Black → Grey) for dark videos">
+              <i data-lucide="sun" class="viewport-bg-icon"></i>
+              <input type="range" id="viewport-bg-brightness" min="0" max="100" step="1" value="18">
+            </div>
             <button id="btn-reset-view" class="viewport-btn" title="Reset Viewport">
               <i data-lucide="rotate-ccw"></i>
             </button>
@@ -878,7 +898,7 @@
               <label for="zoom-speed">Diving Speed</label>
               <span id="zoom-speed-val" class="slider-val">0.05</span>
             </div>
-            <input type="range" id="zoom-speed" min="-0.2" max="0.2" step="0.005" value="0.05">
+            <input type="range" id="zoom-speed" min="-0.5" max="0.5" step="0.005" value="0.05">
           </div>
 
           <div class="control-group">
@@ -1317,6 +1337,173 @@
           </div>
         </div>
 
+        <!-- Section 3.6: Vintage VHS & Analog Camcorder FX -->
+        <div class="panel-section collapsed" id="vhs-fx-section">
+          <h2 class="section-title"><i data-lucide="tv"></i> Vintage VHS &amp; Old Camera FX</h2>
+          
+          <div class="control-group-switch">
+            <label class="switch-label" for="vhs-enabled">VHS &amp; Old Camera FX</label>
+            <input type="checkbox" id="vhs-enabled">
+          </div>
+
+          <div id="vhs-controls-container" style="margin-top: 10px;">
+            <!-- Preset Selector -->
+            <div class="control-group">
+              <label for="vhs-preset">Curated Analog Preset</label>
+              <div class="select-wrapper">
+                <select id="vhs-preset">
+                  <option value="camcorder" selected>Camcorder 1994 (Handheld Nostalgia)</option>
+                  <option value="worn">Worn VHS 1988 (Rental Cassette)</option>
+                  <option value="damaged">Damaged Rental Tape (Heavy Static &amp; Crease)</option>
+                  <option value="subtle">Subtle Analog (Warmth &amp; Fine Grain)</option>
+                  <option value="cctv">Security CCTV 1991 (Scanlines &amp; Grain)</option>
+                  <option value="custom">Custom (Manual Fine-Tuning)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Processing Scope -->
+            <div class="control-group" style="margin-top: 8px;">
+              <label for="vhs-scope">Processing Scope</label>
+              <div class="select-wrapper">
+                <select id="vhs-scope">
+                  <option value="composite" selected>Full Composite (Entire Screen &amp; Overlays)</option>
+                  <option value="tunnel">Tunnel Buffer (Before Mirroring Matrix)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Subgroup 1: Tape Degradation & Tracking -->
+            <div class="control-group" style="margin-top: 12px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.12);">
+              <label style="color: var(--cyan); font-weight: 600; font-size: 0.8rem; margin-bottom: 8px; display: block;">
+                <i data-lucide="film" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> Tape Degradation &amp; Sync
+              </label>
+
+              <!-- Tape Crease -->
+              <div class="control-group">
+                <div class="slider-header">
+                  <label for="vhs-tape-crease" title="Sweeping distorted line of bent magnetic tape with bright luma flare">Tape Crease / Wrinkle</label>
+                  <span id="vhs-tape-crease-val" class="slider-val">10%</span>
+                </div>
+                <input type="range" id="vhs-tape-crease" min="0" max="100" step="1" value="10">
+              </div>
+
+              <!-- Tracking Noise -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-tracking-noise" title="Head-switching RF static snow bar and scanline tearing">Tracking Noise &amp; RF Static</label>
+                  <span id="vhs-tracking-noise-val" class="slider-val">15%</span>
+                </div>
+                <input type="range" id="vhs-tracking-noise" min="0" max="100" step="1" value="15">
+              </div>
+
+              <!-- Vertical Jump -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-vertical-jump" title="V-Hold vertical slip, blanking bar roll and 60Hz micro-jitter">Vertical Jump &amp; V-Hold Slip</label>
+                  <span id="vhs-vertical-jump-val" class="slider-val">8%</span>
+                </div>
+                <input type="range" id="vhs-vertical-jump" min="0" max="100" step="1" value="8">
+              </div>
+
+              <!-- Degradation Blur -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-degradation-blur" title="Softens tape crease, RF static snow, and V-Hold bars with analog blur">Degradation Blur</label>
+                  <span id="vhs-degradation-blur-val" class="slider-val">40%</span>
+                </div>
+                <input type="range" id="vhs-degradation-blur" min="0" max="100" step="1" value="40">
+              </div>
+
+              <!-- Degradation Opacity -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-degradation-opacity" title="Opacity of tape crease flare, tracking RF static, and V-Hold bars">Degradation Opacity</label>
+                  <span id="vhs-degradation-opacity-val" class="slider-val">75%</span>
+                </div>
+                <input type="range" id="vhs-degradation-opacity" min="0" max="100" step="1" value="75">
+              </div>
+            </div>
+
+            <!-- Subgroup 2: Optics & Stability -->
+            <div class="control-group" style="margin-top: 10px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.12);">
+              <label style="color: var(--cyan); font-weight: 600; font-size: 0.8rem; margin-bottom: 8px; display: block;">
+                <i data-lucide="activity" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> Instability &amp; CRT Raster
+              </label>
+
+              <!-- Wobble & TBC Flutter -->
+              <div class="control-group">
+                <div class="slider-header">
+                  <label for="vhs-wobble" title="Capstan flutter, scanline wave and top-of-screen flag waving">Wobble &amp; Tape Flutter</label>
+                  <span id="vhs-wobble-val" class="slider-val">22%</span>
+                </div>
+                <input type="range" id="vhs-wobble" min="0" max="100" step="1" value="22">
+              </div>
+
+              <!-- Bandwidth Softness -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-softness" title="Horizontal analog bandwidth limitation while retaining vertical line sharpness">Bandwidth Softness (1D)</label>
+                  <span id="vhs-softness-val" class="slider-val">30%</span>
+                </div>
+                <input type="range" id="vhs-softness" min="0" max="100" step="1" value="30">
+              </div>
+
+              <!-- CRT Scanlines -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-scanlines" title="Alternating CRT phosphorus scanline dimming">CRT Scanlines</label>
+                  <span id="vhs-scanlines-val" class="slider-val">20%</span>
+                </div>
+                <input type="range" id="vhs-scanlines" min="0" max="100" step="1" value="20">
+              </div>
+
+              <!-- Scanline Blur -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-scanline-blur" title="Softens CRT scanlines with analog phosphor blur so they blend naturally">Scanline Blur</label>
+                  <span id="vhs-scanline-blur-val" class="slider-val">50%</span>
+                </div>
+                <input type="range" id="vhs-scanline-blur" min="0" max="100" step="1" value="50">
+              </div>
+            </div>
+
+            <!-- Subgroup 3: Color & Film Emulsion -->
+            <div class="control-group" style="margin-top: 10px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.12);">
+              <label style="color: var(--cyan); font-weight: 600; font-size: 0.8rem; margin-bottom: 8px; display: block;">
+                <i data-lucide="palette" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> Color Decay &amp; Grain
+              </label>
+
+              <!-- Chroma Bleed -->
+              <div class="control-group">
+                <div class="slider-header">
+                  <label for="vhs-chroma-bleed" title="NTSC delay line color fringing (horizontal Red/Blue offset)">Chroma Bleed (Color Shift)</label>
+                  <span id="vhs-chroma-bleed-val" class="slider-val">35%</span>
+                </div>
+                <input type="range" id="vhs-chroma-bleed" min="0" max="100" step="1" value="35">
+              </div>
+
+              <!-- Magnetic Grain -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-grain" title="Analog tape magnetic luma &amp; chroma noise">Magnetic Tape Grain</label>
+                  <span id="vhs-grain-val" class="slider-val">25%</span>
+                </div>
+                <input type="range" id="vhs-grain" min="0" max="100" step="1" value="25">
+              </div>
+
+              <!-- Color Decay -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-color-decay" title="Lifted milky blacks (NTSC 7.5 IRE setup) and faded vintage cathode tint">Color Decay &amp; Milky Blacks</label>
+                  <span id="vhs-color-decay-val" class="slider-val">15%</span>
+                </div>
+                <input type="range" id="vhs-color-decay" min="0" max="100" step="1" value="15">
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Section 4: Video Exporting Wizard -->
         <div class="panel-section export-section collapsed">
           <h2 class="section-title text-cyan"><i data-lucide="video"></i> Exporting Machine</h2>
@@ -1438,32 +1625,6 @@
     </div>
 
     <!-- Export Overlay Status -->
-    <!-- Welcome Modal -->
-    <div id="welcome-overlay" class="modal-overlay hidden" style="z-index: 4000;">
-      <div class="modal-card" style="position: relative;">
-        <button id="btn-close-welcome-x" style="position: absolute; top: 15px; right: 15px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; padding: 5px;"><i data-lucide="x"></i></button>
-        <h2 style="color: var(--cyan); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-          <i data-lucide="zap"></i> Welcome to VileCut
-        </h2>
-        <p style="margin-bottom: 15px; line-height: 1.6; color: var(--text-color); font-size: 0.95rem;">
-          VileCut is a chaotic motion machine for creating infinite zooming loops, glitch art, and symmetrical visualizers directly from static images.
-        </p>
-        <ul style="margin-bottom: 20px; padding-left: 20px; line-height: 1.6; color: var(--text-color); font-size: 0.9rem;">
-          <li><strong>Full Timeline:</strong> Layer, arrange, and trim your tracks</li>
-          <li><strong>Rich Media:</strong> Support for audio tracks, video backgrounds, and image overlays</li>
-          <li><strong>Cybernetic FX:</strong> Dynamic glow effects, glitch triggering, and symmetry mirrors</li>
-          <li><strong>Advanced Typography:</strong> Multiline text with custom fonts and glitch animations</li>
-          <li><strong>High-Speed Export Engine:</strong> Native MP4 & WebM rendering directly in your browser</li>
-          <li><strong>Social Media Ready:</strong> Built-in aspect ratios (9:16, 1:1, 4:5) for TikTok, Reels, and Instagram</li>
-        </ul>
-        <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-left: 3px solid var(--pink); margin-bottom: 25px; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
-          <strong style="color: var(--pink); display: block; margin-bottom: 5px;">Privacy & Local Processing</strong>
-          Everything happens entirely in your browser client-side. Your images, videos, and audio are never uploaded to any server. High-quality exports are generated locally using your device's resources.
-        </div>
-        <button id="btn-close-welcome" class="btn primary" style="width: 100%;">Got it, let's go</button>
-      </div>
-    </div>
-
     <!-- Info Modal -->
     <div id="info-overlay" class="modal-overlay hidden" style="z-index: 3000;">
       <div class="modal-card">
@@ -1518,6 +1679,590 @@
           <span id="export-percent">0%</span>
         </div>
         <button id="btn-cancel-export" class="btn secondary">Cancel Export</button>
+      </div>
+    </div>
+    <!-- Project Creation Step-by-Step Wizard Overlay -->
+    <div id="project-wizard-overlay" class="modal-overlay hidden">
+      <div class="wizard-modal-card">
+        <!-- Top Bar -->
+        <div class="wizard-top-bar">
+          <div class="wizard-branding">
+            <i data-lucide="wand-2" class="wizard-logo-icon"></i>
+            <h2>VileCut Project Creator</h2>
+            <span class="wizard-badge">Step-by-Step</span>
+          </div>
+          <div class="wizard-top-controls">
+            <button id="btn-wizard-close-x" class="wizard-close-x" title="Exit Wizard"><i data-lucide="x"></i></button>
+          </div>
+        </div>
+
+        <!-- Stepper Indicators -->
+        <div class="wizard-stepper">
+          <div id="wizard-indicator-1" class="wizard-step-indicator active">
+            <span class="indicator-num">1</span>
+            <span class="indicator-label">Intro</span>
+          </div>
+          <div class="wizard-step-separator"></div>
+          <div id="wizard-indicator-2" class="wizard-step-indicator">
+            <span class="indicator-num">2</span>
+            <span class="indicator-label">Framing</span>
+          </div>
+          <div class="wizard-step-separator"></div>
+          <div id="wizard-indicator-3" class="wizard-step-indicator">
+            <span class="indicator-num">3</span>
+            <span class="indicator-label">Tunnel Core</span>
+          </div>
+          <div class="wizard-step-separator"></div>
+          <div id="wizard-indicator-4" class="wizard-step-indicator">
+            <span class="indicator-num">4</span>
+            <span class="indicator-label">Overlays</span>
+          </div>
+          <div class="wizard-step-separator"></div>
+          <div id="wizard-indicator-5" class="wizard-step-indicator">
+            <span class="indicator-num">5</span>
+            <span class="indicator-label">Soundtrack</span>
+          </div>
+          <div class="wizard-step-separator"></div>
+          <div id="wizard-indicator-6" class="wizard-step-indicator">
+            <span class="indicator-num">6</span>
+            <span class="indicator-label">Typography</span>
+          </div>
+          <div class="wizard-step-separator"></div>
+          <div id="wizard-indicator-7" class="wizard-step-indicator">
+            <span class="indicator-num">7</span>
+            <span class="indicator-label">Launch</span>
+          </div>
+        </div>
+
+        <!-- Wizard Body Content -->
+        <div class="wizard-body">
+          <!-- Step 1: Introduction, Capabilities & Client-Side Privacy -->
+          <div id="wizard-step-1" class="wizard-step-view active">
+            <div class="wizard-intro-hero">
+              <div class="wizard-intro-badge">
+                <i data-lucide="shield-check" style="width: 15px; height: 15px;"></i>
+                100% Client-Side Engine • Private & Local
+              </div>
+              <h2 class="wizard-intro-title">Welcome to <span class="gradient-text">VileCut</span></h2>
+              <p class="wizard-intro-lead">
+                An underground chaotic motion synthesizer and recursive camera visualizer. Transform static artwork, band logos, and typography into endless hypnotic zooming video loops directly in your browser.
+              </p>
+            </div>
+
+            <div class="wizard-intro-grid">
+              <!-- Card 1: What It Is -->
+              <div class="wizard-intro-card">
+                <div class="wizard-card-icon-box glow-cyan">
+                  <i data-lucide="wand-2" style="width: 22px; height: 22px;"></i>
+                </div>
+                <h4>What Is VileCut?</h4>
+                <p>
+                  A real-time motion laboratory that slices 2D artwork across exponential depth bands to create seamless, continuous infinite-zoom camera tunnels with multi-track timeline sequencing and live audio reactivity.
+                </p>
+                <div class="wizard-card-tags">
+                  <span class="wizard-mini-tag">Recursive Tunnels</span>
+                  <span class="wizard-mini-tag">Luminosity Slicing</span>
+                  <span class="wizard-mini-tag">Glitch Synthesis</span>
+                </div>
+              </div>
+
+              <!-- Card 2: What You Can Achieve -->
+              <div class="wizard-intro-card">
+                <div class="wizard-card-icon-box glow-pink">
+                  <i data-lucide="film" style="width: 22px; height: 22px;"></i>
+                </div>
+                <h4>What You Can Achieve</h4>
+                <p>
+                  Craft high-impact vertical visuals (TikTok, Reels, Shorts), cinematic stage visuals (16:9, 21:9), album art loops, cybernetic title cards, and analog VHS tape decays with authentic tracking noise and color aberration.
+                </p>
+                <div class="wizard-card-tags">
+                  <span class="wizard-mini-tag">9:16 Vertical & 16:9 Cinema</span>
+                  <span class="wizard-mini-tag">Analog Tape FX</span>
+                  <span class="wizard-mini-tag">Audio Waveforms</span>
+                </div>
+              </div>
+
+              <!-- Card 3: Security & In-Browser Execution -->
+              <div class="wizard-intro-card highlight-security">
+                <div class="wizard-card-icon-box glow-purple">
+                  <i data-lucide="cpu" style="width: 22px; height: 22px;"></i>
+                </div>
+                <h4>Security & Total Privacy</h4>
+                <p>
+                  VileCut operates <strong>100% locally inside your browser</strong>. All image processing, canvas compositing, and MP4/WebCodecs exports execute on your GPU/CPU. Your media files and music <strong>never</strong> leave your device or upload to any cloud server.
+                </p>
+                <div class="wizard-card-tags">
+                  <span class="wizard-mini-tag">Zero Cloud Uploads</span>
+                  <span class="wizard-mini-tag">Client-Side WebCodecs</span>
+                  <span class="wizard-mini-tag">Private & Air-Gapped</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="wizard-footer" style="margin-top: 24px;">
+              <div class="wizard-footer-left">
+                <button type="button" id="btn-wizard-intro-skip-studio" class="btn secondary">
+                  <i data-lucide="external-link"></i> Skip to Full studio view
+                </button>
+              </div>
+              <div class="wizard-footer-right">
+                <button type="button" class="btn-wizard-next btn primary" data-next="2">
+                  Start Project: Choose Framing <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Project Framing & Aspect Ratio -->
+          <div id="wizard-step-2" class="wizard-step-view">
+            <div class="wizard-step-header">
+              <h3><i data-lucide="layout" class="text-cyan"></i> 2. Project Framing & Aspect Ratio</h3>
+              <p>Choose your canvas orientation and target format. VileCut dynamically renders endless recursive tunnel zooms formatted for your exact platform.</p>
+            </div>
+
+            <label class="control-label" style="margin-bottom: 12px; display: block; font-weight: 600;">Choose Target Aspect Ratio:</label>
+            <div class="wizard-ratio-grid">
+              <div class="wizard-ratio-card selected" data-ratio="9-16">
+                <div class="wizard-ratio-icon-box">
+                  <div class="ratio-preview-box ratio-9-16"></div>
+                </div>
+                <div class="ratio-title">9:16 Vertical</div>
+                <div class="ratio-desc">TikTok • Reels • Shorts</div>
+              </div>
+
+              <div class="wizard-ratio-card" data-ratio="16-9">
+                <div class="wizard-ratio-icon-box">
+                  <div class="ratio-preview-box ratio-16-9"></div>
+                </div>
+                <div class="ratio-title">16:9 Landscape</div>
+                <div class="ratio-desc">YouTube • Cinema • TV</div>
+              </div>
+
+              <div class="wizard-ratio-card" data-ratio="1-1">
+                <div class="wizard-ratio-icon-box">
+                  <div class="ratio-preview-box ratio-1-1"></div>
+                </div>
+                <div class="ratio-title">1:1 Square</div>
+                <div class="ratio-desc">Instagram Feed • Album Art</div>
+              </div>
+
+              <div class="wizard-ratio-card" data-ratio="4-5">
+                <div class="wizard-ratio-icon-box">
+                  <div class="ratio-preview-box ratio-4-5"></div>
+                </div>
+                <div class="ratio-title">4:5 Portrait</div>
+                <div class="ratio-desc">Instagram Feed Vertical</div>
+              </div>
+
+              <div class="wizard-ratio-card" data-ratio="21-9">
+                <div class="wizard-ratio-icon-box">
+                  <div class="ratio-preview-box ratio-21-9"></div>
+                </div>
+                <div class="ratio-title">21:9 Ultrawide</div>
+                <div class="ratio-desc">Cinematic Stage Backdrop</div>
+              </div>
+            </div>
+
+            <div class="wizard-duration-row">
+              <div class="row-label">Loop / Project Duration:</div>
+              <div class="wizard-pill-group">
+                <button type="button" class="wizard-dur-pill" data-dur="3">3 sec</button>
+                <button type="button" class="wizard-dur-pill selected" data-dur="5">5 sec (Standard Loop)</button>
+                <button type="button" class="wizard-dur-pill" data-dur="10">10 sec</button>
+                <button type="button" class="wizard-dur-pill" data-dur="15">15 sec</button>
+                <button type="button" class="wizard-dur-pill" data-dur="30">30 sec</button>
+              </div>
+            </div>
+
+            <div class="wizard-footer">
+              <div class="wizard-footer-left">
+                <button type="button" class="btn-wizard-prev btn secondary" data-prev="1">
+                  <i data-lucide="arrow-left"></i> Back: Intro
+                </button>
+              </div>
+              <div class="wizard-footer-right">
+                <button type="button" class="btn-wizard-next btn primary" data-next="3">
+                  Next: Tunnel Core <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Camera Tunnel Graphic Upload & Live Adjustment -->
+          <div id="wizard-step-3" class="wizard-step-view">
+            <div class="wizard-step-header">
+              <h3><i data-lucide="layers" class="text-cyan"></i> 3. Camera Tunnel Core Graphic</h3>
+              <p>Upload the primary artwork to slice into infinite zooming depth bands. See real-time motion and tweak layer depth immediately.</p>
+            </div>
+
+            <div class="wizard-split-layout">
+              <div class="wizard-control-col">
+                <label for="wizard-tunnel-file-input" id="wizard-tunnel-drop-zone" class="wizard-drop-zone">
+                  <i data-lucide="upload-cloud" style="width: 32px; height: 32px; color: var(--cyan); margin-bottom: 8px;"></i>
+                  <p style="margin: 0 0 4px 0; font-size: 0.9rem; font-weight: 600;">Drag & drop image(s) here or click to browse</p>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">Supports multiple PNG, JPG, WebP</span>
+                </label>
+                <input type="file" id="wizard-tunnel-file-input" accept="image/*" multiple style="display: none;">
+
+                <div style="text-align: center; margin: 4px 0;">
+                  <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">— OR —</span>
+                </div>
+
+                <button type="button" id="btn-wizard-load-sample" class="btn secondary wizard-sample-btn">
+                  <i data-lucide="sparkles" class="text-cyan"></i> Generate Procedural Cyber Sigil (Instant Preview)
+                </button>
+
+                <div class="wizard-slider-row" style="margin-top: 10px;">
+                  <div class="slider-label-row">
+                    <span>Depth Slicing Layers:</span>
+                    <strong id="wizard-val-layers" class="text-cyan">8</strong>
+                  </div>
+                  <input type="range" id="wizard-slider-layers" min="3" max="16" value="8" step="1">
+                </div>
+
+                <div class="wizard-slider-row">
+                  <div class="slider-label-row">
+                    <span>Diving Speed:</span>
+                    <strong id="wizard-val-speed" class="text-cyan">0.05</strong>
+                  </div>
+                  <input type="range" id="wizard-slider-speed" min="-0.5" max="0.5" value="0.05" step="0.005">
+                </div>
+
+                <div class="wizard-slider-row">
+                  <div class="slider-label-row">
+                    <span>Edge Feather / Fade:</span>
+                    <strong id="wizard-val-fade" class="text-cyan">10%</strong>
+                  </div>
+                  <input type="range" id="wizard-slider-fade" min="0" max="40" value="10" step="1">
+                </div>
+              </div>
+
+              <div class="wizard-preview-col">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px;">Live Infinite-Zoom Preview</span>
+                <canvas id="wizard-tunnel-preview-canvas" width="320" height="320" class="wizard-canvas-preview"></canvas>
+                <span id="wizard-tunnel-aspect-badge" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 8px;">60 FPS Deterministic Loop • Aspect Ratio: 9:16</span>
+              </div>
+            </div>
+
+            <div class="wizard-footer" style="margin-top: 24px;">
+              <div class="wizard-footer-left">
+                <button type="button" class="btn-wizard-prev btn secondary" data-prev="2">
+                  <i data-lucide="arrow-left"></i> Back
+                </button>
+              </div>
+              <div class="wizard-footer-right">
+                <button type="button" class="btn-wizard-next btn primary" data-next="4">
+                  Next: Overlays & Branding <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 4: Overlays, Logos & Canvas Placement -->
+          <div id="wizard-step-4" class="wizard-step-view">
+            <div class="wizard-step-header">
+              <h3><i data-lucide="image" class="text-cyan"></i> 4. Overlays, Logos & Branding</h3>
+              <p>Add a band logo, visual sticker, or badge to float atop the tunnel. (Optional — can be skipped if you want pure tunnel visuals).</p>
+            </div>
+
+            <div class="wizard-split-layout">
+              <div class="wizard-control-col">
+                <label for="wizard-overlay-file-input" id="wizard-overlay-drop-zone" class="wizard-drop-zone">
+                  <i data-lucide="image-plus" style="width: 32px; height: 32px; color: var(--cyan); margin-bottom: 8px;"></i>
+                  <p style="margin: 0 0 4px 0; font-size: 0.9rem; font-weight: 600;">Upload Logo / Graphic PNG</p>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">Transparent PNG recommended</span>
+                </label>
+                <input type="file" id="wizard-overlay-file-input" accept="image/*" style="display: none;">
+                <div id="wizard-overlay-file-name" class="wizard-badge hidden" style="text-align: center; margin-top: 4px;"></div>
+
+                <div style="margin-top: 8px;">
+                  <label class="control-label" style="margin-bottom: 8px; display: block; font-size: 0.85rem;">Placement on Canvas:</label>
+                  <div class="wizard-placement-grid">
+                    <button type="button" class="wizard-placement-btn selected" data-placement="center">Direct Center</button>
+                    <button type="button" class="wizard-placement-btn" data-placement="top">Top Header</button>
+                    <button type="button" class="wizard-placement-btn" data-placement="bottom">Bottom Footer</button>
+                    <button type="button" class="wizard-placement-btn" data-placement="bottom-right">Bottom-Right Bug</button>
+                  </div>
+                </div>
+
+                <!-- Manual Coordinate Adjustments -->
+                <div class="wizard-slider-row" style="margin-top: 8px;">
+                  <div class="slider-label-row">
+                    <span>Horizontal Position (X):</span>
+                    <strong id="wizard-overlay-pos-x-val" class="text-cyan">0%</strong>
+                  </div>
+                  <input type="range" id="wizard-overlay-pos-x" min="-50" max="50" value="0" step="1">
+                </div>
+
+                <div class="wizard-slider-row" style="margin-top: 8px;">
+                  <div class="slider-label-row">
+                    <span>Vertical Position (Y):</span>
+                    <strong id="wizard-overlay-pos-y-val" class="text-cyan">0%</strong>
+                  </div>
+                  <input type="range" id="wizard-overlay-pos-y" min="-50" max="50" value="0" step="1">
+                </div>
+
+                <div class="wizard-slider-row" style="margin-top: 8px;">
+                  <div class="slider-label-row">
+                    <span>Graphic Scale:</span>
+                    <strong id="wizard-overlay-scale-val" class="text-cyan">70%</strong>
+                  </div>
+                  <input type="range" id="wizard-overlay-scale" min="20" max="150" value="70" step="5">
+                </div>
+
+                <div style="margin-top: 8px;">
+                  <label class="control-label" style="margin-bottom: 6px; display: block; font-size: 0.85rem;">Blend Mode:</label>
+                  <select id="wizard-overlay-blend" class="theme-dropdown" style="width: 100%;">
+                    <option value="normal" selected>Normal</option>
+                    <option value="screen">Screen (Lighten / Glow)</option>
+                    <option value="multiply">Multiply (Darken)</option>
+                    <option value="overlay">Overlay (High Contrast)</option>
+                    <option value="color-dodge">Color Dodge (Extreme Neon)</option>
+                  </select>
+                </div>
+
+                <div class="wizard-hint-box" style="margin-top: 10px; background: rgba(0, 242, 254, 0.06); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: 8px; padding: 10px 12px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">
+                  <i data-lucide="info" style="width: 14px; height: 14px; color: var(--cyan); vertical-align: -2px; margin-right: 4px;"></i>
+                  <strong style="color: var(--cyan);">Add more afterwards:</strong> This positions your primary graphic. You can add, layer, and animate unlimited additional graphics, stickers, and video layers anytime in the main VileCut Studio timeline.
+                </div>
+              </div>
+
+              <div class="wizard-preview-col">
+                <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 8px;">
+                  <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Live Interactive Canvas</span>
+                  <span style="font-size: 0.72rem; color: var(--cyan);"><i data-lucide="move" style="width: 12px; height: 12px; vertical-align: -1px;"></i> Drag to Position</span>
+                </div>
+                <canvas id="wizard-overlay-preview-canvas" width="320" height="320" class="wizard-canvas-preview" style="cursor: grab;"></canvas>
+                <span id="wizard-overlay-aspect-badge" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 8px;">Tunnel Background • Aspect Ratio: 9:16</span>
+              </div>
+            </div>
+
+            <div class="wizard-footer" style="margin-top: 24px;">
+              <div class="wizard-footer-left">
+                <button type="button" class="btn-wizard-prev btn secondary" data-prev="3">
+                  <i data-lucide="arrow-left"></i> Back
+                </button>
+              </div>
+              <div class="wizard-footer-right">
+                <button type="button" class="btn-wizard-next btn primary" data-next="5">
+                  Next: Music & Audio <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 5: Music & Soundtrack -->
+          <div id="wizard-step-5" class="wizard-step-view">
+            <div class="wizard-step-header">
+              <h3><i data-lucide="music" class="text-cyan"></i> 5. Soundtrack & Audio Waveform</h3>
+              <p>Add an audio track or snippet to drive the visual rhythm. (Optional — can be skipped if you are producing silent visuals).</p>
+            </div>
+
+            <div class="wizard-split-layout">
+              <div class="wizard-control-col">
+                <label for="wizard-audio-file-input" id="wizard-audio-drop-zone" class="wizard-drop-zone">
+                  <i data-lucide="music-2" style="width: 32px; height: 32px; color: var(--cyan); margin-bottom: 8px;"></i>
+                  <p style="margin: 0 0 4px 0; font-size: 0.9rem; font-weight: 600;">Drag & drop audio track or browse</p>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">Supports MP3, WAV, OGG, AAC</span>
+                </label>
+                <input type="file" id="wizard-audio-file-input" accept="audio/*" style="display: none;">
+                <div id="wizard-audio-info-badge" class="wizard-badge hidden" style="text-align: center; margin-top: 4px;"></div>
+
+                <div style="background: var(--bg-control); padding: 14px; border-radius: 10px; border: 1px solid var(--border-subtle); margin-top: 12px;">
+                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.88rem; color: var(--text-primary);">
+                    <input type="checkbox" id="wizard-match-audio-dur" style="accent-color: var(--cyan); width: 18px; height: 18px;">
+                    <span>Auto-match video duration to audio file length</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="wizard-preview-col">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px;">Audio Waveform Analyzer</span>
+                <canvas id="wizard-waveform-canvas" width="360" height="90" class="wizard-waveform-canvas"></canvas>
+                <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 8px;">Synchronized to timeline audio track</span>
+              </div>
+            </div>
+
+            <div class="wizard-footer" style="margin-top: 24px;">
+              <div class="wizard-footer-left">
+                <button type="button" class="btn-wizard-prev btn secondary" data-prev="4">
+                  <i data-lucide="arrow-left"></i> Back
+                </button>
+              </div>
+              <div class="wizard-footer-right">
+                <button type="button" class="btn-wizard-next btn primary" data-next="6">
+                  Next: Typography <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 6: Typography & Title Text -->
+          <div id="wizard-step-6" class="wizard-step-view">
+            <div class="wizard-step-header">
+              <h3><i data-lucide="type" class="text-cyan"></i> 6. Typography & Title Card</h3>
+              <p>Add a track title, band name, or lyric phrase. Rendered with cyberpunk neon glow over the live camera tunnel. (Optional).</p>
+            </div>
+
+            <div class="wizard-split-layout">
+              <div class="wizard-control-col">
+                <div>
+                  <label class="control-label" style="margin-bottom: 6px; display: block; font-size: 0.85rem;">Title / Text Content:</label>
+                  <input type="text" id="wizard-text-input" placeholder="e.g. CYBER HORIZON // OUT NOW" class="theme-dropdown" style="width: 100%; padding: 10px 14px; font-size: 0.95rem;">
+                </div>
+
+                <!-- Font Selection & Upload Option -->
+                <div style="margin-top: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="control-label" style="font-size: 0.85rem; margin: 0;">Font Family:</label>
+                    <label for="wizard-font-file-input" style="font-size: 0.75rem; color: var(--cyan); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                      <i data-lucide="upload" style="width: 12px; height: 12px;"></i> Upload Font (.ttf/.otf/.woff)
+                    </label>
+                  </div>
+                  <input type="file" id="wizard-font-file-input" accept=".ttf,.otf,.woff,.woff2" style="display: none;">
+                  <select id="wizard-font-select" class="theme-dropdown" style="width: 100%;">
+                    <option value="Outfit" selected>Outfit (Clean Geometric Sans)</option>
+                    <option value="JetBrains Mono">JetBrains Mono (Cyberpunk Code)</option>
+                    <option value="Impact">Impact (Heavy Punch)</option>
+                    <option value="Georgia">Georgia (Classic Serif)</option>
+                  </select>
+                  <div id="wizard-font-upload-badge" class="wizard-badge hidden" style="text-align: center; margin-top: 4px;"></div>
+                </div>
+
+                <!-- Optional Lyrics / Text Import -->
+                <div style="margin-top: 4px;">
+                  <label for="wizard-text-file-input" style="font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                    <i data-lucide="file-text" style="width: 12px; height: 12px; color: var(--cyan);"></i> Import Text / Lyrics File (.txt, .lrc)
+                  </label>
+                  <input type="file" id="wizard-text-file-input" accept=".txt,.lrc" style="display: none;">
+                </div>
+
+                <!-- Adjustments: Font Size & Glow Radius -->
+                <div class="wizard-slider-row" style="margin-top: 8px;">
+                  <div class="slider-label-row">
+                    <span>Font Size:</span>
+                    <strong id="wizard-text-size-val" class="text-cyan">42px</strong>
+                  </div>
+                  <input type="range" id="wizard-text-size-slider" min="20" max="80" value="42" step="2">
+                </div>
+
+                <div class="wizard-slider-row" style="margin-top: 8px;">
+                  <div class="slider-label-row">
+                    <span>Neon Glow Radius:</span>
+                    <strong id="wizard-text-glow-val" class="text-cyan">20px</strong>
+                  </div>
+                  <input type="range" id="wizard-text-glow-slider" min="0" max="50" value="20" step="2">
+                </div>
+
+                <div style="margin-top: 8px;">
+                  <label class="control-label" style="margin-bottom: 6px; display: block; font-size: 0.85rem;">Color Scheme & Glow:</label>
+                  <div class="wizard-pill-group">
+                    <button type="button" class="wizard-text-style-pill selected" data-style="neon-cyan">Neon Cyan</button>
+                    <button type="button" class="wizard-text-style-pill" data-style="hot-pink">Hot Pink</button>
+                    <button type="button" class="wizard-text-style-pill" data-style="pure-white">Pure White</button>
+                  </div>
+                </div>
+
+                <div style="margin-top: 8px;">
+                  <label class="control-label" style="margin-bottom: 6px; display: block; font-size: 0.85rem;">Placement:</label>
+                  <div class="wizard-pill-group">
+                    <button type="button" class="wizard-text-placement-btn" data-placement="top">Top</button>
+                    <button type="button" class="wizard-text-placement-btn" data-placement="center">Center</button>
+                    <button type="button" class="wizard-text-placement-btn selected" data-placement="bottom">Bottom</button>
+                  </div>
+                </div>
+
+                <div class="wizard-hint-box" style="margin-top: 10px; background: rgba(0, 242, 254, 0.06); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: 8px; padding: 10px 12px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">
+                  <i data-lucide="info" style="width: 14px; height: 14px; color: var(--cyan); vertical-align: -2px; margin-right: 4px;"></i>
+                  <strong style="color: var(--cyan);">Add more layers later:</strong> You can add unlimited text layers, timestamped song lyrics (.lrc), multi-line glitch titles, and per-word animations inside the main VileCut Studio timeline.
+                </div>
+              </div>
+
+              <div class="wizard-preview-col">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px;">Live Typography Preview</span>
+                <canvas id="wizard-text-preview-canvas" width="320" height="320" class="wizard-canvas-preview"></canvas>
+                <span id="wizard-text-aspect-badge" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 8px;">Tunnel Background • Aspect Ratio: 9:16</span>
+              </div>
+            </div>
+
+            <div class="wizard-footer" style="margin-top: 24px;">
+              <div class="wizard-footer-left">
+                <button type="button" class="btn-wizard-prev btn secondary" data-prev="5">
+                  <i data-lucide="arrow-left"></i> Back
+                </button>
+              </div>
+              <div class="wizard-footer-right">
+                <button type="button" class="btn-wizard-next btn primary" data-next="7">
+                  Review & Launch <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 7: Review & Launch Studio -->
+          <div id="wizard-step-7" class="wizard-step-view">
+            <div class="wizard-step-header">
+              <h3><i data-lucide="check-circle" class="text-cyan"></i> 7. Project Configuration Ready</h3>
+              <p>Everything is configured and ready. Click launch to open the full VileCut Studio timeline, play the loop, and apply additional glitches, VHS decays, or export immediately.</p>
+            </div>
+
+            <div class="wizard-summary-grid">
+              <div class="wizard-summary-card">
+                <div class="summary-icon"><i data-lucide="layout"></i></div>
+                <div>
+                  <h4>Aspect Ratio & Duration</h4>
+                  <p id="summary-ratio">9:16 • 5s Duration</p>
+                </div>
+              </div>
+
+              <div class="wizard-summary-card">
+                <div class="summary-icon"><i data-lucide="layers"></i></div>
+                <div>
+                  <h4>Camera Tunnel Core</h4>
+                  <p id="summary-tunnel">1 Image • 8 Layers • 0.5x Speed</p>
+                </div>
+              </div>
+
+              <div class="wizard-summary-card">
+                <div class="summary-icon"><i data-lucide="image"></i></div>
+                <div>
+                  <h4>Overlay Graphic / Logo</h4>
+                  <p id="summary-overlay">None</p>
+                </div>
+              </div>
+
+              <div class="wizard-summary-card">
+                <div class="summary-icon"><i data-lucide="music"></i></div>
+                <div>
+                  <h4>Soundtrack & Audio</h4>
+                  <p id="summary-audio">None</p>
+                </div>
+              </div>
+
+              <div class="wizard-summary-card" style="grid-column: 1 / -1;">
+                <div class="summary-icon"><i data-lucide="type"></i></div>
+                <div>
+                  <h4>Typography & Title</h4>
+                  <p id="summary-text">None</p>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" id="btn-wizard-launch-studio" class="btn-launch-studio">
+              <i data-lucide="play-circle" style="width: 28px; height: 28px;"></i>
+              Launch VileCut Studio & Start Playing
+            </button>
+
+            <div class="wizard-footer" style="margin-top: 24px; border-top: none; padding-left: 0; padding-right: 0;">
+              <div class="wizard-footer-left">
+                <button type="button" class="btn-wizard-prev btn secondary" data-prev="6">
+                  <i data-lucide="arrow-left"></i> Back to Editing
+                </button>
+              </div>
+              <div class="wizard-footer-right"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -51,13 +51,6 @@
   <link rel="stylesheet" href="danger.css">
   <!-- Lucide Icons -->
   <script src="js/lucide.min.js"></script>
-  <script>
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => { if (window.lucide && window.lucide.createIcons) window.lucide.createIcons(); });
-    } else {
-      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
-    }
-  </script>
 </head>
 <body>
   <div class="app-container">
@@ -66,7 +59,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VILECUT</h1>
-        <span class="version-tag">v1.17.3</span>
+        <span class="version-tag">v1.18.0</span>
         <div class="danger-header-badge">
           <span class="danger-pulse"></span>
           <span class="danger-title">⚠️ DANGER ZONE // 10-MIN ENGINE</span>
@@ -90,6 +83,19 @@
             <option value="frozen">Frozen Odyssey (Icy Blue)</option>
           </select>
         </div>
+        <button id="btn-undo" class="btn-header" title="Undo (Ctrl+Z)" disabled>
+          <i data-lucide="undo-2" class="theme-select-icon"></i>
+        </button>
+        <button id="btn-redo" class="btn-header" title="Redo (Ctrl+Y)" disabled>
+          <i data-lucide="redo-2" class="theme-select-icon"></i>
+        </button>
+        <button id="btn-save-project" class="btn-header" title="Save Project (.vilecut.json)">
+          <i data-lucide="save" class="theme-select-icon"></i> Save
+        </button>
+        <button id="btn-load-project" class="btn-header" title="Load Project (.vilecut.json)">
+          <i data-lucide="folder-open" class="theme-select-icon"></i> Load
+        </button>
+        <input type="file" id="project-file-input" accept=".json,.vilecut.json" style="display: none;">
         <button id="btn-info-modal" class="btn-header" title="About & Feedback">
           <i data-lucide="info" class="theme-select-icon"></i> Info
         </button>
@@ -1349,6 +1355,175 @@
                     <button class="swatch-btn geo-contour-swatch" data-color="#ff007f" style="background:#ff007f; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="Pink"></button>
                     <button class="swatch-btn geo-contour-swatch" data-color="#ffffff" style="background:#ffffff; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;" title="White"></button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3.6: Vintage VHS & Analog Camcorder FX -->
+        <div class="panel-section collapsed" id="vhs-fx-section">
+          <h2 class="section-title"><i data-lucide="tv"></i> Vintage VHS &amp; Old Camera FX</h2>
+          
+          <div class="control-group-switch">
+            <label class="switch-label" for="vhs-enabled">VHS &amp; Old Camera FX</label>
+            <input type="checkbox" id="vhs-enabled">
+          </div>
+
+          <div id="vhs-controls-container" style="margin-top: 10px;">
+            <!-- Preset Selector -->
+            <div class="control-group">
+              <label for="vhs-preset">Curated Analog Preset</label>
+              <div class="select-wrapper">
+                <select id="vhs-preset">
+                  <option value="camcorder" selected>Camcorder 1994 (Handheld Nostalgia)</option>
+                  <option value="worn">Worn VHS 1988 (Rental Cassette)</option>
+                  <option value="damaged">Damaged Rental Tape (Heavy Static &amp; Crease)</option>
+                  <option value="subtle">Subtle Analog (Warmth &amp; Fine Grain)</option>
+                  <option value="cctv">Security CCTV 1991 (Scanlines &amp; HUD)</option>
+                  <option value="custom">Custom (Manual Fine-Tuning)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Processing Scope -->
+            <div class="control-group" style="margin-top: 8px;">
+              <label for="vhs-scope">Processing Scope</label>
+              <div class="select-wrapper">
+                <select id="vhs-scope">
+                  <option value="composite" selected>Full Composite (Entire Screen &amp; Overlays)</option>
+                  <option value="tunnel">Tunnel Buffer (Before Mirroring Matrix)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Subgroup 1: Tape Degradation & Tracking -->
+            <div class="control-group" style="margin-top: 12px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.12);">
+              <label style="color: var(--cyan); font-weight: 600; font-size: 0.8rem; margin-bottom: 8px; display: block;">
+                <i data-lucide="film" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> Tape Degradation &amp; Sync
+              </label>
+
+              <!-- Tape Crease -->
+              <div class="control-group">
+                <div class="slider-header">
+                  <label for="vhs-tape-crease" title="Sweeping distorted line of bent magnetic tape with bright luma flare">Tape Crease / Wrinkle</label>
+                  <span id="vhs-tape-crease-val" class="slider-val">10%</span>
+                </div>
+                <input type="range" id="vhs-tape-crease" min="0" max="100" step="1" value="10">
+              </div>
+
+              <!-- Tracking Noise -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-tracking-noise" title="Head-switching RF static snow bar and scanline tearing">Tracking Noise &amp; RF Static</label>
+                  <span id="vhs-tracking-noise-val" class="slider-val">15%</span>
+                </div>
+                <input type="range" id="vhs-tracking-noise" min="0" max="100" step="1" value="15">
+              </div>
+
+              <!-- Vertical Jump -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-vertical-jump" title="V-Hold vertical slip, blanking bar roll and 60Hz micro-jitter">Vertical Jump &amp; V-Hold Slip</label>
+                  <span id="vhs-vertical-jump-val" class="slider-val">8%</span>
+                </div>
+                <input type="range" id="vhs-vertical-jump" min="0" max="100" step="1" value="8">
+              </div>
+            </div>
+
+            <!-- Subgroup 2: Optics & Stability -->
+            <div class="control-group" style="margin-top: 10px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.12);">
+              <label style="color: var(--cyan); font-weight: 600; font-size: 0.8rem; margin-bottom: 8px; display: block;">
+                <i data-lucide="activity" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> Instability &amp; CRT Raster
+              </label>
+
+              <!-- Wobble & TBC Flutter -->
+              <div class="control-group">
+                <div class="slider-header">
+                  <label for="vhs-wobble" title="Capstan flutter, scanline wave and top-of-screen flag waving">Wobble &amp; Tape Flutter</label>
+                  <span id="vhs-wobble-val" class="slider-val">22%</span>
+                </div>
+                <input type="range" id="vhs-wobble" min="0" max="100" step="1" value="22">
+              </div>
+
+              <!-- Bandwidth Softness -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-softness" title="Horizontal analog bandwidth limitation while retaining vertical line sharpness">Bandwidth Softness (1D)</label>
+                  <span id="vhs-softness-val" class="slider-val">30%</span>
+                </div>
+                <input type="range" id="vhs-softness" min="0" max="100" step="1" value="30">
+              </div>
+
+              <!-- CRT Scanlines -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-scanlines" title="Alternating CRT phosphorus scanline dimming">CRT Scanlines</label>
+                  <span id="vhs-scanlines-val" class="slider-val">20%</span>
+                </div>
+                <input type="range" id="vhs-scanlines" min="0" max="100" step="1" value="20">
+              </div>
+            </div>
+
+            <!-- Subgroup 3: Color & Film Emulsion -->
+            <div class="control-group" style="margin-top: 10px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.12);">
+              <label style="color: var(--cyan); font-weight: 600; font-size: 0.8rem; margin-bottom: 8px; display: block;">
+                <i data-lucide="palette" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> Color Decay &amp; Grain
+              </label>
+
+              <!-- Chroma Bleed -->
+              <div class="control-group">
+                <div class="slider-header">
+                  <label for="vhs-chroma-bleed" title="NTSC delay line color fringing (horizontal Red/Blue offset)">Chroma Bleed (Color Shift)</label>
+                  <span id="vhs-chroma-bleed-val" class="slider-val">35%</span>
+                </div>
+                <input type="range" id="vhs-chroma-bleed" min="0" max="100" step="1" value="35">
+              </div>
+
+              <!-- Magnetic Grain -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-grain" title="Analog tape magnetic luma &amp; chroma noise">Magnetic Tape Grain</label>
+                  <span id="vhs-grain-val" class="slider-val">25%</span>
+                </div>
+                <input type="range" id="vhs-grain" min="0" max="100" step="1" value="25">
+              </div>
+
+              <!-- Color Decay -->
+              <div class="control-group" style="margin-top: 8px;">
+                <div class="slider-header">
+                  <label for="vhs-color-decay" title="Lifted milky blacks (NTSC 7.5 IRE setup) and faded vintage cathode tint">Color Decay &amp; Milky Blacks</label>
+                  <span id="vhs-color-decay-val" class="slider-val">15%</span>
+                </div>
+                <input type="range" id="vhs-color-decay" min="0" max="100" step="1" value="15">
+              </div>
+            </div>
+
+            <!-- Subgroup 4: Retro On-Screen Display (OSD HUD) -->
+            <div class="control-group" style="margin-top: 10px; background: rgba(0, 0, 0, 0.18); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.12);">
+              <div class="control-group-switch" style="margin-bottom: 8px;">
+                <label class="switch-label" for="vhs-osd-active" style="font-size: 0.85rem; font-weight: 600; color: var(--cyan);">
+                  <i data-lucide="monitor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Retro OSD Display
+                </label>
+                <input type="checkbox" id="vhs-osd-active" checked>
+              </div>
+
+              <div id="vhs-osd-controls" style="padding-left: 4px;">
+                <div class="control-group">
+                  <label for="vhs-osd-mode">OSD Theme &amp; Style</label>
+                  <div class="select-wrapper">
+                    <select id="vhs-osd-mode">
+                      <option value="camcorder" selected>Camcorder (REC ●, Battery, Date)</option>
+                      <option value="vcr">VCR Playback (PLAY ▶, SP, Counter)</option>
+                      <option value="cctv">Security CCTV (CAM 04, Clock)</option>
+                      <option value="custom">Custom Text Display</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="control-group" id="vhs-osd-custom-group" style="display: none; margin-top: 8px;">
+                  <label for="vhs-osd-custom-text">Custom OSD Text</label>
+                  <input type="text" id="vhs-osd-custom-text" value="PLAY ▶  SP" placeholder="e.g. REC ● 00:12:44" style="background: var(--bg-control); border: 1px solid var(--border-subtle); color: var(--text-primary); border-radius: 6px; padding: 6px 10px; width: 100%; font-family: monospace; font-size: 0.85rem;">
                 </div>
               </div>
             </div>

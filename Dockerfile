@@ -1,4 +1,4 @@
-FROM nginx:1.27-alpine
+FROM nginx:alpine
 
 # Custom server config (gzip, caching, security headers)
 COPY nginx.conf /etc/nginx/conf.d/default.conf

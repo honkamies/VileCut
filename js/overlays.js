@@ -603,6 +603,7 @@ export function drawVideoOverlay(renderCtx, w, h, time, vid) {
   if (overlayVideoCanvas.width !== w || overlayVideoCanvas.height !== h) {
     overlayVideoCanvas.width = w;
     overlayVideoCanvas.height = h;
+    lastOverlayVideoFilter = '';
   }
 
   // Draw filtered video frame onto local buffer canvas
@@ -610,7 +611,7 @@ export function drawVideoOverlay(renderCtx, w, h, time, vid) {
   const contrastVal = vid.contrast !== undefined ? vid.contrast : 100;
   const monochromeStr = vid.monochrome ? 'grayscale(100%)' : '';
   const newFilter = `brightness(${brightnessVal}%) contrast(${contrastVal}%) ${monochromeStr}`.trim() || 'none';
-  if (lastOverlayVideoFilter !== newFilter) {
+  if (lastOverlayVideoFilter !== newFilter || overlayVideoCtx.filter !== newFilter) {
     overlayVideoCtx.filter = newFilter;
     lastOverlayVideoFilter = newFilter;
   }
@@ -638,8 +639,9 @@ export function drawVideoOverlay(renderCtx, w, h, time, vid) {
   } else {
     // Background cover-scale behavior
     const coverScale = Math.max(w / vw, h / vh);
-    drawW = vw * coverScale;
-    drawH = vh * coverScale;
+    const scaleFactor = vid.scale !== undefined ? vid.scale / 100 : 1.0;
+    drawW = vw * coverScale * scaleFactor;
+    drawH = vh * coverScale * scaleFactor;
     drawX = (w - drawW) / 2 + (vid.x !== undefined ? vid.x : 0.0) * w;
     drawY = (h - drawH) / 2 + (vid.y !== undefined ? vid.y : 0.0) * h;
   }

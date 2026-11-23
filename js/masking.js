@@ -18,7 +18,7 @@ export function ensureRandomBoundaries() {
 export class ImageProcessor {
   static processImageLayers(imgObj) {
     const img = imgObj.img;
-    const maxDim = 1024;
+    const maxDim = 1440;
     let w = img.naturalWidth;
     let h = img.naturalHeight;
     if (w > maxDim || h > maxDim) {
@@ -41,6 +41,7 @@ export class ImageProcessor {
     const srcPixels = srcImgData.data;
 
     imgObj.layers = [];
+    imgObj.layerCoveragePct = [];
     const N = state.layerCount;
 
     // Pre-calculate random boundaries for random mode if needed
@@ -134,6 +135,7 @@ export class ImageProcessor {
     const layerCtxs = [];
     const layerImgDatas = [];
     const layerPixels = [];
+    const nonTransparentCounts = new Int32Array(N);
 
     for (let i = 0; i < N; i++) {
       const layerCanvas = document.createElement('canvas');
@@ -182,7 +184,9 @@ export class ImageProcessor {
           }
           if (weight > 0.02) {
             const dest = layerPixels[i];
-            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = a * weight;
+            const outA = a * weight;
+            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = outA;
+            if (outA > 10) nonTransparentCounts[i]++;
           }
         }
       }
@@ -220,7 +224,9 @@ export class ImageProcessor {
           }
           if (weight > 0.02) {
             const dest = layerPixels[i];
-            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = a * weight;
+            const outA = a * weight;
+            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = outA;
+            if (outA > 10) nonTransparentCounts[i]++;
           }
         }
       }
@@ -256,7 +262,9 @@ export class ImageProcessor {
           }
           if (weight > 0.02) {
             const dest = layerPixels[i];
-            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = a * weight;
+            const outA = a * weight;
+            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = outA;
+            if (outA > 10) nonTransparentCounts[i]++;
           }
         }
       }
@@ -294,11 +302,18 @@ export class ImageProcessor {
           }
           if (weight > 0.02) {
             const dest = layerPixels[i];
-            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = a * weight;
+            const outA = a * weight;
+            dest[p] = r; dest[p+1] = g; dest[p+2] = b; dest[p+3] = outA;
+            if (outA > 10) nonTransparentCounts[i]++;
           }
         }
       }
     }
+
+    const totalAreaPixels = Math.max(1, w * h);
+    // Estimate vignette survival factor so cached coverage percentage reflects edge fade without re-reading pixels
+    const edgeRatio = Math.max(0, Math.min(0.5, (state.layerEdgeFade || 0) / 100));
+    const vignetteFactor = (1 - edgeRatio) * (1 - edgeRatio);
 
     // WRITE AND APPLY MASK
     for (let i = 0; i < N; i++) {
@@ -312,6 +327,8 @@ export class ImageProcessor {
       }
       
       imgObj.layers.push(layerCanvases[i]);
+      const pct = ((nonTransparentCounts[i] * vignetteFactor) / totalAreaPixels) * 100;
+      imgObj.layerCoveragePct.push(pct.toFixed(1));
     }
   }
 
@@ -420,17 +437,9 @@ export function drawInspectorPreview() {
   const container = previewCanvas.parentElement;
   container.className = 'inspector-preview-container bg-' + state.inspectorBgMode;
 
-  const lCtx = layerCanvas.getContext('2d');
-  const imgData = lCtx.getImageData(0, 0, layerCanvas.width, layerCanvas.height);
-  const pixels = imgData.data;
-  let nonTransparent = 0;
-  for (let p = 3; p < pixels.length; p += 4) {
-    if (pixels[p] > 10) {
-      nonTransparent++;
-    }
-  }
-  const totalPixels = layerCanvas.width * layerCanvas.height;
-  const percent = ((nonTransparent / totalPixels) * 100).toFixed(1);
+  const percent = (activeImgObj.layerCoveragePct && activeImgObj.layerCoveragePct[idx] !== undefined)
+    ? activeImgObj.layerCoveragePct[idx]
+    : '0.0';
   
   let rangeText = '';
   if (state.maskType === 'adaptive-luminosity' && activeImgObj.adaptiveBoundaries) {

@@ -5,11 +5,16 @@ export class Engine {
     this.lastFrameTime = 0;
     this.animationFrameId = null;
     this.subscribers = new Set();
-    
-    // React to play/pause state changes automatically
+
+    // React to play/pause and manual glitch state changes automatically
     subscribe('isPlaying', (isPlaying) => {
       if (isPlaying) {
-        // Start engine only if we are not already running
+        this.start();
+      }
+    });
+
+    subscribe('glitchActive', (glitchActive) => {
+      if (glitchActive) {
         this.start();
       }
     });
@@ -34,20 +39,27 @@ export class Engine {
   }
 
   loop = (timestamp) => {
-    // Keep the animation frame loop running to handle updates, seeking, and subscribers when paused.
-    this.animationFrameId = requestAnimationFrame(this.loop);
-
     if (state.isExporting) {
+      this.animationFrameId = null;
       return;
     }
 
     if (!this.lastFrameTime) this.lastFrameTime = timestamp;
-    const dt = (timestamp - this.lastFrameTime) / 1000;
+    // Clamp dt to 0.1s max to avoid huge jumps when resuming from pause or background tab
+    const rawDt = (timestamp - this.lastFrameTime) / 1000;
+    const dt = Math.min(0.1, Math.max(0, rawDt));
     this.lastFrameTime = timestamp;
 
     // Notify subsystems
     for (const sub of this.subscribers) {
       sub(dt, timestamp);
+    }
+
+    // Only keep scheduling frames while playing or decaying an active glitch spike
+    if (state.isPlaying || state.glitchActive) {
+      this.animationFrameId = requestAnimationFrame(this.loop);
+    } else {
+      this.animationFrameId = null;
     }
   }
 }

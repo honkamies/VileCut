@@ -1,6 +1,7 @@
-import { state } from './state.js';
+import { state, getDefaultState, HistoryManager, SERIALIZABLE_SETTINGS_KEYS } from './state.js';
 import { UI } from './ui.js';
-import { getPseudoRandom, loadConfiguredFonts, getTimelineDuration, generateUUID, getMinimumRequiredTimelineDuration } from './utils.js';
+import { getPseudoRandom, loadConfiguredFonts, getTimelineDuration, generateUUID, formatDurationLabel, formatTimecode, parseDurationInput, getMinimumRequiredTimelineDuration } from './utils.js';
+
 import { ImageProcessor, drawInspectorPreview, drawMaskGraph } from './masking.js';
 import { GlitchManager } from './glitch.js';
 import { stopAudioSource, syncAudioPlayback, getAudioContext, activeAudioGain, activeAudioSource } from './audio.js';
@@ -20,9 +21,14 @@ import {
   swapTracks
 } from './timeline.js';
 import { VideoExporter } from './exporter.js';
+import { LyricsManager } from './lyrics.js';
+import { VhsFxManager, VHS_PRESETS } from './vhs_fx.js';
+import { WizardManager } from './wizard.js';
 
 // Run on application load
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
+  // Initialize Step-by-Step Creation Wizard
+  WizardManager.init();
   // --- COLLAPSIBLE PANEL SECTIONS ---
   document.querySelectorAll('.panel-section').forEach((section) => {
     const header = section.querySelector('.section-title-row') || section.querySelector('.section-title');
@@ -89,13 +95,13 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("Error loading " + file.name + ": " + err.message);
       }
     }
-    
+
     if (state.uploadedImages.length > 0) {
       state.imageLoaded = true;
       if (state.activeImageIndex === -1) {
         state.activeImageIndex = 0;
       }
-      
+
       ImageProcessor.reprocessAllImagesLayers();
       ImageProcessor.initializeRenderStack();
       updateImagesDeckUI();
@@ -109,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function handleMultipleImageFiles(files) {
     await addImages(files);
-    
+
     if (state.uploadedImages.length > 0) {
       engine.start();
     }
@@ -179,11 +185,12 @@ document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
     }
   }
+  window.updateImagesDeckUI = updateImagesDeckUI;
 
   function removeImageFromDeck(index) {
     const removedId = state.uploadedImages[index].id;
     state.uploadedImages.splice(index, 1);
-    
+
     if (state.uploadedImages.length === 0) {
       state.activeImageIndex = -1;
       state.imageLoaded = false;
@@ -194,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.activeImageIndex >= state.uploadedImages.length) {
         state.activeImageIndex = state.uploadedImages.length - 1;
       }
-      
+
       state.layers.forEach(layer => {
         if (layer.sourceImageId === removedId) {
           const randomImgObj = state.uploadedImages[Math.floor(Math.random() * state.uploadedImages.length)];
@@ -203,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
-    
+
     updateImagesDeckUI();
     ImageProcessor.renderActiveImageLayersPreview();
   }
@@ -213,8 +220,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!UI.exportEstimateText) return;
     const isGif = state.exportFormat === 'gif';
     const fps = parseInt(UI.exportFps ? UI.exportFps.value : (state.exportFps || 30)) || 30;
+    const defaultDur = state.isDangerZone ? 30 : 10;
 
-    let duration = 5;
+    let duration = defaultDur;
     let cycles = 0;
     if (state.exportMode === 'duration') {
       duration = state.exportDuration;
@@ -231,11 +239,16 @@ document.addEventListener('DOMContentLoaded', () => {
       cycles = loops;
     }
 
+    const totalFrames = Math.ceil(duration * fps);
+    const mins = Math.floor(duration / 60);
+    const secs = Math.round(duration % 60);
+    const timeStr = mins > 0 ? `${mins}m ${secs > 0 ? secs + 's' : ''}` : `${duration.toFixed(1)}s`;
+    const streamNotice = duration >= 45 ? ' • Direct-to-Disk Stream Active' : '';
+
     if (isGif) {
-      const totalFrames = Math.ceil(duration * fps);
-      UI.exportEstimateText.innerText = `Est. GIF: ${duration.toFixed(1)}s (${totalFrames} frames @ ${fps}fps, ${cycles.toFixed(2)} cycles)`;
+      UI.exportEstimateText.innerText = `Est. GIF: ${duration.toFixed(1)}s (${totalFrames.toLocaleString()} frames @ ${fps}fps, ${cycles.toFixed(2)} cycles)`;
     } else {
-      UI.exportEstimateText.innerText = `Est. Video Length: ${duration.toFixed(1)}s (${cycles.toFixed(2)} cycles)`;
+      UI.exportEstimateText.innerText = `Est. Video: ${timeStr} (${totalFrames.toLocaleString()} frames @ ${fps}fps, ${cycles.toFixed(2)} cycles)${streamNotice}`;
     }
   }
 
@@ -248,6 +261,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (UI.gifTip) {
       UI.gifTip.style.display = isGif ? 'flex' : 'none';
     }
+    if (UI.exportBitrateGroup) {
+      UI.exportBitrateGroup.style.display = isGif ? 'none' : 'flex';
+    }
     if (UI.mp4Warning) {
       const hasWebCodecs = typeof window.VideoEncoder !== 'undefined';
       if (state.exportFormat === 'mp4' && !hasWebCodecs) {
@@ -259,6 +275,44 @@ document.addEventListener('DOMContentLoaded', () => {
     if (UI.btnExportVideo) {
       UI.btnExportVideo.innerHTML = isGif ? '<i data-lucide="download"></i> Begin GIF Export' : '<i data-lucide="download"></i> Begin Video Export';
       if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+    }
+  }
+
+  function updateBitrateDisplay(mbps) {
+    if (!UI.exportBitrateVal) return;
+    let label = 'Ultra Crisp (Recommended)';
+    let color = state.isDangerZone ? 'var(--danger-primary)' : 'var(--cyan)';
+    if (mbps <= 8) {
+      label = 'Standard (Smaller File)';
+      color = '#94a3b8';
+    } else if (mbps <= 16) {
+      label = 'High Quality';
+      color = 'var(--cyan)';
+    } else if (mbps <= 28) {
+      label = 'Ultra Crisp (Zero Artifacts)';
+      color = state.isDangerZone ? 'var(--danger-primary)' : 'var(--cyan)';
+    } else {
+      label = 'Master Studio (Pristine)';
+      color = '#39ff14';
+    }
+    UI.exportBitrateVal.innerText = `${mbps} Mbps (${label})`;
+    UI.exportBitrateVal.style.color = color;
+
+    if (UI.btnBitratePresets) {
+      UI.btnBitratePresets.forEach(btn => {
+        const bVal = parseInt(btn.dataset.bitrate, 10);
+        if (bVal === mbps) {
+          btn.style.background = 'rgba(255,230,0,0.15)';
+          btn.style.borderColor = 'var(--danger-primary)';
+          btn.style.color = 'var(--danger-primary)';
+          btn.style.fontWeight = '700';
+        } else {
+          btn.style.background = 'rgba(255,255,255,0.06)';
+          btn.style.borderColor = 'rgba(255,255,255,0.15)';
+          btn.style.color = '#94a3b8';
+          btn.style.fontWeight = '400';
+        }
+      });
     }
   }
 
@@ -280,25 +334,492 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function checkGifLockout() {
+    const isTooLong = state.exportDuration > 30;
+    if (!UI.exportFormat) return;
+    const gifOpt = UI.exportFormat.querySelector('option[value="gif"]');
+    if (gifOpt) {
+      if (isTooLong) {
+        gifOpt.disabled = true;
+        gifOpt.innerText = 'Animated GIF (Disabled: >30s causes Out Of Memory)';
+        if (state.exportFormat === 'gif') {
+          state.exportFormat = 'mp4';
+          UI.exportFormat.value = 'mp4';
+          if (UI.gifTip) UI.gifTip.style.display = 'none';
+        }
+      } else {
+        gifOpt.disabled = false;
+        gifOpt.innerText = 'Animated GIF (Seamless Loop .gif)';
+      }
+    }
+  }
+
+  function setProjectDuration(dur) {
+    const maxDur = state.isDangerZone ? 600 : 60;
+    const minRequired = getMinimumRequiredTimelineDuration();
+    state.exportDuration = Math.min(maxDur, Math.max(minRequired, Math.round(dur)));
+    const label = state.isDangerZone ? formatDurationLabel(state.exportDuration) : `${state.exportDuration}s`;
+    const tc = formatTimecode(state.exportDuration);
+
+    if (UI.exportDuration) {
+      UI.exportDuration.max = maxDur;
+      UI.exportDuration.value = state.exportDuration;
+    }
+    if (UI.exportDurationVal) UI.exportDurationVal.innerText = label;
+    if (UI.exportDurationInput && document.activeElement !== UI.exportDurationInput) {
+      UI.exportDurationInput.value = tc;
+    }
+
+    if (UI.timelineDurationSlider) {
+      UI.timelineDurationSlider.max = maxDur;
+      UI.timelineDurationSlider.title = minRequired > (state.isDangerZone ? 5 : 1)
+        ? `Timeline duration (${minRequired}s - ${maxDur}s). Minimum locked by timeline elements.`
+        : `Drag to adjust duration (${state.isDangerZone ? '5s - 10m' : '1s - 60s'})`;
+      UI.timelineDurationSlider.value = state.exportDuration;
+    }
+    if (UI.timelineDurationVal) {
+      UI.timelineDurationVal.innerText = state.isDangerZone ? `(${state.exportDuration}s)` : `${state.exportDuration}s`;
+    }
+    if (UI.timelineDurationInput && document.activeElement !== UI.timelineDurationInput) {
+      UI.timelineDurationInput.value = tc;
+    }
+
+    checkGifLockout();
+    updateExportEstimate();
+    updateTimelineRuler();
+    updateTimelineTracks();
+    updatePlayhead();
+    if (state.selectedAudio) {
+      selectAudio(true);
+    }
+  }
+  window.setProjectDuration = setProjectDuration;
+
+  // --- UNIFIED UI SYNC & RESET HELPERS ---
+  function syncUIFromState({ reprocessLayers = false } = {}) {
+    if (UI.maskType) {
+      UI.maskType.value = state.maskType;
+      if (UI.luminositySmoothnessGroup && UI.colorRangeHueGroup) {
+        if (state.maskType === 'luminosity' || state.maskType === 'adaptive-luminosity') {
+          UI.luminositySmoothnessGroup.style.display = 'flex';
+          UI.colorRangeHueGroup.style.display = 'none';
+        } else if (state.maskType === 'color-range') {
+          UI.luminositySmoothnessGroup.style.display = 'none';
+          UI.colorRangeHueGroup.style.display = 'flex';
+        } else {
+          UI.luminositySmoothnessGroup.style.display = 'none';
+          UI.colorRangeHueGroup.style.display = 'none';
+        }
+      }
+    }
+    if (UI.layerCount) UI.layerCount.value = state.layerCount;
+    if (UI.layerCountVal) UI.layerCountVal.innerText = `${state.layerCount}`;
+    if (UI.maskFeather) UI.maskFeather.value = state.maskFeather;
+    if (UI.maskFeatherVal) UI.maskFeatherVal.innerText = `${state.maskFeather}`;
+    if (UI.hueTolerance) UI.hueTolerance.value = state.hueTolerance;
+    if (UI.hueToleranceVal) UI.hueToleranceVal.innerText = `${state.hueTolerance}°`;
+    if (UI.layerEdgeFade) UI.layerEdgeFade.value = state.layerEdgeFade;
+    if (UI.layerEdgeFadeVal) UI.layerEdgeFadeVal.innerText = `${state.layerEdgeFade}%`;
+
+    if (UI.aspectRatio) UI.aspectRatio.value = state.aspectRatio;
+    resizeMainCanvas();
+
+    if (UI.zoomSpeed) UI.zoomSpeed.value = state.zoomSpeed;
+    if (UI.zoomSpeedVal) UI.zoomSpeedVal.innerText = `${state.zoomSpeed}`;
+    if (UI.zoomDepth) UI.zoomDepth.value = state.zoomDepth;
+    if (UI.zoomDepthVal) UI.zoomDepthVal.innerText = `${state.zoomDepth}`;
+    if (UI.cameraRotation) UI.cameraRotation.value = state.cameraRotation;
+    if (UI.cameraRotationVal) UI.cameraRotationVal.innerText = `${Number(state.cameraRotation).toFixed(1)}°/s`;
+    if (UI.cameraDrift) UI.cameraDrift.value = state.cameraDrift;
+    if (UI.cameraDriftVal) UI.cameraDriftVal.innerText = `${Number(state.cameraDrift).toFixed(1)}`;
+
+    if (UI.mirrorMode) UI.mirrorMode.value = state.mirrorMode;
+    if (UI.kaleidoscopeSlicesGroup) {
+      UI.kaleidoscopeSlicesGroup.style.display = state.mirrorMode === 'kaleidoscope' ? 'flex' : 'none';
+    }
+    if (UI.kSlices) UI.kSlices.value = state.kaleidoscopeSlices;
+    if (UI.kSlicesVal) UI.kSlicesVal.innerText = `${state.kaleidoscopeSlices}`;
+
+    if (UI.btnToggleGrid) UI.btnToggleGrid.classList.toggle('active', !!state.gridActive);
+    if (UI.mainCanvas && UI.mainCanvas.parentElement) {
+      UI.mainCanvas.parentElement.classList.toggle('composition-grid', !!state.gridActive);
+    }
+
+    if (UI.glitchEnabled) UI.glitchEnabled.checked = !!state.glitchEnabled;
+    if (UI.rgbSplit) UI.rgbSplit.value = state.rgbSplit;
+    if (UI.rgbSplitVal) UI.rgbSplitVal.innerText = `${state.rgbSplit} px`;
+    if (UI.pixelSort) UI.pixelSort.value = state.pixelSort;
+    if (UI.pixelSortVal) UI.pixelSortVal.innerText = `${state.pixelSort}%`;
+    if (UI.glitchFrequency) UI.glitchFrequency.value = state.glitchFrequency;
+    if (UI.glitchFrequencyVal) UI.glitchFrequencyVal.innerText = `${state.glitchFrequency}%`;
+    if (UI.glitchSeverity) UI.glitchSeverity.value = state.glitchSeverity;
+    if (UI.glitchSeverityVal) UI.glitchSeverityVal.innerText = `${state.glitchSeverity}px`;
+    if (UI.depthModulation) UI.depthModulation.value = state.depthModulation;
+    if (UI.depthModulationVal) UI.depthModulationVal.innerText = `${state.depthModulation}%`;
+    if (UI.glitchMonochrome) UI.glitchMonochrome.checked = !!state.glitchMonochrome;
+    if (UI.glitchStyleRgbSort) UI.glitchStyleRgbSort.checked = !!state.glitchStyleRgbSort;
+    if (UI.glitchStyleVhs) UI.glitchStyleVhs.checked = !!state.glitchStyleVhs;
+    if (UI.glitchStyleBlock) UI.glitchStyleBlock.checked = !!state.glitchStyleBlock;
+    if (UI.glitchStyleLiquid) UI.glitchStyleLiquid.checked = !!state.glitchStyleLiquid;
+    if (UI.glitchStyleRandom) UI.glitchStyleRandom.checked = !!state.glitchStyleRandom;
+    if (UI.glitchStyleFlicker) UI.glitchStyleFlicker.checked = !!state.glitchStyleFlicker;
+    if (UI.glitchFlickerHighlights) UI.glitchFlickerHighlights.checked = !!state.glitchFlickerHighlightsOnly;
+
+    // Geometric FX
+    if (UI.geometricEnabled) UI.geometricEnabled.checked = !!state.geometricEnabled;
+    if (UI.geoCurtainActive) UI.geoCurtainActive.checked = !!state.geoCurtainActive;
+    const curtainControls = document.getElementById('geo-curtain-controls');
+    if (curtainControls) curtainControls.style.display = state.geoCurtainActive ? 'block' : 'none';
+    if (UI.geoCurtainDirection) UI.geoCurtainDirection.value = state.geoCurtainDirection;
+    if (UI.geoCurtainAngleGroup) UI.geoCurtainAngleGroup.style.display = state.geoCurtainDirection === 'custom' ? 'block' : 'none';
+    if (UI.geoCurtainAngle) UI.geoCurtainAngle.value = state.geoCurtainAngle;
+    if (UI.geoCurtainAngleVal) UI.geoCurtainAngleVal.innerText = `${state.geoCurtainAngle}°`;
+    if (UI.geoCurtainBidirectional) UI.geoCurtainBidirectional.checked = !!state.geoCurtainBidirectional;
+    if (UI.geoCurtainMultiEdge) UI.geoCurtainMultiEdge.checked = !!state.geoCurtainMultiEdge;
+    if (UI.geoCurtainLumTrigger) UI.geoCurtainLumTrigger.value = state.geoCurtainLumTrigger;
+    if (UI.geoCurtainLumGateGroup) UI.geoCurtainLumGateGroup.style.display = state.geoCurtainLumTrigger === 'custom' ? 'block' : 'none';
+    if (UI.geoCurtainMinLum) UI.geoCurtainMinLum.value = state.geoCurtainMinLum;
+    if (UI.geoCurtainMinLumVal) UI.geoCurtainMinLumVal.innerText = `${state.geoCurtainMinLum}%`;
+    if (UI.geoCurtainMaxLum) UI.geoCurtainMaxLum.value = state.geoCurtainMaxLum;
+    if (UI.geoCurtainMaxLumVal) UI.geoCurtainMaxLumVal.innerText = `${state.geoCurtainMaxLum}%`;
+    if (UI.geoCurtainColorMode) UI.geoCurtainColorMode.value = state.geoCurtainColorMode;
+    if (UI.geoCurtainTintGroup) UI.geoCurtainTintGroup.style.display = state.geoCurtainColorMode === 'tint' ? 'block' : 'none';
+    if (UI.geoCurtainTintColor) UI.geoCurtainTintColor.value = state.geoCurtainTintColor;
+    if (UI.geoCurtainLumMod) UI.geoCurtainLumMod.value = state.geoCurtainLumMod;
+    if (UI.geoCurtainLumModVal) UI.geoCurtainLumModVal.innerText = `${state.geoCurtainLumMod}%`;
+    if (UI.geoCurtainOriginDot) UI.geoCurtainOriginDot.checked = !!state.geoCurtainOriginDot;
+    if (UI.geoCurtainLength) UI.geoCurtainLength.value = state.geoCurtainLength;
+    if (UI.geoCurtainLengthVal) UI.geoCurtainLengthVal.innerText = `${state.geoCurtainLength}%`;
+    if (UI.geoCurtainDensity) UI.geoCurtainDensity.value = state.geoCurtainDensity;
+    if (UI.geoCurtainDensityVal) UI.geoCurtainDensityVal.innerText = `${state.geoCurtainDensity}%`;
+    if (UI.geoCurtainThreshold) UI.geoCurtainThreshold.value = state.geoCurtainThreshold;
+    if (UI.geoCurtainThresholdVal) UI.geoCurtainThresholdVal.innerText = `${state.geoCurtainThreshold}`;
+    if (UI.geoCurtainFlicker) UI.geoCurtainFlicker.value = state.geoCurtainFlicker;
+    if (UI.geoCurtainFlickerVal) UI.geoCurtainFlickerVal.innerText = `${state.geoCurtainFlicker}%`;
+    if (UI.geoCurtainOpacity) UI.geoCurtainOpacity.value = state.geoCurtainOpacity;
+    if (UI.geoCurtainOpacityVal) UI.geoCurtainOpacityVal.innerText = `${state.geoCurtainOpacity}%`;
+    if (UI.geoCurtainBlend) UI.geoCurtainBlend.value = state.geoCurtainBlend;
+
+    if (UI.geoNodesActive) UI.geoNodesActive.checked = !!state.geoNodesActive;
+    const nodesControls = document.getElementById('geo-nodes-controls');
+    if (nodesControls) nodesControls.style.display = state.geoNodesActive ? 'block' : 'none';
+    if (UI.geoNodeShape) UI.geoNodeShape.value = state.geoNodeShape;
+    if (UI.geoNodeDensity) UI.geoNodeDensity.value = state.geoNodeDensity;
+    if (UI.geoNodeDensityVal) UI.geoNodeDensityVal.innerText = `${state.geoNodeDensity}%`;
+    if (UI.geoNodeSize) UI.geoNodeSize.value = state.geoNodeSize;
+    if (UI.geoNodeSizeVal) UI.geoNodeSizeVal.innerText = `${state.geoNodeSize}px`;
+    if (UI.geoNodeColor) UI.geoNodeColor.value = state.geoNodeColor;
+
+    if (UI.geoContoursActive) UI.geoContoursActive.checked = !!state.geoContoursActive;
+    const contourControls = document.getElementById('geo-contours-controls');
+    if (contourControls) contourControls.style.display = state.geoContoursActive ? 'block' : 'none';
+    if (UI.geoContourLevels) UI.geoContourLevels.value = state.geoContourLevels;
+    if (UI.geoContourLevelsVal) UI.geoContourLevelsVal.innerText = `${state.geoContourLevels}`;
+    if (UI.geoContourOpacity) UI.geoContourOpacity.value = state.geoContourOpacity;
+    if (UI.geoContourOpacityVal) UI.geoContourOpacityVal.innerText = `${state.geoContourOpacity}%`;
+    if (UI.geoContourColor) UI.geoContourColor.value = state.geoContourColor;
+
+    // Vintage VHS & Analog Camcorder FX
+    if (UI.vhsEnabled) UI.vhsEnabled.checked = !!state.vhsEnabled;
+    const vhsControls = document.getElementById('vhs-controls-container');
+    if (vhsControls) vhsControls.style.opacity = state.vhsEnabled ? '1.0' : '0.6';
+    if (UI.vhsPreset) UI.vhsPreset.value = state.vhsPreset || 'camcorder';
+    if (UI.vhsScope) UI.vhsScope.value = state.vhsScope || 'composite';
+    if (UI.vhsTapeCrease) UI.vhsTapeCrease.value = state.vhsTapeCrease;
+    if (UI.vhsTapeCreaseVal) UI.vhsTapeCreaseVal.innerText = `${state.vhsTapeCrease}%`;
+    if (UI.vhsTrackingNoise) UI.vhsTrackingNoise.value = state.vhsTrackingNoise;
+    if (UI.vhsTrackingNoiseVal) UI.vhsTrackingNoiseVal.innerText = `${state.vhsTrackingNoise}%`;
+    if (UI.vhsVerticalJump) UI.vhsVerticalJump.value = state.vhsVerticalJump;
+    if (UI.vhsVerticalJumpVal) UI.vhsVerticalJumpVal.innerText = `${state.vhsVerticalJump}%`;
+    if (UI.vhsDegradationBlur) UI.vhsDegradationBlur.value = state.vhsDegradationBlur !== undefined ? state.vhsDegradationBlur : 40;
+    if (UI.vhsDegradationBlurVal) UI.vhsDegradationBlurVal.innerText = `${state.vhsDegradationBlur !== undefined ? state.vhsDegradationBlur : 40}%`;
+    if (UI.vhsDegradationOpacity) UI.vhsDegradationOpacity.value = state.vhsDegradationOpacity !== undefined ? state.vhsDegradationOpacity : 75;
+    if (UI.vhsDegradationOpacityVal) UI.vhsDegradationOpacityVal.innerText = `${state.vhsDegradationOpacity !== undefined ? state.vhsDegradationOpacity : 75}%`;
+    if (UI.vhsWobble) UI.vhsWobble.value = state.vhsWobble;
+    if (UI.vhsWobbleVal) UI.vhsWobbleVal.innerText = `${state.vhsWobble}%`;
+    if (UI.vhsSoftness) UI.vhsSoftness.value = state.vhsSoftness;
+    if (UI.vhsSoftnessVal) UI.vhsSoftnessVal.innerText = `${state.vhsSoftness}%`;
+    if (UI.vhsScanlines) UI.vhsScanlines.value = state.vhsScanlines;
+    if (UI.vhsScanlinesVal) UI.vhsScanlinesVal.innerText = `${state.vhsScanlines}%`;
+    if (UI.vhsScanlineBlur) UI.vhsScanlineBlur.value = state.vhsScanlineBlur !== undefined ? state.vhsScanlineBlur : 50;
+    if (UI.vhsScanlineBlurVal) UI.vhsScanlineBlurVal.innerText = `${state.vhsScanlineBlur !== undefined ? state.vhsScanlineBlur : 50}%`;
+    if (UI.vhsChromaBleed) UI.vhsChromaBleed.value = state.vhsChromaBleed;
+    if (UI.vhsChromaBleedVal) UI.vhsChromaBleedVal.innerText = `${state.vhsChromaBleed}%`;
+    if (UI.vhsGrain) UI.vhsGrain.value = state.vhsGrain;
+    if (UI.vhsGrainVal) UI.vhsGrainVal.innerText = `${state.vhsGrain}%`;
+    if (UI.vhsColorDecay) UI.vhsColorDecay.value = state.vhsColorDecay;
+    if (UI.vhsColorDecayVal) UI.vhsColorDecayVal.innerText = `${state.vhsColorDecay}%`;
+
+    // Export & Timeline
+    if (UI.exportFormat) UI.exportFormat.value = state.exportFormat;
+    if (UI.exportFps) UI.exportFps.value = `${state.exportFps}`;
+    if (UI.exportResolution) UI.exportResolution.value = state.exportResolution;
+    if (UI.exportBitrate) UI.exportBitrate.value = state.exportBitrateMbps || 24;
+    updateBitrateDisplay(state.exportBitrateMbps || 24);
+    if (UI.exportMode) UI.exportMode.value = state.exportMode;
+    if (UI.exportDurationGroup) UI.exportDurationGroup.style.display = state.exportMode === 'duration' ? 'flex' : 'none';
+    if (UI.exportLoopsGroup) UI.exportLoopsGroup.style.display = state.exportMode === 'duration' ? 'none' : 'flex';
+    if (UI.timelineDurationControl) {
+      UI.timelineDurationControl.classList.toggle('disabled', state.exportMode !== 'duration');
+    }
+    if (UI.exportLoops) UI.exportLoops.value = state.exportLoops;
+    if (UI.exportLoopsVal) UI.exportLoopsVal.innerText = `${state.exportLoops}`;
+
+    if (UI.videoFadeInActive) UI.videoFadeInActive.checked = !!state.videoFadeInActive;
+    if (UI.videoFadeInDurationGroup) UI.videoFadeInDurationGroup.style.display = state.videoFadeInActive ? 'flex' : 'none';
+    if (UI.videoFadeInDuration) UI.videoFadeInDuration.value = state.videoFadeInDuration;
+    if (UI.videoFadeInDurationVal) UI.videoFadeInDurationVal.innerText = `${Number(state.videoFadeInDuration).toFixed(1)}s`;
+
+    if (UI.videoFadeOutActive) UI.videoFadeOutActive.checked = !!state.videoFadeOutActive;
+    if (UI.videoFadeOutDurationGroup) UI.videoFadeOutDurationGroup.style.display = state.videoFadeOutActive ? 'flex' : 'none';
+    if (UI.videoFadeOutDuration) UI.videoFadeOutDuration.value = state.videoFadeOutDuration;
+    if (UI.videoFadeOutDurationVal) UI.videoFadeOutDurationVal.innerText = `${Number(state.videoFadeOutDuration).toFixed(1)}s`;
+
+    setProjectDuration(state.exportDuration);
+    updateMp4WarningVisibility();
+    updateGlitchTriggerButtonState();
+
+    if (reprocessLayers && state.uploadedImages.length > 0) {
+      ImageProcessor.reprocessAllImagesLayers();
+      ImageProcessor.initializeRenderStack();
+    }
+
+    selectText(state.selectedTextId);
+    selectGraphic(state.selectedGraphicId);
+    selectGlitchTrigger(state.selectedGlitchTriggerId);
+    updateTimelineRuler();
+    updateTimelineTracks();
+    updatePlayhead();
+    drawMaskGraph();
+    renderFrame(state.time);
+  }
+
+  function resetSettingsToDefaults({ keepOverlays = false } = {}) {
+    HistoryManager.pushState(keepOverlays ? 'Reset View' : 'Reset All Settings');
+    const defaults = getDefaultState(state.isDangerZone);
+
+    state.time = 0;
+    stopAudioSource();
+    state.cameraAngle = 0;
+    state.cameraRotationBase = 0;
+    state.activeSpikeStyle = null;
+    state.glitchZoomBoostTimer = 0;
+
+    SERIALIZABLE_SETTINGS_KEYS.forEach((key) => {
+      state[key] = defaults[key];
+    });
+    state.randomBoundaries = [];
+
+    if (!keepOverlays) {
+      state.texts = [];
+      state.selectedTextId = null;
+      state.graphics = [];
+      state.selectedGraphicId = null;
+      state.glitchTriggers = [];
+      state.selectedGlitchTriggerId = null;
+      state.audioTrack = null;
+      selectAudio(false);
+
+      if (state.videoBlocks && state.videoBlocks.length > 0) {
+        state.videoBlocks.forEach(block => {
+          if (block.element) block.element.pause();
+          URL.revokeObjectURL(block.url);
+        });
+      }
+      state.videoBlocks = [];
+      state.selectedVideoId = null;
+      selectVideo(null);
+      if (UI.videoFileInput) UI.videoFileInput.value = '';
+    }
+
+    syncUIFromState({ reprocessLayers: !keepOverlays });
+    if (state.isPlaying) {
+      syncAudioPlayback();
+    }
+  }
+
+  // --- UNDO / REDO & PROJECT SAVE / LOAD BINDINGS ---
+  const updateUndoRedoButtons = ({ canUndo, canRedo }) => {
+    if (UI.btnUndo) UI.btnUndo.disabled = !canUndo;
+    if (UI.btnRedo) UI.btnRedo.disabled = !canRedo;
+  };
+  HistoryManager.onChange = updateUndoRedoButtons;
+  updateUndoRedoButtons({ canUndo: HistoryManager.canUndo(), canRedo: HistoryManager.canRedo() });
+
+  const performUndo = () => {
+    const prevMask = `${state.maskType}:${state.layerCount}:${state.maskFeather}:${state.hueTolerance}:${state.layerEdgeFade}`;
+    if (HistoryManager.undo()) {
+      const nextMask = `${state.maskType}:${state.layerCount}:${state.maskFeather}:${state.hueTolerance}:${state.layerEdgeFade}`;
+      syncUIFromState({ reprocessLayers: prevMask !== nextMask });
+    }
+  };
+
+  const performRedo = () => {
+    const prevMask = `${state.maskType}:${state.layerCount}:${state.maskFeather}:${state.hueTolerance}:${state.layerEdgeFade}`;
+    if (HistoryManager.redo()) {
+      const nextMask = `${state.maskType}:${state.layerCount}:${state.maskFeather}:${state.hueTolerance}:${state.layerEdgeFade}`;
+      syncUIFromState({ reprocessLayers: prevMask !== nextMask });
+    }
+  };
+
+  if (UI.btnUndo) UI.btnUndo.addEventListener('click', performUndo);
+  if (UI.btnRedo) UI.btnRedo.addEventListener('click', performRedo);
+
+  if (UI.btnSaveProject) {
+    UI.btnSaveProject.addEventListener('click', () => {
+      const projectData = HistoryManager.serializeProject();
+      const jsonStr = typeof projectData === 'string' ? projectData : JSON.stringify(projectData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `vilecut_project_${Date.now()}.vilecut.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 200);
+    });
+  }
+
+  if (UI.btnLoadProject && UI.projectFileInput) {
+    UI.btnLoadProject.addEventListener('click', () => {
+      UI.projectFileInput.click();
+    });
+
+    UI.projectFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          let data = JSON.parse(evt.target.result);
+          // Backward compatibility: unwrap previously double-stringified project files
+          if (typeof data === 'string') {
+            data = JSON.parse(data);
+          }
+          if (!data || !data.settings) {
+            throw new Error('Invalid .vilecut.json project file.');
+          }
+          HistoryManager.pushState('Load Project');
+
+          Object.keys(data.settings).forEach((key) => {
+            if (SERIALIZABLE_SETTINGS_KEYS.includes(key)) {
+              state[key] = data.settings[key];
+            }
+          });
+          state.texts = Array.isArray(data.texts) ? data.texts.map(t => ({ ...t })) : [];
+          state.glitchTriggers = Array.isArray(data.glitchTriggers) ? data.glitchTriggers.map(gt => ({ ...gt })) : [];
+
+          if (Array.isArray(data.uploadedImages)) {
+            const loadedDeck = [];
+            for (const item of data.uploadedImages) {
+              if (!item.dataUrl) continue;
+              const img = await new Promise((resolve) => {
+                const im = new Image();
+                im.onload = () => resolve(im);
+                im.onerror = () => resolve(null);
+                im.src = item.dataUrl;
+              });
+              if (img) {
+                loadedDeck.push({
+                  id: item.id || generateUUID(),
+                  name: item.name || 'Image.png',
+                  img,
+                  layers: []
+                });
+              }
+            }
+            state.uploadedImages = loadedDeck;
+            state.imageLoaded = loadedDeck.length > 0;
+            state.activeImageIndex = loadedDeck.length > 0
+              ? Math.min(loadedDeck.length - 1, Math.max(0, data.activeImageIndex || 0))
+              : -1;
+            if (loadedDeck.length > 0) {
+              ImageProcessor.reprocessAllImagesLayers();
+              ImageProcessor.initializeRenderStack();
+            }
+            updateImagesDeckUI();
+          }
+
+          if (Array.isArray(data.graphics)) {
+            const loadedGraphics = [];
+            for (const g of data.graphics) {
+              const copy = { ...g };
+              if (g.dataUrl) {
+                const img = await new Promise((resolve) => {
+                  const im = new Image();
+                  im.onload = () => resolve(im);
+                  im.onerror = () => resolve(null);
+                  im.src = g.dataUrl;
+                });
+                copy.img = img;
+                delete copy.dataUrl;
+              }
+              if (copy.img) loadedGraphics.push(copy);
+            }
+            state.graphics = loadedGraphics;
+          }
+
+          state.selectedTextId = null;
+          state.selectedGraphicId = null;
+          state.selectedGlitchTriggerId = null;
+          resizeMainCanvas();
+          if (state.exportDuration) {
+            setProjectDuration(state.exportDuration);
+          }
+          syncUIFromState({ reprocessLayers: true });
+          updateTimelineTracks();
+          renderFrame(state.time);
+
+          const missingMedia = [];
+          if (data.mediaManifest?.audio?.fileName) {
+            missingMedia.push(`Audio: ${data.mediaManifest.audio.fileName}`);
+          }
+          if (Array.isArray(data.mediaManifest?.videos) && data.mediaManifest.videos.length > 0) {
+            data.mediaManifest.videos.forEach(v => {
+              if (v.fileName) missingMedia.push(`Video: ${v.fileName}`);
+            });
+          }
+          if (missingMedia.length > 0) {
+            alert(
+              'Project settings, images, graphics, and text layers restored!\n\n' +
+              'Because browsers cannot automatically read large local audio/video files from disk, please re-import:\n• ' +
+              missingMedia.join('\n• ')
+            );
+          }
+        } catch (err) {
+          console.error('Failed to load project file:', err);
+          alert('Failed to load project file: ' + err.message);
+        } finally {
+          e.target.value = '';
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
   function syncVideoPlayback() {
     if (!state.videoBlocks || state.videoBlocks.length === 0) return;
     const dur = getTimelineDuration();
     const playheadTime = state.time % dur;
-    
+
     state.videoBlocks.forEach(block => {
       const video = block.element;
       if (!video) return;
-      
+
       const isActive = (playheadTime >= block.startTime && playheadTime < block.endTime);
-      
+
       if (isActive) {
-        const targetTime = playheadTime - block.startTime;
-        if (state.isPlaying && state.imageLoaded) {
+        const targetTime = Math.min(block.duration || Infinity, (block.sourceOffset || 0) + (playheadTime - block.startTime));
+        if (state.isPlaying) {
           if (video.paused) {
             video.play().catch(e => console.log("Video auto-play blocked:", e));
           }
           const diff = Math.abs(video.currentTime - targetTime);
-          if (diff > 0.15) {
+          if (diff > 0.25) {
             video.currentTime = targetTime;
           }
         } else {
@@ -316,52 +837,333 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+  window.syncVideoPlayback = syncVideoPlayback;
 
   // --- ANIMATION LOOP DECOUPLED VIA ENGINE ---
+  let lastFpsDomUpdate = 0;
   engine.subscribe((dt, timestamp) => {
     if (dt > 0) {
       state.fps = Math.round(1 / dt);
-      UI.fpsValue.innerText = state.fps;
+      if (timestamp - lastFpsDomUpdate > 250) {
+        lastFpsDomUpdate = timestamp;
+        if (UI.fpsValue) {
+          UI.fpsValue.innerText = state.isPlaying ? state.fps : 'IDLE';
+        }
+      }
     }
 
-    if (state.isPlaying && state.imageLoaded) {
+    if (state.isPlaying || state.glitchActive) {
       const dur = getTimelineDuration();
-      state.prevTime = state.time;
-      state.time += dt;
-      
-      let wrapped = false;
-      if (state.time >= dur) {
-        state.time = state.time % dur;
-        wrapped = true;
-        // Make camera rotation continuous when wrapping time back to 0
-        state.cameraRotationBase += state.cameraRotation * dur * (Math.PI / 180);
-      }
-      
-      if (state.glitchEnabled) {
-        GlitchManager.update(dt);
-      }
+      if (state.isPlaying) {
+        state.prevTime = state.time;
+        state.time += dt;
 
-      if (state.audioTrack) {
-        if (wrapped) {
-          syncAudioPlayback();
-        } else {
-          const start = state.audioTrack.timelineStart;
-          const end = start + state.audioTrack.duration;
-          const shouldBePlaying = (state.time >= start && state.time < end);
-          if (shouldBePlaying && !activeAudioSource) {
+        let wrapped = false;
+        if (state.time >= dur) {
+          state.time = state.time % dur;
+          wrapped = true;
+          state.cameraRotationBase += state.cameraRotation * dur * (Math.PI / 180);
+        }
+
+        if (state.audioTrack) {
+          if (wrapped) {
             syncAudioPlayback();
+          } else {
+            const start = state.audioTrack.timelineStart;
+            const end = start + state.audioTrack.duration;
+            const shouldBePlaying = (state.time >= start && state.time < end);
+            if (shouldBePlaying && !activeAudioSource) {
+              syncAudioPlayback();
+            }
           }
         }
       }
-      
+
+      if (state.glitchEnabled || state.glitchActive) {
+        GlitchManager.update(dt);
+      }
+
       renderFrame(state.time);
-      updatePlayhead();
+      if (state.isPlaying) {
+        updatePlayhead();
+      }
     }
 
     if (state.videoBlocks && state.videoBlocks.length > 0) {
       syncVideoPlayback();
     }
   });
+
+  // --- DIRECT VIEWPORT CANVAS DRAG-TO-MOVE FOR SELECTED OVERLAYS ---
+  if (UI.mainCanvas) {
+    let isCanvasDragging = false;
+    let dragTarget = null;
+    let dragTargetType = null;
+    let dragStartMouseX = 0;
+    let dragStartMouseY = 0;
+    let dragStartObjX = 0;
+    let dragStartObjY = 0;
+
+    const getActiveDraggableOverlay = () => {
+      if (state.selectedTextId) {
+        const txt = state.texts.find(t => t.id === state.selectedTextId);
+        if (txt) return { obj: txt, type: 'text' };
+      }
+      if (state.selectedGraphicId) {
+        const grp = state.graphics.find(g => g.id === state.selectedGraphicId);
+        if (grp) return { obj: grp, type: 'graphic' };
+      }
+      if (state.selectedVideoId && state.videoBlocks) {
+        const vid = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+        if (vid) return { obj: vid, type: 'video' };
+      }
+      return null;
+    };
+
+    const findOverlayAtCoords = (clientX, clientY) => {
+      const rect = UI.mainCanvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      const cw = UI.mainCanvas.width;
+      const ch = UI.mainCanvas.height;
+
+      const clickX = ((clientX - rect.left) / rect.width) * cw;
+      const clickY = ((clientY - rect.top) / rect.height) * ch;
+      const dur = getTimelineDuration();
+      const loopTime = ((state.time % dur) + dur) % dur;
+
+      // 1. Check Graphic Overlays (top-most first)
+      const hitMargin = Math.max(24, Math.round(cw * 0.04));
+      if (state.graphics && state.graphics.length > 0) {
+        for (let i = state.graphics.length - 1; i >= 0; i--) {
+          const grp = state.graphics[i];
+          if (loopTime < grp.startTime || loopTime > grp.endTime) continue;
+          if (!grp.img) continue;
+          const cx = cw / 2 + (grp.x || 0) * cw;
+          const cy = ch / 2 + (grp.y || 0) * ch;
+          const scaleFactor = grp.scale !== undefined ? grp.scale / 100 : 1.0;
+          const scaleMultiplier = cw / 1024;
+          const finalW = Math.max(36, grp.img.width * scaleFactor * scaleMultiplier);
+          const finalH = Math.max(36, grp.img.height * scaleFactor * scaleMultiplier);
+
+          if (clickX >= cx - finalW / 2 - hitMargin && clickX <= cx + finalW / 2 + hitMargin &&
+              clickY >= cy - finalH / 2 - hitMargin && clickY <= cy + finalH / 2 + hitMargin) {
+            return { obj: grp, type: 'graphic' };
+          }
+        }
+      }
+
+      // 2. Check Text Overlays
+      if (state.texts && state.texts.length > 0) {
+        for (let i = state.texts.length - 1; i >= 0; i--) {
+          const txt = state.texts[i];
+          if (loopTime < txt.startTime || loopTime > txt.endTime) continue;
+          const cx = cw / 2 + (txt.x || 0) * cw;
+          const cy = ch / 2 + (txt.y || 0) * ch;
+          const scaleMultiplier = cw / 1024;
+          const drawSize = (txt.fontSize || 42) * scaleMultiplier;
+          const approxW = Math.max(60, (txt.text || '').length * drawSize * 0.6);
+          const approxH = Math.max(30, drawSize * 1.5);
+
+          if (clickX >= cx - approxW / 2 - hitMargin && clickX <= cx + approxW / 2 + hitMargin &&
+              clickY >= cy - approxH / 2 - hitMargin && clickY <= cy + approxH / 2 + hitMargin) {
+            return { obj: txt, type: 'text' };
+          }
+        }
+      }
+
+      // 3. Check Video Overlays
+      if (state.videoBlocks && state.videoBlocks.length > 0) {
+        for (let i = state.videoBlocks.length - 1; i >= 0; i--) {
+          const vid = state.videoBlocks[i];
+          if (loopTime < vid.startTime || loopTime > vid.endTime) continue;
+          const cx = cw / 2 + (vid.x || 0) * cw;
+          const cy = ch / 2 + (vid.y || 0) * ch;
+          const finalW = Math.max(40, (vid.width || 300) * (cw / 1024));
+          const finalH = Math.max(40, (vid.height || 200) * (cw / 1024));
+          if (clickX >= cx - finalW / 2 - hitMargin && clickX <= cx + finalW / 2 + hitMargin &&
+              clickY >= cy - finalH / 2 - hitMargin && clickY <= cy + finalH / 2 + hitMargin) {
+            return { obj: vid, type: 'video' };
+          }
+        }
+      }
+
+      return null;
+    };
+
+    UI.mainCanvas.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      let active = getActiveDraggableOverlay();
+      const hit = findOverlayAtCoords(e.clientX, e.clientY);
+      if (hit) {
+        if (hit.type === 'graphic') selectGraphic(hit.obj.id);
+        else if (hit.type === 'text') selectText(hit.obj.id);
+        else if (hit.type === 'video') selectVideo(hit.obj.id);
+        active = hit;
+      }
+      if (!active) {
+        if (state.graphics && state.graphics.length === 1) {
+          selectGraphic(state.graphics[0].id);
+          active = { obj: state.graphics[0], type: 'graphic' };
+        } else if (state.texts && state.texts.length === 1) {
+          selectText(state.texts[0].id);
+          active = { obj: state.texts[0], type: 'text' };
+        } else if (state.videoBlocks && state.videoBlocks.length === 1) {
+          selectVideo(state.videoBlocks[0].id);
+          active = { obj: state.videoBlocks[0], type: 'video' };
+        }
+      }
+      if (!active) return;
+
+      HistoryManager.pushState('Move Overlay on Canvas');
+      isCanvasDragging = true;
+      dragTarget = active.obj;
+      dragTargetType = active.type;
+      dragStartMouseX = e.clientX;
+      dragStartMouseY = e.clientY;
+      dragStartObjX = dragTarget.x || 0;
+      dragStartObjY = dragTarget.y || 0;
+      UI.mainCanvas.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    UI.mainCanvas.addEventListener('mousemove', (e) => {
+      if (isCanvasDragging) return;
+      const hit = findOverlayAtCoords(e.clientX, e.clientY);
+      if (hit || getActiveDraggableOverlay()) {
+        UI.mainCanvas.style.cursor = 'grab';
+      } else {
+        UI.mainCanvas.style.cursor = '';
+      }
+    });
+
+    // Touch Support for Direct Canvas Dragging
+    UI.mainCanvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 0) return;
+      const touch = e.touches[0];
+      let active = getActiveDraggableOverlay();
+      const hit = findOverlayAtCoords(touch.clientX, touch.clientY);
+      if (hit) {
+        if (hit.type === 'graphic') selectGraphic(hit.obj.id);
+        else if (hit.type === 'text') selectText(hit.obj.id);
+        else if (hit.type === 'video') selectVideo(hit.obj.id);
+        active = hit;
+      }
+      if (!active) {
+        if (state.graphics && state.graphics.length === 1) {
+          selectGraphic(state.graphics[0].id);
+          active = { obj: state.graphics[0], type: 'graphic' };
+        } else if (state.texts && state.texts.length === 1) {
+          selectText(state.texts[0].id);
+          active = { obj: state.texts[0], type: 'text' };
+        } else if (state.videoBlocks && state.videoBlocks.length === 1) {
+          selectVideo(state.videoBlocks[0].id);
+          active = { obj: state.videoBlocks[0], type: 'video' };
+        }
+      }
+      if (!active) return;
+
+      HistoryManager.pushState('Move Overlay on Canvas');
+      isCanvasDragging = true;
+      dragTarget = active.obj;
+      dragTargetType = active.type;
+      dragStartMouseX = touch.clientX;
+      dragStartMouseY = touch.clientY;
+      dragStartObjX = dragTarget.x || 0;
+      dragStartObjY = dragTarget.y || 0;
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isCanvasDragging || !dragTarget || e.touches.length === 0) return;
+      const touch = e.touches[0];
+      const rect = UI.mainCanvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      const dx = (touch.clientX - dragStartMouseX) / rect.width;
+      const dy = (touch.clientY - dragStartMouseY) / rect.height;
+
+      const clampedX = Math.max(-0.5, Math.min(0.5, dragStartObjX + dx));
+      const clampedY = Math.max(-0.5, Math.min(0.5, dragStartObjY + dy));
+
+      dragTarget.x = Math.round(clampedX * 100) / 100;
+      dragTarget.y = Math.round(clampedY * 100) / 100;
+
+      if (dragTargetType === 'text') {
+        if (UI.textPosX) UI.textPosX.value = dragTarget.x;
+        if (UI.textPosXVal) UI.textPosXVal.innerText = `${Math.round(dragTarget.x * 100)}%`;
+        if (UI.textPosY) UI.textPosY.value = dragTarget.y;
+        if (UI.textPosYVal) UI.textPosYVal.innerText = `${Math.round(dragTarget.y * 100)}%`;
+      } else if (dragTargetType === 'graphic') {
+        const pctX = Math.round(dragTarget.x * 100);
+        const pctY = Math.round(dragTarget.y * 100);
+        if (UI.graphicPosX) UI.graphicPosX.value = pctX;
+        if (UI.graphicPosXVal) UI.graphicPosXVal.innerText = `${pctX}%`;
+        if (UI.graphicPosY) UI.graphicPosY.value = pctY;
+        if (UI.graphicPosYVal) UI.graphicPosYVal.innerText = `${pctY}%`;
+      } else if (dragTargetType === 'video') {
+        if (UI.videoPosX) UI.videoPosX.value = dragTarget.x;
+        if (UI.videoPosXVal) UI.videoPosXVal.innerText = `${Math.round(dragTarget.x * 100)}%`;
+        if (UI.videoPosY) UI.videoPosY.value = dragTarget.y;
+        if (UI.videoPosYVal) UI.videoPosYVal.innerText = `${Math.round(dragTarget.y * 100)}%`;
+      }
+
+      renderFrame(state.time);
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => {
+      if (isCanvasDragging) {
+        isCanvasDragging = false;
+        dragTarget = null;
+        dragTargetType = null;
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isCanvasDragging || !dragTarget) return;
+      const rect = UI.mainCanvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      const dx = (e.clientX - dragStartMouseX) / rect.width;
+      const dy = (e.clientY - dragStartMouseY) / rect.height;
+
+      const clampedX = Math.max(-0.5, Math.min(0.5, dragStartObjX + dx));
+      const clampedY = Math.max(-0.5, Math.min(0.5, dragStartObjY + dy));
+
+      dragTarget.x = Math.round(clampedX * 100) / 100;
+      dragTarget.y = Math.round(clampedY * 100) / 100;
+
+      if (dragTargetType === 'text') {
+        if (UI.textPosX) UI.textPosX.value = dragTarget.x;
+        if (UI.textPosXVal) UI.textPosXVal.innerText = `${Math.round(dragTarget.x * 100)}%`;
+        if (UI.textPosY) UI.textPosY.value = dragTarget.y;
+        if (UI.textPosYVal) UI.textPosYVal.innerText = `${Math.round(dragTarget.y * 100)}%`;
+      } else if (dragTargetType === 'graphic') {
+        const pctX = Math.round(dragTarget.x * 100);
+        const pctY = Math.round(dragTarget.y * 100);
+        if (UI.graphicPosX) UI.graphicPosX.value = pctX;
+        if (UI.graphicPosXVal) UI.graphicPosXVal.innerText = `${pctX}%`;
+        if (UI.graphicPosY) UI.graphicPosY.value = pctY;
+        if (UI.graphicPosYVal) UI.graphicPosYVal.innerText = `${pctY}%`;
+      } else if (dragTargetType === 'video') {
+        if (UI.videoPosX) UI.videoPosX.value = dragTarget.x;
+        if (UI.videoPosXVal) UI.videoPosXVal.innerText = `${Math.round(dragTarget.x * 100)}%`;
+        if (UI.videoPosY) UI.videoPosY.value = dragTarget.y;
+        if (UI.videoPosYVal) UI.videoPosYVal.innerText = `${Math.round(dragTarget.y * 100)}%`;
+      }
+
+      renderFrame(state.time);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isCanvasDragging) {
+        isCanvasDragging = false;
+        dragTarget = null;
+        dragTargetType = null;
+        UI.mainCanvas.style.cursor = '';
+      }
+    });
+  }
 
   // --- DRAG AND DROP / FILE INPUTS ---
   window.addEventListener('dragover', (e) => {
@@ -408,12 +1210,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Toggle Switches Bindings
   UI.glitchEnabled.addEventListener('change', (e) => {
+    HistoryManager.pushState('Toggle Glitch');
     state.glitchEnabled = e.target.checked;
     updateGlitchTriggerButtonState();
   });
 
   if (UI.glitchMonochrome) {
     UI.glitchMonochrome.addEventListener('change', (e) => {
+      HistoryManager.pushState('Toggle Monochrome Glitch');
       state.glitchMonochrome = e.target.checked;
       renderFrame(state.time);
     });
@@ -422,6 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const bindGlitchCheckbox = (elem, stateKey) => {
     if (elem) {
       elem.addEventListener('change', (e) => {
+        HistoryManager.pushState(`Toggle ${stateKey}`);
         state[stateKey] = e.target.checked;
         renderFrame(state.time);
       });
@@ -448,6 +1253,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Layer Parameter Updates
   UI.maskType.addEventListener('change', (e) => {
+    HistoryManager.pushState('Change Mask Type');
     state.maskType = e.target.value;
     if (state.maskType === 'luminosity' || state.maskType === 'adaptive-luminosity') {
       UI.luminositySmoothnessGroup.style.display = 'flex';
@@ -547,6 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       UI.btnPlayPause.classList.remove('active');
       UI.playPauseIcon.setAttribute('data-lucide', 'play');
+      if (UI.fpsValue) UI.fpsValue.innerText = 'IDLE';
       stopAudioSource();
     }
     if (state.videoBlocks && state.videoBlocks.length > 0) {
@@ -564,6 +1371,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.isPlaying = false;
       UI.btnPlayPause.classList.remove('active');
       UI.playPauseIcon.setAttribute('data-lucide', 'play');
+      if (UI.fpsValue) UI.fpsValue.innerText = 'IDLE';
       stopAudioSource();
       if (typeof lucide !== 'undefined') lucide.createIcons();
     }
@@ -624,131 +1432,35 @@ document.addEventListener('DOMContentLoaded', () => {
     UI.mainCanvas.parentElement.classList.toggle('composition-grid', state.gridActive);
   });
 
+  // Viewport Canvas Backdrop Brightness (Black -> Grey for dark video visibility; does not affect export)
+  const viewportBgSlider = document.getElementById('viewport-bg-brightness');
+  const viewportAreaEl = document.querySelector('.viewport-area');
+  const applyViewportBgBrightness = (pct) => {
+    const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+    const v = Math.round((clamped / 100) * 200);
+    if (viewportAreaEl) {
+      viewportAreaEl.style.background = `rgb(${v}, ${v}, ${v})`;
+    }
+    if (UI.mainCanvas) {
+      UI.mainCanvas.style.borderColor = clamped > 55
+        ? 'rgba(0, 0, 0, 0.45)'
+        : 'rgba(255, 255, 255, 0.28)';
+    }
+  };
+  if (viewportBgSlider) {
+    const savedBg = localStorage.getItem('vilecut_viewport_bg');
+    const initialBg = savedBg !== null ? parseInt(savedBg, 10) : 18;
+    viewportBgSlider.value = initialBg;
+    applyViewportBgBrightness(initialBg);
+    viewportBgSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      applyViewportBgBrightness(val);
+      localStorage.setItem('vilecut_viewport_bg', String(val));
+    });
+  }
+
   UI.btnResetView.addEventListener('click', () => {
-    state.time = 0;
-    stopAudioSource();
-    if (state.isPlaying) {
-      syncAudioPlayback();
-    }
-    state.cameraAngle = 0;
-    
-    UI.aspectRatio.value = 'original';
-    state.aspectRatio = 'original';
-
-    UI.layerEdgeFade.value = 10;
-    state.layerEdgeFade = 10;
-    UI.layerEdgeFadeVal.innerText = '10%';
-
-    UI.zoomSpeed.value = 0.05;
-    state.zoomSpeed = 0.05;
-    UI.zoomSpeedVal.innerText = '0.05';
-    
-    UI.zoomDepth.value = 4.0;
-    state.zoomDepth = 4.0;
-    UI.zoomDepthVal.innerText = '4.0';
-
-    UI.cameraRotation.value = 0;
-    state.cameraRotation = 0;
-    state.cameraRotationBase = 0;
-    UI.cameraRotationVal.innerText = '0.0°/s';
-
-    UI.cameraDrift.value = 0;
-    state.cameraDrift = 0;
-    UI.cameraDriftVal.innerText = '0.0';
-
-    UI.exportMode.value = 'duration';
-    state.exportMode = 'duration';
-    UI.exportDuration.value = 5;
-    state.exportDuration = 5;
-    UI.exportDurationVal.innerText = '5s';
-    if (UI.timelineDurationSlider) {
-      UI.timelineDurationSlider.value = 5;
-    }
-    if (UI.timelineDurationVal) {
-      UI.timelineDurationVal.innerText = '5s';
-    }
-    if (UI.timelineDurationControl) {
-      UI.timelineDurationControl.classList.remove('disabled');
-    }
-    UI.exportLoops.value = 1;
-    state.exportLoops = 1;
-    UI.exportLoopsVal.innerText = '1';
-    if (UI.exportFormat) {
-      UI.exportFormat.value = 'mp4';
-    }
-    state.exportFormat = 'mp4';
-    updateMp4WarningVisibility();
-    state.timelineZoom = 1.0;
-    UI.exportDurationGroup.style.display = 'flex';
-    UI.exportLoopsGroup.style.display = 'none';
-    updateExportEstimate();
-
-    UI.mirrorMode.value = 'none';
-    state.mirrorMode = 'none';
-    UI.kaleidoscopeSlicesGroup.style.display = 'none';
-
-    UI.rgbSplit.value = 0;
-    state.rgbSplit = 0;
-    UI.rgbSplitVal.innerText = '0 px';
-
-    UI.pixelSort.value = 0;
-    state.pixelSort = 0;
-    UI.pixelSortVal.innerText = '0%';
-
-    UI.depthModulation.value = 0;
-    state.depthModulation = 0;
-    UI.depthModulationVal.innerText = '0%';
-
-    UI.glitchEnabled.checked = false;
-    state.glitchEnabled = false;
-
-    if (UI.glitchMonochrome) {
-      UI.glitchMonochrome.checked = false;
-    }
-    state.glitchMonochrome = false;
-
-    if (UI.glitchStyleRgbSort) UI.glitchStyleRgbSort.checked = true;
-    if (UI.glitchStyleVhs) UI.glitchStyleVhs.checked = false;
-    if (UI.glitchStyleBlock) UI.glitchStyleBlock.checked = false;
-    if (UI.glitchStyleLiquid) UI.glitchStyleLiquid.checked = false;
-    if (UI.glitchStyleRandom) UI.glitchStyleRandom.checked = false;
-    if (UI.glitchStyleFlicker) UI.glitchStyleFlicker.checked = false;
-    if (UI.glitchFlickerHighlights) UI.glitchFlickerHighlights.checked = false;
-    state.glitchStyleRgbSort = true;
-    state.glitchStyleVhs = false;
-    state.glitchStyleBlock = false;
-    state.glitchStyleLiquid = false;
-    state.glitchStyleRandom = false;
-    state.glitchStyleFlicker = false;
-    state.glitchFlickerHighlightsOnly = false;
-    state.activeSpikeStyle = null;
-
-    UI.videoFadeInActive.checked = false;
-    state.videoFadeInActive = false;
-    UI.videoFadeInDurationGroup.style.display = 'none';
-    UI.videoFadeInDuration.value = 0.5;
-    state.videoFadeInDuration = 0.5;
-    UI.videoFadeInDurationVal.innerText = '0.5s';
-
-    UI.videoFadeOutActive.checked = false;
-    state.videoFadeOutActive = false;
-    UI.videoFadeOutDurationGroup.style.display = 'none';
-    UI.videoFadeOutDuration.value = 0.5;
-    state.videoFadeOutDuration = 0.5;
-    UI.videoFadeOutDurationVal.innerText = '0.5s';
-
-    state.selectedTextId = null;
-    selectText(null);
-    state.graphics = [];
-    state.selectedGraphicId = null;
-    selectGraphic(null);
-    updateTimelineRuler();
-    updateTimelineTracks();
-    updatePlayhead();
-
-    renderFrame(0);
-    drawMaskGraph();
-    updateGlitchTriggerButtonState();
+    resetSettingsToDefaults({ keepOverlays: true });
   });
 
   if (UI.btnInfoModal) {
@@ -760,37 +1472,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (UI.btnCloseInfo) {
     UI.btnCloseInfo.addEventListener('click', () => {
       UI.infoOverlay.classList.add('hidden');
-    });
-  }
-
-  if (UI.welcomeOverlay) {
-    const hasSeenWelcome = localStorage.getItem('vilecut_welcomed');
-    if (!hasSeenWelcome) {
-      UI.welcomeOverlay.classList.remove('hidden');
-    }
-
-    const closeWelcome = () => {
-      UI.welcomeOverlay.classList.add('hidden');
-      localStorage.setItem('vilecut_welcomed', 'true');
-    };
-
-    if (UI.btnCloseWelcome) {
-      UI.btnCloseWelcome.addEventListener('click', closeWelcome);
-    }
-    if (UI.btnCloseWelcomeX) {
-      UI.btnCloseWelcomeX.addEventListener('click', closeWelcome);
-    }
-    
-    UI.welcomeOverlay.addEventListener('click', (e) => {
-      if (e.target === UI.welcomeOverlay) {
-        closeWelcome();
-      }
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !UI.welcomeOverlay.classList.contains('hidden')) {
-        closeWelcome();
-      }
     });
   }
 
@@ -809,255 +1490,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (UI.btnResetSettingsOnly) {
     UI.btnResetSettingsOnly.addEventListener('click', () => {
-      // 1. Time & playback state
-      state.time = 0;
-      stopAudioSource();
-      state.cameraAngle = 0;
-      state.isPlaying = true;
-      UI.btnPlayPause.classList.add('active');
-      UI.playPauseIcon.setAttribute('data-lucide', 'pause');
-      state.lastFrameTime = performance.now();
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-
-      // 2. Masking parameters
-      state.maskType = 'adaptive-luminosity';
-      UI.maskType.value = 'adaptive-luminosity';
-      UI.luminositySmoothnessGroup.style.display = 'flex';
-      UI.colorRangeHueGroup.style.display = 'none';
-
-      state.layerCount = 5;
-      UI.layerCount.value = 5;
-      UI.layerCountVal.innerText = '5';
-
-      state.maskFeather = 0.3;
-      UI.maskFeather.value = 0.3;
-      UI.maskFeatherVal.innerText = '0.30';
-
-      state.hueTolerance = 45;
-      UI.hueTolerance.value = 45;
-      UI.hueToleranceVal.innerText = '45°';
-
-      state.layerEdgeFade = 10;
-      UI.layerEdgeFade.value = 10;
-      UI.layerEdgeFadeVal.innerText = '10%';
-
-      state.randomBoundaries = [];
-
-      // 3. Viewport/Motion Parameters
-      state.aspectRatio = 'original';
-      UI.aspectRatio.value = 'original';
-      resizeMainCanvas();
-
-      state.zoomSpeed = 0.05;
-      UI.zoomSpeed.value = 0.05;
-      UI.zoomSpeedVal.innerText = '0.05';
-
-      state.zoomDepth = 4.0;
-      UI.zoomDepth.value = 4.0;
-      UI.zoomDepthVal.innerText = '4.0';
-
-      state.cameraRotation = 0;
-      state.cameraRotationBase = 0;
-      UI.cameraRotation.value = 0;
-      UI.cameraRotationVal.innerText = '0.0°/s';
-
-      state.cameraDrift = 0.0;
-      UI.cameraDrift.value = 0;
-      UI.cameraDriftVal.innerText = '0.0';
-
-      state.mirrorMode = 'none';
-      UI.mirrorMode.value = 'none';
-      UI.kaleidoscopeSlicesGroup.style.display = 'none';
-
-      state.kaleidoscopeSlices = 8;
-      UI.kSlices.value = 8;
-      UI.kSlicesVal.innerText = '8';
-
-      state.gridActive = false;
-      UI.btnToggleGrid.classList.remove('active');
-      UI.mainCanvas.parentElement.classList.remove('composition-grid');
-
-      // 4. Glitch FX
-      state.rgbSplit = 0;
-      UI.rgbSplit.value = 0;
-      UI.rgbSplitVal.innerText = '0 px';
-
-      state.pixelSort = 0;
-      UI.pixelSort.value = 0;
-      UI.pixelSortVal.innerText = '0%';
-
-      state.glitchFrequency = 5;
-      UI.glitchFrequency.value = 5;
-      UI.glitchFrequencyVal.innerText = '5%';
-
-      state.glitchSeverity = 10;
-      UI.glitchSeverity.value = 10;
-      UI.glitchSeverityVal.innerText = '10px';
-
-      state.depthModulation = 0;
-      UI.depthModulation.value = 0;
-      UI.depthModulationVal.innerText = '0%';
-
-      state.glitchEnabled = false;
-      UI.glitchEnabled.checked = false;
-
-      state.glitchMonochrome = false;
-      if (UI.glitchMonochrome) {
-        UI.glitchMonochrome.checked = false;
-      }
-
-      state.glitchStyleRgbSort = true;
-      if (UI.glitchStyleRgbSort) UI.glitchStyleRgbSort.checked = true;
-      state.glitchStyleVhs = false;
-      if (UI.glitchStyleVhs) UI.glitchStyleVhs.checked = false;
-      state.glitchStyleBlock = false;
-      if (UI.glitchStyleBlock) UI.glitchStyleBlock.checked = false;
-      state.glitchStyleLiquid = false;
-      if (UI.glitchStyleLiquid) UI.glitchStyleLiquid.checked = false;
-      state.glitchStyleRandom = false;
-      if (UI.glitchStyleRandom) UI.glitchStyleRandom.checked = false;
-      state.glitchStyleFlicker = false;
-      if (UI.glitchStyleFlicker) UI.glitchStyleFlicker.checked = false;
-      state.glitchFlickerHighlightsOnly = false;
-      if (UI.glitchFlickerHighlights) UI.glitchFlickerHighlights.checked = false;
-      state.activeSpikeStyle = null;
-
-      // 4.5 Geometric FX Reset
-      state.geometricEnabled = false;
-      if (UI.geometricEnabled) UI.geometricEnabled.checked = false;
-      state.geoCurtainActive = false;
-      if (UI.geoCurtainActive) UI.geoCurtainActive.checked = false;
-      const curtainControls = document.getElementById('geo-curtain-controls');
-      if (curtainControls) curtainControls.style.display = 'none';
-      state.geoCurtainLumTrigger = 'all';
-      if (UI.geoCurtainLumTrigger) UI.geoCurtainLumTrigger.value = 'all';
-      if (UI.geoCurtainLumGateGroup) UI.geoCurtainLumGateGroup.style.display = 'none';
-      state.geoCurtainMinLum = 0;
-      if (UI.geoCurtainMinLum) UI.geoCurtainMinLum.value = 0;
-      if (UI.geoCurtainMinLumVal) UI.geoCurtainMinLumVal.innerText = '0%';
-      state.geoCurtainMaxLum = 100;
-      if (UI.geoCurtainMaxLum) UI.geoCurtainMaxLum.value = 100;
-      if (UI.geoCurtainMaxLumVal) UI.geoCurtainMaxLumVal.innerText = '100%';
-      state.geoCurtainColorMode = 'neon';
-      if (UI.geoCurtainColorMode) UI.geoCurtainColorMode.value = 'neon';
-      if (UI.geoCurtainTintGroup) UI.geoCurtainTintGroup.style.display = 'none';
-      state.geoCurtainLumMod = 40;
-      if (UI.geoCurtainLumMod) UI.geoCurtainLumMod.value = 40;
-      if (UI.geoCurtainLumModVal) UI.geoCurtainLumModVal.innerText = '40%';
-      state.geoCurtainOriginDot = true;
-      if (UI.geoCurtainOriginDot) UI.geoCurtainOriginDot.checked = true;
-      state.geoCurtainMultiEdge = false;
-      if (UI.geoCurtainMultiEdge) UI.geoCurtainMultiEdge.checked = false;
-      state.geoNodesActive = false;
-      if (UI.geoNodesActive) UI.geoNodesActive.checked = false;
-      const nodesControls = document.getElementById('geo-nodes-controls');
-      if (nodesControls) nodesControls.style.display = 'none';
-      state.geoContoursActive = false;
-      if (UI.geoContoursActive) UI.geoContoursActive.checked = false;
-      const contourControls = document.getElementById('geo-contours-controls');
-      if (contourControls) contourControls.style.display = 'none';
-
-      // 5. Exporter Settings
-      state.exportFormat = 'mp4';
-      if (UI.exportFormat) {
-        UI.exportFormat.value = 'mp4';
-      }
-      updateMp4WarningVisibility();
-      state.timelineZoom = 1.0;
-
-      state.exportFps = 30;
-      UI.exportFps.value = '30';
-
-      state.exportResolution = 'viewport';
-      UI.exportResolution.value = 'viewport';
-
-      state.exportMode = 'duration';
-      UI.exportMode.value = 'duration';
-
-      state.exportDuration = 5;
-      UI.exportDuration.value = 5;
-      UI.exportDurationVal.innerText = '5s';
-      if (UI.timelineDurationSlider) {
-        UI.timelineDurationSlider.value = 5;
-      }
-      if (UI.timelineDurationVal) {
-        UI.timelineDurationVal.innerText = '5s';
-      }
-      if (UI.timelineDurationControl) {
-        UI.timelineDurationControl.classList.remove('disabled');
-      }
-
-      state.exportLoops = 1;
-      UI.exportLoops.value = 1;
-      UI.exportLoopsVal.innerText = '1';
-
-      UI.exportDurationGroup.style.display = 'flex';
-      UI.exportLoopsGroup.style.display = 'none';
-
-      state.videoFadeInActive = false;
-      UI.videoFadeInActive.checked = false;
-      UI.videoFadeInDurationGroup.style.display = 'none';
-      state.videoFadeInDuration = 0.5;
-      UI.videoFadeInDuration.value = 0.5;
-      UI.videoFadeInDurationVal.innerText = '0.5s';
-
-      state.videoFadeOutActive = false;
-      UI.videoFadeOutActive.checked = false;
-      UI.videoFadeOutDurationGroup.style.display = 'none';
-      state.videoFadeOutDuration = 0.5;
-      UI.videoFadeOutDuration.value = 0.5;
-      UI.videoFadeOutDurationVal.innerText = '0.5s';
-
-      // 6. Overlays (Texts, Graphics, Audio)
-      state.texts = [];
-      state.selectedTextId = null;
-      selectText(null);
-
-      state.graphics = [];
-      state.selectedGraphicId = null;
-      selectGraphic(null);
-
-      state.glitchTriggers = [];
-      state.selectedGlitchTriggerId = null;
-      selectGlitchTrigger(null);
-
-      state.audioTrack = null;
-      selectAudio(false);
-
-      if (state.videoBlocks && state.videoBlocks.length > 0) {
-        state.videoBlocks.forEach(block => {
-          if (block.element) {
-            block.element.pause();
-          }
-          URL.revokeObjectURL(block.url);
-        });
-      }
-      state.videoBlocks = [];
-      state.selectedVideoId = null;
-      selectVideo(null);
-      if (UI.videoFileInput) {
-        UI.videoFileInput.value = '';
-      }
-
-      // 7. Re-process layer stacks to apply default mask settings
-      if (state.uploadedImages.length > 0) {
-        ImageProcessor.reprocessAllImagesLayers();
-        ImageProcessor.initializeRenderStack();
-      }
-
-      // 8. Update timelines and canvas
-      updateExportEstimate();
-      updateTimelineRuler();
-      updateTimelineTracks();
-      updatePlayhead();
-      drawMaskGraph();
-      renderFrame(0);
-
-      // 9. Sync audio
-      syncAudioPlayback();
-      updateGlitchTriggerButtonState();
+      resetSettingsToDefaults({ keepOverlays: false });
     });
   }
 
@@ -1083,6 +1516,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Sidebar Parameters Bindings
   UI.aspectRatio.addEventListener('change', (e) => {
+    HistoryManager.pushState('Change Aspect Ratio');
     state.aspectRatio = e.target.value;
     resizeMainCanvas();
     renderFrame(state.time);
@@ -1125,6 +1559,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   UI.mirrorMode.addEventListener('change', (e) => {
+    HistoryManager.pushState('Change Mirror Mode');
     state.mirrorMode = e.target.value;
     if (state.mirrorMode === 'kaleidoscope') {
       UI.kaleidoscopeSlicesGroup.style.display = 'flex';
@@ -1171,15 +1606,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Micro-Geometric & Pixel FX Bindings ---
   if (UI.geometricEnabled) {
     UI.geometricEnabled.addEventListener('change', (e) => {
+      HistoryManager.pushState('Toggle Geometric FX');
       state.geometricEnabled = e.target.checked;
       renderFrame(state.time);
     });
   }
 
-  // Module A: Spectral Edge Curtain
   const geoCurtainControls = document.getElementById('geo-curtain-controls');
   if (UI.geoCurtainActive) {
     UI.geoCurtainActive.addEventListener('change', (e) => {
+      HistoryManager.pushState('Toggle Edge Curtain');
       state.geoCurtainActive = e.target.checked;
       if (geoCurtainControls) geoCurtainControls.style.display = e.target.checked ? 'block' : 'none';
       renderFrame(state.time);
@@ -1332,6 +1768,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const geoNodesControls = document.getElementById('geo-nodes-controls');
   if (UI.geoNodesActive) {
     UI.geoNodesActive.addEventListener('change', (e) => {
+      HistoryManager.pushState('Toggle Geometry Nodes');
       state.geoNodesActive = e.target.checked;
       if (geoNodesControls) geoNodesControls.style.display = e.target.checked ? 'block' : 'none';
       renderFrame(state.time);
@@ -1376,6 +1813,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const geoContoursControls = document.getElementById('geo-contours-controls');
   if (UI.geoContoursActive) {
     UI.geoContoursActive.addEventListener('change', (e) => {
+      HistoryManager.pushState('Toggle Contours');
       state.geoContoursActive = e.target.checked;
       if (geoContoursControls) geoContoursControls.style.display = e.target.checked ? 'block' : 'none';
       renderFrame(state.time);
@@ -1410,6 +1848,61 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Vintage VHS & Analog Camcorder FX Bindings
+  if (UI.vhsEnabled) {
+    UI.vhsEnabled.addEventListener('change', (e) => {
+      HistoryManager.pushState('Toggle VHS FX');
+      state.vhsEnabled = e.target.checked;
+      const vhsControls = document.getElementById('vhs-controls-container');
+      if (vhsControls) vhsControls.style.opacity = state.vhsEnabled ? '1.0' : '0.6';
+      renderFrame(state.time);
+    });
+  }
+
+  if (UI.vhsPreset) {
+    UI.vhsPreset.addEventListener('change', (e) => {
+      HistoryManager.pushState('Change VHS Preset');
+      VhsFxManager.applyPreset(e.target.value);
+      syncUIFromState();
+      renderFrame(state.time);
+    });
+  }
+
+  if (UI.vhsScope) {
+    UI.vhsScope.addEventListener('change', (e) => {
+      state.vhsScope = e.target.value;
+      renderFrame(state.time);
+    });
+  }
+
+  const vhsSliders = [
+    { el: UI.vhsTapeCrease, val: UI.vhsTapeCreaseVal, prop: 'vhsTapeCrease' },
+    { el: UI.vhsTrackingNoise, val: UI.vhsTrackingNoiseVal, prop: 'vhsTrackingNoise' },
+    { el: UI.vhsVerticalJump, val: UI.vhsVerticalJumpVal, prop: 'vhsVerticalJump' },
+    { el: UI.vhsDegradationBlur, val: UI.vhsDegradationBlurVal, prop: 'vhsDegradationBlur' },
+    { el: UI.vhsDegradationOpacity, val: UI.vhsDegradationOpacityVal, prop: 'vhsDegradationOpacity' },
+    { el: UI.vhsWobble, val: UI.vhsWobbleVal, prop: 'vhsWobble' },
+    { el: UI.vhsSoftness, val: UI.vhsSoftnessVal, prop: 'vhsSoftness' },
+    { el: UI.vhsScanlines, val: UI.vhsScanlinesVal, prop: 'vhsScanlines' },
+    { el: UI.vhsScanlineBlur, val: UI.vhsScanlineBlurVal, prop: 'vhsScanlineBlur' },
+    { el: UI.vhsChromaBleed, val: UI.vhsChromaBleedVal, prop: 'vhsChromaBleed' },
+    { el: UI.vhsGrain, val: UI.vhsGrainVal, prop: 'vhsGrain' },
+    { el: UI.vhsColorDecay, val: UI.vhsColorDecayVal, prop: 'vhsColorDecay' }
+  ];
+
+  vhsSliders.forEach(({ el, val, prop }) => {
+    if (el) {
+      el.addEventListener('input', (e) => {
+        const num = parseInt(e.target.value);
+        state[prop] = num;
+        if (val) val.innerText = `${num}%`;
+        state.vhsPreset = 'custom';
+        if (UI.vhsPreset) UI.vhsPreset.value = 'custom';
+        renderFrame(state.time);
+      });
+    }
+  });
+
   // Exporter Parameters Bindings
   UI.exportMode.addEventListener('change', (e) => {
     state.exportMode = e.target.value;
@@ -1432,38 +1925,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updatePlayhead();
   });
 
-  function setProjectDuration(dur) {
-    const minRequired = getMinimumRequiredTimelineDuration();
-    state.exportDuration = Math.min(60, Math.max(minRequired, Math.round(dur)));
-
-    if (UI.exportDuration) {
-      UI.exportDuration.min = minRequired;
-      UI.exportDuration.value = state.exportDuration;
-    }
-    if (UI.exportDurationVal) {
-      UI.exportDurationVal.innerText = `${state.exportDuration}s`;
-    }
-
-    if (UI.timelineDurationSlider) {
-      UI.timelineDurationSlider.min = minRequired;
-      UI.timelineDurationSlider.value = state.exportDuration;
-      UI.timelineDurationSlider.title = minRequired > 1 
-        ? `Timeline duration (${minRequired}s - 60s). Minimum locked by timeline elements.`
-        : `Drag to adjust loop duration (1s - 60s)`;
-    }
-    if (UI.timelineDurationVal) {
-      UI.timelineDurationVal.innerText = `${state.exportDuration}s`;
-    }
-
-    updateExportEstimate();
-    updateTimelineRuler();
-    updateTimelineTracks();
-    updatePlayhead();
-    if (state.selectedAudio) {
-      selectAudio(true);
-    }
-  }
-
   UI.exportDuration.addEventListener('input', (e) => {
     setProjectDuration(parseInt(e.target.value));
   });
@@ -1471,6 +1932,56 @@ document.addEventListener('DOMContentLoaded', () => {
   UI.timelineDurationSlider.addEventListener('input', (e) => {
     setProjectDuration(parseInt(e.target.value));
   });
+
+  if (UI.timelineDurationInput) {
+    const applyTimelineInput = () => {
+      const parsed = parseDurationInput(UI.timelineDurationInput.value);
+      if (parsed) {
+        setProjectDuration(parsed);
+      }
+      UI.timelineDurationInput.value = formatTimecode(state.exportDuration);
+    };
+    UI.timelineDurationInput.addEventListener('change', applyTimelineInput);
+    UI.timelineDurationInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        applyTimelineInput();
+        UI.timelineDurationInput.blur();
+      }
+    });
+  }
+
+  if (UI.exportDurationInput) {
+    const applyExportInput = () => {
+      const parsed = parseDurationInput(UI.exportDurationInput.value);
+      if (parsed) {
+        setProjectDuration(parsed);
+      }
+      UI.exportDurationInput.value = formatTimecode(state.exportDuration);
+    };
+    UI.exportDurationInput.addEventListener('change', applyExportInput);
+    UI.exportDurationInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        applyExportInput();
+        UI.exportDurationInput.blur();
+      }
+    });
+  }
+
+  const matchSongDuration = () => {
+    if (state.audioTrack && state.audioTrack.duration) {
+      setProjectDuration(state.audioTrack.duration);
+    }
+  };
+
+  if (UI.btnMatchSongDuration) {
+    UI.btnMatchSongDuration.addEventListener('click', matchSongDuration);
+  }
+  if (UI.btnExportMatchSong) {
+    UI.btnExportMatchSong.addEventListener('click', matchSongDuration);
+  }
+  if (UI.btnSyncTimelineToAudio) {
+    UI.btnSyncTimelineToAudio.addEventListener('click', matchSongDuration);
+  }
 
   UI.exportLoops.addEventListener('input', (e) => {
     state.exportLoops = parseInt(e.target.value);
@@ -1551,6 +2062,26 @@ document.addEventListener('DOMContentLoaded', () => {
     renderFrame(state.time);
   });
 
+  // Video Export Bitrate & Quality Bindings
+  if (UI.exportBitrate) {
+    UI.exportBitrate.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      state.exportBitrateMbps = val;
+      updateBitrateDisplay(val);
+    });
+  }
+
+  if (UI.btnBitratePresets) {
+    UI.btnBitratePresets.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseInt(btn.dataset.bitrate, 10);
+        if (UI.exportBitrate) UI.exportBitrate.value = val;
+        state.exportBitrateMbps = val;
+        updateBitrateDisplay(val);
+      });
+    });
+  }
+
   // Video Export Click Bindings
   UI.btnExportVideo.addEventListener('click', () => {
     state.exportFps = parseInt(UI.exportFps.value);
@@ -1562,12 +2093,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- TEXT OVERLAYS & TIMELINE EVENTS BINDINGS ---
+  const maxTextBlocks = state.isDangerZone ? 300 : 50;
+
   UI.btnAddTextNew.addEventListener('click', () => {
-    if (state.texts.length >= 15) {
-      alert("Maximum limit of 15 text overlay blocks reached.");
+    if (state.texts.length >= maxTextBlocks) {
+      alert(`Maximum limit of ${maxTextBlocks} text overlay blocks reached.`);
       return;
     }
-    
+
+    HistoryManager.pushState('Add Text Track');
+
     let maxTrackIdx = 0;
     const allIndices = [
       ...state.texts.map(t => t.trackIndex !== undefined ? t.trackIndex : 0),
@@ -1579,7 +2114,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const targetTrackIdx = maxTrackIdx + 1;
 
-    
     const duration = getTimelineDuration();
     const newText = {
       id: 'txt_' + generateUUID(),
@@ -1602,7 +2136,7 @@ document.addEventListener('DOMContentLoaded', () => {
       endTime: duration,
       trackIndex: targetTrackIdx
     };
-    
+
     state.texts.push(newText);
     selectText(newText.id);
     updateTimelineTracks();
@@ -1616,21 +2150,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const selectedTxt = state.texts.find(t => t.id === state.selectedTextId);
     if (!selectedTxt) return;
-    
-    if (state.texts.length >= 15) {
-      alert("Maximum limit of 15 text overlay blocks reached.");
+
+    if (state.texts.length >= maxTextBlocks) {
+      alert(`Maximum limit of ${maxTextBlocks} text overlay blocks reached.`);
       return;
     }
-    
+
+    HistoryManager.pushState('Add Text to Track');
+
     const duration = getTimelineDuration();
     let startTime = state.time;
     if (startTime >= duration - 0.2) {
       startTime = Math.max(0, duration - 3.0);
     }
     const endTime = Math.min(duration, startTime + 3.0);
-    
+
     const targetTrackIdx = selectedTxt.trackIndex !== undefined ? selectedTxt.trackIndex : 0;
-    
+
     const newText = {
       id: 'txt_' + generateUUID(),
       text: 'NEXT TEXT',
@@ -1652,7 +2188,7 @@ document.addEventListener('DOMContentLoaded', () => {
       endTime: endTime,
       trackIndex: targetTrackIdx
     };
-    
+
     state.texts.push(newText);
     selectText(newText.id);
     updateTimelineTracks();
@@ -1664,10 +2200,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedTxt = state.texts.find(t => t.id === state.selectedTextId);
     if (!selectedTxt) return;
 
-    if (state.texts.length >= 15) {
-      alert("Maximum limit of 15 text overlay blocks reached.");
+    if (state.texts.length >= maxTextBlocks) {
+      alert(`Maximum limit of ${maxTextBlocks} text overlay blocks reached.`);
       return;
     }
+
+    HistoryManager.pushState('Duplicate Text');
 
     const duration = getTimelineDuration();
     let startTime = selectedTxt.endTime;
@@ -1694,12 +2232,392 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!state.selectedTextId) return;
     const index = state.texts.findIndex(t => t.id === state.selectedTextId);
     if (index !== -1) {
+      HistoryManager.pushState('Delete Text');
       state.texts.splice(index, 1);
       selectText(null);
       updateTimelineTracks();
       renderFrame(state.time);
     }
   });
+
+  // --- LYRIC VIDEO GENERATOR BINDINGS ---
+  const DEMO_METAL_LRC = `[ti:Cybernetic Storm]
+[ar:Danger Zone Syndicate]
+[al:VileCut 10-Minute Engine]
+[00:03.00]Systems online, circuits alive
+[00:06.50]Diving through the glitch in forty-five
+[00:10.00]Neon pulses tearing through the wire
+[00:14.20]A digital tempest of crimson and fire
+[00:18.50]Static screams across the frequency
+[00:22.80]Fractured frames in hyper-velocity
+[00:27.00]No safety limits, danger unleashed
+[00:31.50]Ten minutes of render into the beast
+[00:36.00]Bass drop shuddering the screen
+[00:40.50]The darkest cut that you've ever seen`;
+
+  const renderLyricsPreviewList = (blocks) => {
+    if (!UI.lyricsPreviewList || !blocks) return;
+    UI.lyricsPreviewList.innerHTML = '';
+    const previewCount = Math.min(8, blocks.length);
+    for (let i = 0; i < previewCount; i++) {
+      const b = blocks[i];
+      const formatTime = (s) => {
+        const mins = Math.floor(s / 60);
+        const secs = (s % 60).toFixed(1).padStart(4, '0');
+        return `${mins}:${secs}`;
+      };
+      const item = document.createElement('div');
+      item.className = 'lyrics-preview-entry';
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'lyrics-preview-time';
+      timeSpan.textContent = `[${formatTime(b.startTime)} → ${formatTime(b.endTime)}]`;
+
+      const textSpan = document.createElement('span');
+      textSpan.className = 'lyrics-preview-text';
+      textSpan.textContent = b.text;
+
+      item.appendChild(timeSpan);
+      item.appendChild(textSpan);
+      UI.lyricsPreviewList.appendChild(item);
+    }
+
+    if (blocks.length > previewCount) {
+      const more = document.createElement('div');
+      more.className = 'lyrics-preview-entry';
+      more.style.color = '#94a3b8';
+      more.style.fontStyle = 'italic';
+      more.textContent = `... and ${blocks.length - previewCount} more lines`;
+      UI.lyricsPreviewList.appendChild(more);
+    }
+  };
+
+  const loadLyricsContent = (fileName, content) => {
+    try {
+      const result = LyricsManager.parseFile(fileName, content);
+      if (!result.blocks || result.blocks.length === 0) {
+        alert('No valid lyrics or timestamps could be parsed from this file.');
+        return;
+      }
+
+      if (UI.lyricsUppercase && UI.lyricsUppercase.checked) {
+        result.blocks.forEach(b => { if (b.text) b.text = b.text.toUpperCase(); });
+      }
+
+      LyricsManager.pendingLyrics = result.blocks;
+      LyricsManager.pendingFileName = fileName;
+
+      if (UI.lyricsSummaryText) {
+        UI.lyricsSummaryText.innerText = `Detected ${result.format} format: ${result.blocks.length} lines parsed from "${fileName}".`;
+      }
+
+      renderLyricsPreviewList(result.blocks);
+
+      if (UI.lyricsStylePreviewSample && result.blocks.length > 0) {
+        UI.lyricsStylePreviewSample.innerText = result.blocks[0].text;
+      }
+      updateLyricsStylePreview();
+
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    } catch (err) {
+      console.error('Error parsing lyrics file:', err);
+      alert('Failed to parse lyrics file: ' + err.message);
+    }
+  };
+
+  const updateLyricsStylePreview = () => {
+    if (!UI.lyricsStylePreviewSample) return;
+    const font = UI.lyricsFont ? UI.lyricsFont.value : 'Outfit';
+    const size = UI.lyricsSize ? parseFloat(UI.lyricsSize.value) : 38;
+    const color = UI.lyricsColor ? UI.lyricsColor.value : '#00f2fe';
+    const glitch = UI.lyricsGlitch ? UI.lyricsGlitch.value : 'none';
+    const transition = UI.lyricsTransition ? UI.lyricsTransition.value : 'fade-blur';
+    const position = UI.lyricsPosition ? UI.lyricsPosition.value : 'lower-third';
+
+    UI.lyricsStylePreviewSample.style.fontFamily = `"${font}", sans-serif`;
+
+    const previewPx = Math.max(16, Math.min(46, Math.round(size * 0.82)));
+    UI.lyricsStylePreviewSample.style.fontSize = `${previewPx}px`;
+    UI.lyricsStylePreviewSample.style.color = color;
+
+    const isCaps = UI.lyricsUppercase ? UI.lyricsUppercase.checked : false;
+    UI.lyricsStylePreviewSample.style.textTransform = isCaps ? 'uppercase' : 'none';
+
+    if (glitch === 'rgb-split') {
+      UI.lyricsStylePreviewSample.style.textShadow = `-3px 0 #ff0055, 3px 0 #00f2fe, 0 0 14px ${color}88, 0 2px 4px #000`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = '0.04em';
+    } else if (glitch === 'flicker') {
+      UI.lyricsStylePreviewSample.style.textShadow = `0 0 22px ${color}, 0 0 8px ${color}, 0 2px 4px #000`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = '0.02em';
+    } else if (glitch === 'scramble') {
+      UI.lyricsStylePreviewSample.style.textShadow = `0 0 10px ${color}aa, 2px 2px 0 #ff0055`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = '0.07em';
+    } else if (glitch === 'chaos') {
+      UI.lyricsStylePreviewSample.style.textShadow = `2px -2px 0 #ffe600, -2px 2px 0 #00f2fe, 0 0 12px ${color}`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = '0.05em';
+    } else {
+      UI.lyricsStylePreviewSample.style.textShadow = `0 0 12px ${color}66, 0 2px 4px rgba(0,0,0,0.9)`;
+      UI.lyricsStylePreviewSample.style.letterSpacing = 'normal';
+    }
+
+    if (UI.lyricsPreviewFontLabel) {
+      UI.lyricsPreviewFontLabel.innerText = `${font} • ${size}px`;
+    }
+    if (UI.lyricsStylePreviewSub) {
+      const posLabel = position === 'lower-third' ? 'Lower Third (+35%)' : position === 'bottom' ? 'Bottom (+42%)' : position === 'center' ? 'Center (0%)' : 'Top (-35%)';
+      const transOption = UI.lyricsTransition?.selectedOptions?.[0]?.text || transition;
+      const glitchOption = UI.lyricsGlitch?.selectedOptions?.[0]?.text || glitch;
+      UI.lyricsStylePreviewSub.innerText = `Position: ${posLabel} • Transition: ${transOption} • FX: ${glitchOption}`;
+    }
+  };
+
+  const syncAvailableFontsToLyrics = () => {
+    if (!UI.textFont || !UI.lyricsFont) return;
+    const lyricsValues = new Set(Array.from(UI.lyricsFont.options).map(o => o.value));
+    Array.from(UI.textFont.options).forEach(opt => {
+      if (!lyricsValues.has(opt.value)) {
+        const newOpt = document.createElement('option');
+        newOpt.value = opt.value;
+        newOpt.innerText = opt.innerText;
+        newOpt.style.fontFamily = `"${opt.value}", sans-serif`;
+        UI.lyricsFont.appendChild(newOpt);
+      }
+    });
+  };
+
+  if (UI.btnImportLyrics) {
+    UI.btnImportLyrics.addEventListener('click', () => {
+      if (UI.lyricsModalOverlay) {
+        syncAvailableFontsToLyrics();
+        updateLyricsStylePreview();
+        UI.lyricsModalOverlay.classList.remove('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    });
+  }
+
+  if (UI.btnUploadLyricsFont && UI.lyricsFontFileInput) {
+    UI.btnUploadLyricsFont.addEventListener('click', () => {
+      UI.lyricsFontFileInput.click();
+    });
+  }
+
+  if (UI.lyricsFontFileInput) {
+    UI.lyricsFontFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const rawName = file.name.replace(/\.[^/.]+$/, '').trim();
+      const fontName = rawName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const fontFace = new FontFace(fontName, arrayBuffer);
+        const loadedFace = await fontFace.load();
+        document.fonts.add(loadedFace);
+
+        let exists = false;
+        for (let i = 0; i < UI.lyricsFont.options.length; i++) {
+          if (UI.lyricsFont.options[i].value === fontName) {
+            exists = true;
+            break;
+          }
+        }
+        if (!exists) {
+          const opt = document.createElement('option');
+          opt.value = fontName;
+          opt.innerText = `${fontName} (Uploaded)`;
+          opt.style.fontFamily = `"${fontName}", sans-serif`;
+          UI.lyricsFont.appendChild(opt);
+        }
+        UI.lyricsFont.value = fontName;
+
+        if (UI.textFont) {
+          let textOptExists = false;
+          for (let i = 0; i < UI.textFont.options.length; i++) {
+            if (UI.textFont.options[i].value === fontName) {
+              textOptExists = true;
+              break;
+            }
+          }
+          if (!textOptExists) {
+            const mainOpt = document.createElement('option');
+            mainOpt.value = fontName;
+            mainOpt.innerText = `${fontName} (Uploaded)`;
+            mainOpt.style.fontFamily = `"${fontName}", sans-serif`;
+            UI.textFont.appendChild(mainOpt);
+          }
+        }
+
+        if (UI.lyricsFontUploadedBadge && UI.lyricsFontUploadedName) {
+          UI.lyricsFontUploadedBadge.style.display = 'inline-flex';
+          UI.lyricsFontUploadedName.innerText = `Custom font loaded: ${fontName}`;
+          if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        updateLyricsStylePreview();
+      } catch (err) {
+        console.error('Failed to load custom font:', err);
+        alert('Failed to load custom font: ' + err.message);
+      } finally {
+        e.target.value = '';
+      }
+    });
+  }
+
+  if (UI.lyricsFont) UI.lyricsFont.addEventListener('change', updateLyricsStylePreview);
+  if (UI.lyricsColor) UI.lyricsColor.addEventListener('input', updateLyricsStylePreview);
+  if (UI.lyricsPosition) UI.lyricsPosition.addEventListener('change', updateLyricsStylePreview);
+  if (UI.lyricsTransition) UI.lyricsTransition.addEventListener('change', updateLyricsStylePreview);
+  if (UI.lyricsGlitch) UI.lyricsGlitch.addEventListener('change', updateLyricsStylePreview);
+
+  if (UI.btnLyricsToCaps) {
+    UI.btnLyricsToCaps.addEventListener('click', () => {
+      if (LyricsManager.pendingLyrics && LyricsManager.pendingLyrics.length > 0) {
+        LyricsManager.pendingLyrics.forEach(b => {
+          if (b.text) b.text = b.text.toUpperCase();
+        });
+        renderLyricsPreviewList(LyricsManager.pendingLyrics);
+        if (UI.lyricsStylePreviewSample) {
+          UI.lyricsStylePreviewSample.innerText = (LyricsManager.pendingLyrics[0]?.text || '').toUpperCase();
+        }
+      } else if (UI.lyricsStylePreviewSample) {
+        UI.lyricsStylePreviewSample.innerText = UI.lyricsStylePreviewSample.innerText.toUpperCase();
+      }
+      if (UI.lyricsUppercase) {
+        UI.lyricsUppercase.checked = true;
+      }
+      updateLyricsStylePreview();
+    });
+  }
+
+  if (UI.lyricsUppercase) {
+    UI.lyricsUppercase.addEventListener('change', () => {
+      if (UI.lyricsUppercase.checked && LyricsManager.pendingLyrics) {
+        LyricsManager.pendingLyrics.forEach(b => { if (b.text) b.text = b.text.toUpperCase(); });
+        renderLyricsPreviewList(LyricsManager.pendingLyrics);
+        if (UI.lyricsStylePreviewSample && LyricsManager.pendingLyrics.length > 0) {
+          UI.lyricsStylePreviewSample.innerText = LyricsManager.pendingLyrics[0].text;
+        }
+      }
+      updateLyricsStylePreview();
+    });
+  }
+
+  if (UI.btnBrowseLyrics && UI.lyricsFileInput) {
+    UI.btnBrowseLyrics.addEventListener('click', () => {
+      UI.lyricsFileInput.click();
+    });
+  }
+
+  if (UI.btnLoadDemoLrc) {
+    UI.btnLoadDemoLrc.addEventListener('click', () => {
+      loadLyricsContent('demo_metal_storm.lrc', DEMO_METAL_LRC);
+    });
+  }
+
+  if (UI.lyricsDropArea) {
+    UI.lyricsDropArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      UI.lyricsDropArea.style.borderColor = 'var(--cyan)';
+      UI.lyricsDropArea.style.background = 'rgba(0, 242, 254, 0.08)';
+    });
+    UI.lyricsDropArea.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      UI.lyricsDropArea.style.borderColor = 'rgba(255, 230, 0, 0.35)';
+      UI.lyricsDropArea.style.background = 'rgba(255, 230, 0, 0.03)';
+    });
+    UI.lyricsDropArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      UI.lyricsDropArea.style.borderColor = 'rgba(255, 230, 0, 0.35)';
+      UI.lyricsDropArea.style.background = 'rgba(255, 230, 0, 0.03)';
+      const file = e.dataTransfer?.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          loadLyricsContent(file.name, event.target.result);
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+
+  if (UI.lyricsFileInput) {
+    UI.lyricsFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        loadLyricsContent(file.name, event.target.result);
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+  }
+
+  if (UI.lyricsSize && UI.lyricsSizeVal) {
+    UI.lyricsSize.addEventListener('input', () => {
+      UI.lyricsSizeVal.innerText = `${UI.lyricsSize.value}px`;
+      updateLyricsStylePreview();
+    });
+  }
+
+  const closeLyricsModal = () => {
+    if (UI.lyricsModalOverlay) {
+      UI.lyricsModalOverlay.classList.add('hidden');
+    }
+  };
+
+  if (UI.btnCloseLyricsX) UI.btnCloseLyricsX.addEventListener('click', closeLyricsModal);
+  if (UI.btnCancelLyrics) UI.btnCancelLyrics.addEventListener('click', closeLyricsModal);
+  if (UI.lyricsModalOverlay) {
+    UI.lyricsModalOverlay.addEventListener('click', (e) => {
+      if (e.target === UI.lyricsModalOverlay) {
+        closeLyricsModal();
+      }
+    });
+  }
+
+  if (UI.btnApplyLyricsClear) {
+    UI.btnApplyLyricsClear.addEventListener('click', () => {
+      if (!LyricsManager.pendingLyrics || LyricsManager.pendingLyrics.length === 0) return;
+      HistoryManager.pushState('Generate Lyrics (Replace)');
+      const options = {
+        clearExisting: true,
+        font: UI.lyricsFont ? UI.lyricsFont.value : 'Outfit',
+        size: UI.lyricsSize ? parseFloat(UI.lyricsSize.value) : 38,
+        color: UI.lyricsColor ? UI.lyricsColor.value : '#00f2fe',
+        position: UI.lyricsPosition ? UI.lyricsPosition.value : 'lower-third',
+        transitionMode: UI.lyricsTransition ? UI.lyricsTransition.value : 'fade-blur',
+        glitchMode: UI.lyricsGlitch ? UI.lyricsGlitch.value : 'none',
+        autoExpandTimeline: UI.lyricsAutoExpand ? UI.lyricsAutoExpand.checked : true,
+        allCaps: UI.lyricsUppercase ? UI.lyricsUppercase.checked : false
+      };
+      LyricsManager.generateLayers(LyricsManager.pendingLyrics, options);
+      closeLyricsModal();
+    });
+  }
+
+  if (UI.btnApplyLyricsAppend) {
+    UI.btnApplyLyricsAppend.addEventListener('click', () => {
+      if (!LyricsManager.pendingLyrics || LyricsManager.pendingLyrics.length === 0) return;
+      HistoryManager.pushState('Generate Lyrics (Append)');
+      const options = {
+        clearExisting: false,
+        font: UI.lyricsFont ? UI.lyricsFont.value : 'Outfit',
+        size: UI.lyricsSize ? parseFloat(UI.lyricsSize.value) : 38,
+        color: UI.lyricsColor ? UI.lyricsColor.value : '#00f2fe',
+        position: UI.lyricsPosition ? UI.lyricsPosition.value : 'lower-third',
+        transitionMode: UI.lyricsTransition ? UI.lyricsTransition.value : 'fade-blur',
+        glitchMode: UI.lyricsGlitch ? UI.lyricsGlitch.value : 'none',
+        autoExpandTimeline: UI.lyricsAutoExpand ? UI.lyricsAutoExpand.checked : true,
+        allCaps: UI.lyricsUppercase ? UI.lyricsUppercase.checked : false
+      };
+      LyricsManager.generateLayers(LyricsManager.pendingLyrics, options);
+      closeLyricsModal();
+    });
+  }
 
   // Add Graphic Layer
   UI.btnAddGraphic.addEventListener('click', () => {
@@ -1720,6 +2638,7 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
+        HistoryManager.pushState('Add Graphic Overlay');
         const duration = getTimelineDuration();
         let maxTrackIdx = 0;
         const allIndices = [
@@ -1767,6 +2686,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!state.selectedGraphicId) return;
     const index = state.graphics.findIndex(g => g.id === state.selectedGraphicId);
     if (index !== -1) {
+      HistoryManager.pushState('Delete Graphic');
       state.graphics.splice(index, 1);
       selectGraphic(null);
       updateTimelineTracks();
@@ -1941,8 +2861,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-
-
   // Timeline Navigation Jump Bindings
   UI.btnTimelineStart.addEventListener('click', () => {
     state.time = 0.0;
@@ -1967,15 +2885,15 @@ document.addEventListener('DOMContentLoaded', () => {
   UI.audioFileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     UI.canvasLoading.classList.remove('hidden');
-    
+
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
         const ctxAudio = getAudioContext();
         const audioBuffer = await ctxAudio.decodeAudioData(event.target.result);
-        
+
         const channelData = audioBuffer.getChannelData(0);
         const numPeaks = 1000;
         const step = Math.ceil(channelData.length / numPeaks);
@@ -1997,7 +2915,7 @@ document.addEventListener('DOMContentLoaded', () => {
             peaks[i] /= maxPeak;
           }
         }
-        
+
         state.audioTrack = {
           fileName: file.name,
           buffer: audioBuffer,
@@ -2009,11 +2927,24 @@ document.addEventListener('DOMContentLoaded', () => {
           fadeOutDuration: 0.0,
           peaks: peaks
         };
-        
+
+        if (state.isDangerZone) {
+          const songDur = Math.min(600, Math.max(5, Math.ceil(audioBuffer.duration)));
+          setProjectDuration(songDur);
+        }
+
+        const songTc = formatTimecode(audioBuffer.duration);
+        if (UI.songDurBadge) UI.songDurBadge.innerText = songTc;
+        if (UI.exportSongDurBadge) UI.exportSongDurBadge.innerText = songTc;
+        if (UI.btnMatchSongDuration) UI.btnMatchSongDuration.style.display = 'inline-flex';
+        if (UI.btnExportMatchSong) UI.btnExportMatchSong.style.display = 'inline-flex';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
         selectAudio(true);
         if (state.isPlaying) {
           syncAudioPlayback();
         }
+
       } catch (err) {
         console.error("Error decoding audio data:", err);
         alert("Could not decode audio file. Please try a standard MP3 or WAV file.");
@@ -2078,6 +3009,8 @@ document.addEventListener('DOMContentLoaded', () => {
     stopAudioSource();
     state.audioTrack = null;
     selectAudio(false);
+    if (UI.btnMatchSongDuration) UI.btnMatchSongDuration.style.display = 'none';
+    if (UI.btnExportMatchSong) UI.btnExportMatchSong.style.display = 'none';
     updateTimelineTracks();
   });
 
@@ -2104,12 +3037,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       video.addEventListener('loadedmetadata', () => {
         const dur = getTimelineDuration();
-        
+
         let startTime = state.time;
         if (startTime >= dur - 0.2) {
           startTime = Math.max(0, dur - video.duration);
         }
-        
+
         const newBlock = {
           id: 'vid_' + generateUUID(),
           fileName: file.name,
@@ -2117,6 +3050,7 @@ document.addEventListener('DOMContentLoaded', () => {
           url: url,
           element: video,
           duration: video.duration,
+          sourceOffset: 0.0,
           startTime: startTime,
           endTime: Math.min(dur, startTime + video.duration),
           monochrome: false,
@@ -2124,6 +3058,7 @@ document.addEventListener('DOMContentLoaded', () => {
           kaleidoscopeSlices: 8,
           brightness: 100,
           contrast: 100,
+          scale: 100,
           x: 0.0,
           y: 0.0,
           edgeFade: 0,
@@ -2135,6 +3070,8 @@ document.addEventListener('DOMContentLoaded', () => {
         state.videoBlocks.push(newBlock);
         selectVideo(newBlock.id);
         UI.canvasLoading.classList.add('hidden');
+        resizeMainCanvas();
+        updateTimelineTracks();
         renderFrame(state.time);
       });
 
@@ -2156,13 +3093,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (block.element) {
           block.element.pause();
         }
-        
-        // Revoke Object URL if no other block is using it
+
         const isUrlUsedElsewhere = state.videoBlocks.some((v, idx) => idx !== index && v.url === block.url);
         if (!isUrlUsedElsewhere) {
           URL.revokeObjectURL(block.url);
         }
-        
+
         state.videoBlocks.splice(index, 1);
         selectVideo(null);
         renderFrame(state.time);
@@ -2175,19 +3111,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!state.selectedVideoId) return;
       const selectedBlock = state.videoBlocks.find(v => v.id === state.selectedVideoId);
       if (!selectedBlock) return;
-      
+
       const dur = getTimelineDuration();
       let startTime = state.time;
       const blockDuration = selectedBlock.endTime - selectedBlock.startTime;
       if (startTime >= dur - 0.2) startTime = Math.max(0, dur - blockDuration);
       const endTime = Math.min(dur, startTime + blockDuration);
-      
+
       const clonedVideo = document.createElement('video');
       clonedVideo.src = selectedBlock.url;
       clonedVideo.muted = true;
       clonedVideo.playsInline = true;
       clonedVideo.loop = false;
-      
+
       clonedVideo.addEventListener('loadedmetadata', () => {
         const newBlock = {
           ...selectedBlock,
@@ -2202,6 +3138,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
   // Layer Move Up / Down Event Listeners with track swapping
   if (UI.btnVideoMoveUp) {
     UI.btnVideoMoveUp.addEventListener('click', () => {
@@ -2250,7 +3187,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (block) {
         const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
         const newTrack = oldTrack + 1;
-        swapTracks(oldTrack, newTrack);
+        const siblings = [
+          ...state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === oldTrack),
+          ...state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === oldTrack),
+          ...(state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === oldTrack) : [])
+        ];
+        if (siblings.length > 1) {
+          block.trackIndex = newTrack;
+        } else {
+          swapTracks(oldTrack, newTrack);
+        }
         normalizeTracks();
         updateTimelineTracks();
         renderFrame(state.time);
@@ -2266,7 +3212,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
         if (oldTrack > 1) {
           const newTrack = oldTrack - 1;
-          swapTracks(oldTrack, newTrack);
+          const siblings = [
+            ...state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === oldTrack),
+            ...state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === oldTrack),
+            ...(state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === oldTrack) : [])
+          ];
+          if (siblings.length > 1) {
+            block.trackIndex = newTrack;
+          } else {
+            swapTracks(oldTrack, newTrack);
+          }
           normalizeTracks();
           updateTimelineTracks();
           renderFrame(state.time);
@@ -2282,7 +3237,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (block) {
         const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
         const newTrack = oldTrack + 1;
-        swapTracks(oldTrack, newTrack);
+        const siblings = [
+          ...state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === oldTrack),
+          ...state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === oldTrack),
+          ...(state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === oldTrack) : [])
+        ];
+        if (siblings.length > 1) {
+          block.trackIndex = newTrack;
+        } else {
+          swapTracks(oldTrack, newTrack);
+        }
         normalizeTracks();
         updateTimelineTracks();
         renderFrame(state.time);
@@ -2298,7 +3262,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const oldTrack = block.trackIndex !== undefined ? block.trackIndex : 0;
         if (oldTrack > 1) {
           const newTrack = oldTrack - 1;
-          swapTracks(oldTrack, newTrack);
+          const siblings = [
+            ...state.texts.filter(t => (t.trackIndex !== undefined ? t.trackIndex : 0) === oldTrack),
+            ...state.graphics.filter(g => (g.trackIndex !== undefined ? g.trackIndex : 0) === oldTrack),
+            ...(state.videoBlocks ? state.videoBlocks.filter(v => (v.trackIndex !== undefined ? v.trackIndex : 0) === oldTrack) : [])
+          ];
+          if (siblings.length > 1) {
+            block.trackIndex = newTrack;
+          } else {
+            swapTracks(oldTrack, newTrack);
+          }
           normalizeTracks();
           updateTimelineTracks();
           renderFrame(state.time);
@@ -2315,15 +3288,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const val = parseFloat(e.target.value);
         const loopDur = getTimelineDuration();
         const blockLen = block.endTime - block.startTime;
-        
+
         block.startTime = Math.min(loopDur - 0.2, val);
         block.endTime = Math.min(loopDur, block.startTime + blockLen);
-        
+
         if (UI.videoTimelineStartVal) {
           UI.videoTimelineStartVal.innerText = `${block.startTime.toFixed(1)}s`;
         }
         e.target.value = block.startTime;
-        
+
         updateTimelineTracks();
         renderFrame(state.time);
       }
@@ -2425,6 +3398,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (UI.videoScale) {
+    UI.videoScale.addEventListener('input', (e) => {
+      if (!state.selectedVideoId) return;
+      const block = state.videoBlocks.find(v => v.id === state.selectedVideoId);
+      if (block) {
+        block.scale = parseInt(e.target.value);
+        if (UI.videoScaleVal) {
+          UI.videoScaleVal.innerText = `${block.scale}%`;
+        }
+        renderFrame(state.time);
+      }
+    });
+  }
+
   if (UI.videoEdgeFade) {
     UI.videoEdgeFade.addEventListener('input', (e) => {
       if (!state.selectedVideoId) return;
@@ -2467,8 +3454,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-
-
   // Text Inputs updates
   UI.textContent.addEventListener('input', (e) => {
     if (!state.selectedTextId) return;
@@ -2480,10 +3465,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  if (UI.btnTextToCaps) {
+    UI.btnTextToCaps.addEventListener('click', () => {
+      if (!state.selectedTextId) return;
+      const txt = state.texts.find(t => t.id === state.selectedTextId);
+      if (txt) {
+        HistoryManager.pushState('Text to Uppercase');
+        txt.text = (txt.text || '').toUpperCase();
+        UI.textContent.value = txt.text;
+        updateTimelineTracks();
+        renderFrame(state.time);
+      }
+    });
+  }
+
+  if (UI.btnAllTextsToCaps) {
+    UI.btnAllTextsToCaps.addEventListener('click', () => {
+      if (state.texts.length === 0) return;
+      HistoryManager.pushState('All Texts to Uppercase');
+      state.texts.forEach(t => {
+        if (t.text) t.text = t.text.toUpperCase();
+      });
+      state.texts = [...state.texts];
+      if (state.selectedTextId) {
+        const cur = state.texts.find(t => t.id === state.selectedTextId);
+        if (cur) UI.textContent.value = cur.text;
+      }
+      updateTimelineTracks();
+      renderFrame(state.time);
+    });
+  }
+
   UI.textFont.addEventListener('change', (e) => {
     if (!state.selectedTextId) return;
     const txt = state.texts.find(t => t.id === state.selectedTextId);
     if (txt) {
+      HistoryManager.pushState('Change Text Font');
       txt.font = e.target.value;
       renderFrame(state.time);
     }
@@ -2646,13 +3663,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const fontFace = new FontFace(fontName, arrayBuffer);
       fontFace.load().then((loadedFace) => {
         document.fonts.add(loadedFace);
-        
+
         const option = document.createElement('option');
         option.value = fontName;
         option.innerText = fontName + " (Custom)";
         UI.textFont.appendChild(option);
         UI.textFont.value = fontName;
-        
+
         if (state.selectedTextId) {
           const txt = state.texts.find(t => t.id === state.selectedTextId);
           if (txt) {
@@ -2674,6 +3691,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.exportFormat = UI.exportFormat.value;
   }
   updateMp4WarningVisibility();
+  updateBitrateDisplay(state.exportBitrateMbps || 24);
   if (UI.glitchMonochrome) {
     state.glitchMonochrome = UI.glitchMonochrome.checked;
   }
@@ -2684,6 +3702,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (UI.glitchStyleRandom) state.glitchStyleRandom = UI.glitchStyleRandom.checked;
   if (UI.glitchStyleFlicker) state.glitchStyleFlicker = UI.glitchStyleFlicker.checked;
   if (UI.glitchFlickerHighlights) state.glitchFlickerHighlightsOnly = UI.glitchFlickerHighlights.checked;
+
   // Glitch Trigger bindings
   if (UI.btnAddGlitchTrigger) {
     UI.btnAddGlitchTrigger.addEventListener('click', () => {
@@ -2691,6 +3710,7 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("Maximum limit of 10 glitch trigger points reached.");
         return;
       }
+      HistoryManager.pushState('Add Glitch Trigger');
       const newTrigger = {
         id: 'gt_' + generateUUID(),
         time: state.time,
@@ -2709,6 +3729,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!state.selectedGlitchTriggerId) return;
       const index = state.glitchTriggers.findIndex(t => t.id === state.selectedGlitchTriggerId);
       if (index !== -1) {
+        HistoryManager.pushState('Delete Glitch Trigger');
         state.glitchTriggers.splice(index, 1);
         selectGlitchTrigger(null);
         updateTimelineTracks();
@@ -2768,39 +3789,69 @@ document.addEventListener('DOMContentLoaded', () => {
   loadConfiguredFonts();
   updateGlitchTriggerButtonState();
 
-  // Handle keyboard shortcuts (Spacebar for play/pause, Delete/Backspace for timeline item deletion)
+  // Handle keyboard shortcuts (Undo/Redo, Spacebar for play/pause, Delete/Backspace for timeline item deletion)
   window.addEventListener('keydown', (e) => {
+    const activeEl = document.activeElement;
+    const isEditableField = activeEl && (
+      activeEl.tagName === 'TEXTAREA' ||
+      (activeEl.tagName === 'INPUT' && (
+        activeEl.type === 'text' ||
+        activeEl.type === 'search' ||
+        activeEl.type === 'url' ||
+        activeEl.type === 'email' ||
+        activeEl.type === 'password' ||
+        activeEl.type === 'number' ||
+        !activeEl.type
+      )) ||
+      (activeEl.isContentEditable && activeEl.id !== 'lyrics-style-preview-sample')
+    );
+
+    // Undo / Redo hotkeys (Ctrl+Z / Cmd+Z, Ctrl+Y / Ctrl+Shift+Z)
+    if ((e.ctrlKey || e.metaKey) && !isEditableField) {
+      if (e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          performRedo();
+        } else {
+          performUndo();
+        }
+        return;
+      } else if (e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        performRedo();
+        return;
+      }
+    }
+
     if (e.code === 'Space') {
-      const activeEl = document.activeElement;
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+      if (isEditableField && !e.ctrlKey && !e.altKey && !e.metaKey) {
         return;
       }
       e.preventDefault();
-      UI.btnPlayPause.click();
+      if (UI.btnPlayPause) {
+        UI.btnPlayPause.click();
+      }
     } else if (e.key === ',' || (e.code === 'ArrowLeft' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey)) {
-      const activeEl = document.activeElement;
       if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
         return;
       }
       e.preventDefault();
       stepFrame(-1);
     } else if (e.key === '.' || (e.code === 'ArrowRight' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey)) {
-      const activeEl = document.activeElement;
       if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
         return;
       }
       e.preventDefault();
       stepFrame(1);
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
-      const activeEl = document.activeElement;
       if (activeEl && (
-        activeEl.tagName === 'INPUT' || 
-        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
         activeEl.isContentEditable
       )) {
         return;
       }
-      
+
       let deleted = false;
       if (state.selectedTextId && UI.btnDeleteText) {
         UI.btnDeleteText.click();
@@ -2818,16 +3869,31 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.btnDeleteAudio.click();
         deleted = true;
       }
-      
+
       if (deleted) {
         e.preventDefault();
       }
+    } else if (e.key === 'Escape') {
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        activeEl.blur();
+      }
     }
   });
+
+  // Initialize canvas layout and launch background engine loop
+  resizeMainCanvas();
+  renderFrame(state.time);
+  engine.start();
 
   // Handle browser window resize events
   window.addEventListener('resize', () => {
     resizeMainCanvas();
     renderFrame(state.time);
   });
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
