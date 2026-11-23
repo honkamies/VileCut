@@ -2,6 +2,16 @@
 
 All notable changes to the VileCut application will be documented in this file.
 
+## [1.20.1] - 2026-11-23
+
+### Changed
+- **Wizard Launch Button Text**: Renamed Step 7 button to **"Let's start editing!"** with clapperboard icon to reflect entering the studio paused for editing.
+
+### Fixed & Optimized
+- **Canvas Readback Performance**: Added `{ willReadFrequently: true }` to `mainCanvas`, `masking.js` `tempCtx`, and `wizard.js` preview slicing context to prevent GPU→CPU readback stalls during Glitch, Geometric, VHS, and GIF export passes.
+- **GIF Export Seek Guard**: Added early-exit seek check and 400ms timeout guard to GIF export video seeking (matching MP4/WebM export).
+- **Dead DOM Reference Cleanup**: Removed unused `#btn-wizard-skip-all` references from `wizard.js` and `ui.js`.
+
 ## [1.20.0] - 2026-11-23
 
 ### Added

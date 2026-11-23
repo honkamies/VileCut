@@ -209,10 +209,6 @@ export class WizardManager {
     if (btnCloseX) {
       btnCloseX.addEventListener('click', () => this.close());
     }
-    const btnSkipAll = document.getElementById('btn-wizard-skip-all');
-    if (btnSkipAll) {
-      btnSkipAll.addEventListener('click', () => this.launchDefaultStudio());
-    }
     const btnIntroSkip = document.getElementById('btn-wizard-intro-skip-studio');
     if (btnIntroSkip) {
       btnIntroSkip.addEventListener('click', () => this.launchDefaultStudio());
@@ -964,7 +960,7 @@ export class WizardManager {
     const tempC = document.createElement('canvas');
     tempC.width = w;
     tempC.height = h;
-    const tCtx = tempC.getContext('2d');
+    const tCtx = tempC.getContext('2d', { willReadFrequently: true });
     tCtx.drawImage(img, 0, 0, w, h);
     const imgData = tCtx.getImageData(0, 0, w, h);
     const data = imgData.data;

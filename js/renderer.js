@@ -14,7 +14,7 @@ export const videoMaskCanvas = document.createElement('canvas');
 export const videoMaskCtx = videoMaskCanvas.getContext('2d');
 export const kaleidoscopeMaskCanvas = document.createElement('canvas');
 export const kaleidoscopeMaskCtx = kaleidoscopeMaskCanvas.getContext('2d');
-export const ctx = UI.mainCanvas.getContext('2d');
+export const ctx = UI.mainCanvas.getContext('2d', { willReadFrequently: true });
 
 let lastVideoBufferFilter = '';
 

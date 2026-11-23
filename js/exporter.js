@@ -630,7 +630,11 @@ export class VideoExporter {
           await Promise.all(activeBlocks.map(block => {
             if (!block.element) return Promise.resolve();
             const video = block.element;
-            const relativeTime = Math.min(block.duration || Infinity, (block.sourceOffset || 0) + (loopTime - block.startTime));
+            const maxT = Math.max(0, (block.duration || video.duration || 0) - 0.01);
+            const relativeTime = Math.max(0, Math.min(maxT, (block.sourceOffset || 0) + (loopTime - block.startTime)));
+            if (Math.abs(video.currentTime - relativeTime) < 0.004 && video.readyState >= 2) {
+              return Promise.resolve();
+            }
             return new Promise(resolve => {
               let resolved = false;
               let timeoutId = null;
@@ -643,7 +647,7 @@ export class VideoExporter {
               };
               video.addEventListener('seeked', onSeeked);
               video.currentTime = relativeTime;
-              timeoutId = setTimeout(onSeeked, 3000);
+              timeoutId = setTimeout(onSeeked, 400);
             });
           }));
         }

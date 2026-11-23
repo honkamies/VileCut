@@ -43,7 +43,6 @@ export const UI = {
   btnOpenWizard: document.getElementById('btn-open-wizard'),
   projectWizardOverlay: document.getElementById('project-wizard-overlay'),
   btnWizardCloseX: document.getElementById('btn-wizard-close-x'),
-  btnWizardSkipAll: document.getElementById('btn-wizard-skip-all'),
   btnWizardLaunchStudio: document.getElementById('btn-wizard-launch-studio'),
 
   // Undo / Redo & Project Save / Load

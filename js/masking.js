@@ -35,7 +35,7 @@ export class ImageProcessor {
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = w;
     tempCanvas.height = h;
-    const tempCtx = tempCanvas.getContext('2d');
+    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
     tempCtx.drawImage(img, 0, 0, w, h);
     const srcImgData = tempCtx.getImageData(0, 0, w, h);
     const srcPixels = srcImgData.data;
