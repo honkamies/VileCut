@@ -50,15 +50,54 @@
   <link rel="stylesheet" href="style.css">
   <!-- Lucide Icons -->
   <script src="js/lucide.min.js"></script>
+  <style>
+    @keyframes vcBootSpin { to { transform: rotate(360deg); } }
+    #app-boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: #07070d;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, sans-serif;
+      transition: opacity 0.25s ease;
+    }
+    #app-boot-splash.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .vc-boot-spinner {
+      width: 26px;
+      height: 26px;
+      border: 2px solid rgba(0, 242, 254, 0.2);
+      border-top-color: #00f2fe;
+      border-radius: 50%;
+      animation: vcBootSpin 0.75s linear infinite;
+    }
+    .vc-boot-label {
+      font-size: 0.85rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(226, 232, 240, 0.72);
+    }
+  </style>
 </head>
 <body>
+  <div id="app-boot-splash" aria-label="Loading VileCut">
+    <div class="vc-boot-spinner"></div>
+    <div class="vc-boot-label">Loading VileCut...</div>
+  </div>
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VILECUT</h1>
-        <span class="version-tag">v1.20.1</span>
+        <span class="version-tag">v1.20.2</span>
       </div>
       <div class="header-actions">
         <a href="danger/" class="btn-header danger-entrance-btn" title="Open Danger Zone Extended 10-Minute Engine">

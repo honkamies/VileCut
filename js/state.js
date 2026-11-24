@@ -502,7 +502,7 @@ export class HistoryManager {
     };
 
     return {
-      version: '1.20.1',
+      version: '1.20.2',
       app: 'VileCut',
       exportedAt: new Date().toISOString(),
       isDangerZone: state.isDangerZone,

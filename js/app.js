@@ -3890,6 +3890,15 @@ function initApp() {
     resizeMainCanvas();
     renderFrame(state.time);
   });
+
+  // Smoothly dismiss minimal boot splash now that wizard/editor is painted underneath
+  const bootSplash = document.getElementById('app-boot-splash');
+  if (bootSplash) {
+    requestAnimationFrame(() => {
+      bootSplash.classList.add('fade-out');
+      setTimeout(() => bootSplash.remove(), 260);
+    });
+  }
 }
 
 if (document.readyState === 'loading') {

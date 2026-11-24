@@ -90,7 +90,7 @@ export class WizardManager {
     const forceWizard = urlParams.get('mode') === 'wizard' || urlParams.get('wizard') === '1';
 
     if (!forceClassic && (forceWizard || (!hasSeenWizard && state.uploadedImages.length === 0))) {
-      setTimeout(() => this.open(), 300);
+      this.open();
     }
   }
 

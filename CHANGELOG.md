@@ -2,6 +2,11 @@
 
 All notable changes to the VileCut application will be documented in this file.
 
+## [1.20.2] - 2026-11-24
+
+### Added
+- **Minimal Boot Loading Splash (`#app-boot-splash`)**: Displays a brief inline-styled dark loading screen from first paint and smoothly fades directly into the New Project Wizard with zero flash of the underlying editor UI.
+
 ## [1.20.1] - 2026-11-23
 
 ### Changed
