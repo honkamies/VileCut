@@ -8,6 +8,7 @@ COPY index.html vilecut.html style.css robots.txt sitemap.xml CNAME /usr/share/n
 COPY js/ /usr/share/nginx/html/js/
 COPY fonts/ /usr/share/nginx/html/fonts/
 COPY danger/ /usr/share/nginx/html/danger/
+COPY samples/ /usr/share/nginx/html/samples/
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

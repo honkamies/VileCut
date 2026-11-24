@@ -49,7 +49,43 @@ export class WizardManager {
   static textCanvas = null;
   static textCtx = null;
 
+  static SAMPLE_PACKS = {
+    set1: {
+      name: 'Brutalist Concrete',
+      files: [
+        'samples/set1/1.webp',
+        'samples/set1/2.webp',
+        'samples/set1/3.webp',
+        'samples/set1/4.webp'
+      ]
+    },
+    set2: {
+      name: 'Twilight Woods',
+      files: [
+        'samples/set2/1.webp',
+        'samples/set2/2.webp',
+        'samples/set2/3.webp',
+        'samples/set2/4.webp'
+      ]
+    },
+    set3: {
+      name: 'Winter Forest',
+      files: [
+        'samples/set3/1.webp',
+        'samples/set3/2.webp',
+        'samples/set3/3.webp',
+        'samples/set3/4.webp',
+        'samples/set3/5.webp',
+        'samples/set3/6.webp'
+      ]
+    }
+  };
+
+  static activeSamplePack = null;
+  static _packLoadToken = 0;
+
   static previewLayers = [];
+  static previewImageLayerSets = [];
   static previewAnimId = null;
   static previewTime = 0;
   static previewPhase = 0;
@@ -293,6 +329,14 @@ export class WizardManager {
         this.loadSampleCyberSigil();
       });
     }
+
+    // Step 3: Multi-Image Sample Pack Cards
+    document.querySelectorAll('.wizard-sample-pack-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const packId = card.getAttribute('data-sample-pack');
+        if (packId) this.loadSamplePack(packId);
+      });
+    });
 
     // Step 2: Tunnel Sliders
     const sliderLayers = document.getElementById('wizard-slider-layers');
@@ -691,6 +735,60 @@ export class WizardManager {
     this.wizardState.tunnelImages = loadedImages;
     this.wizardState.tunnelFile = loadedImages[0].file;
     this.wizardState.tunnelImg = loadedImages[0].img;
+    this.activeSamplePack = null;
+    document.querySelectorAll('.wizard-sample-pack-card').forEach(c => c.classList.remove('selected', 'loading'));
+    this.updateTunnelDeckStatus(`Custom Upload (${loadedImages.length} image${loadedImages.length > 1 ? 's' : ''})`);
+
+    this.reprocessPreviewLayers();
+  }
+
+  static updateTunnelDeckStatus(label) {
+    const el = document.getElementById('wizard-tunnel-deck-status');
+    if (el) el.innerText = `Active: ${label}`;
+  }
+
+  static async loadSamplePack(packId) {
+    const pack = this.SAMPLE_PACKS[packId];
+    if (!pack) return;
+
+    const loadToken = ++this._packLoadToken;
+    const cards = document.querySelectorAll('.wizard-sample-pack-card');
+    cards.forEach(c => {
+      const isTarget = c.getAttribute('data-sample-pack') === packId;
+      c.classList.toggle('loading', isTarget);
+    });
+    this.updateTunnelDeckStatus(`Loading ${pack.name}...`);
+
+    const loadUrl = (url, idx) => new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve({
+        id: generateUUID(),
+        name: `${pack.name.replace(/\s+/g, '_')}_${idx + 1}.webp`,
+        file: null,
+        img
+      });
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+
+    const results = await Promise.all(pack.files.map((url, idx) => loadUrl(url, idx)));
+    if (loadToken !== this._packLoadToken) return; // superseded by a newer click
+
+    const loadedImages = results.filter(Boolean);
+    cards.forEach(c => c.classList.remove('loading'));
+    if (loadedImages.length === 0) {
+      this.updateTunnelDeckStatus('Failed to load sample pack');
+      return;
+    }
+
+    this.activeSamplePack = packId;
+    cards.forEach(c => c.classList.toggle('selected', c.getAttribute('data-sample-pack') === packId));
+
+    this.wizardState.tunnelImages = loadedImages;
+    this.wizardState.tunnelFile = null;
+    this.wizardState.tunnelImg = loadedImages[0].img;
+    this.updateTunnelDeckStatus(`${pack.name} (${loadedImages.length} images)`);
 
     this.reprocessPreviewLayers();
   }
@@ -937,6 +1035,9 @@ export class WizardManager {
 
     const sampleImg = new Image();
     sampleImg.onload = () => {
+      this._packLoadToken++;
+      this.activeSamplePack = null;
+      document.querySelectorAll('.wizard-sample-pack-card').forEach(c => c.classList.remove('selected', 'loading'));
       this.wizardState.tunnelImages = [{
         id: generateUUID(),
         name: 'Cyber_Sigil_Sample.png',
@@ -945,25 +1046,25 @@ export class WizardManager {
       }];
       this.wizardState.tunnelFile = null;
       this.wizardState.tunnelImg = sampleImg;
+      this.updateTunnelDeckStatus('Cyber Sigil (1 image)');
       this.reprocessPreviewLayers();
     };
     sampleImg.src = sCanvas.toDataURL();
   }
 
-  static reprocessPreviewLayers() {
-    if (!this.wizardState.tunnelImg) return;
-    const img = this.wizardState.tunnelImg;
-    const N = this.wizardState.layerCount;
-    const w = 480;
-    const h = Math.round((480 / img.naturalWidth) * img.naturalHeight);
+  static sliceImageForPreview(img, N, fadeBand, maxDim = 360) {
+    const natW = img.naturalWidth || img.width || maxDim;
+    const natH = img.naturalHeight || img.height || maxDim;
+    const scale = Math.min(1, maxDim / Math.max(natW, natH));
+    const w = Math.max(16, Math.round(natW * scale));
+    const h = Math.max(16, Math.round(natH * scale));
 
     const tempC = document.createElement('canvas');
     tempC.width = w;
     tempC.height = h;
     const tCtx = tempC.getContext('2d', { willReadFrequently: true });
     tCtx.drawImage(img, 0, 0, w, h);
-    const imgData = tCtx.getImageData(0, 0, w, h);
-    const data = imgData.data;
+    const data = tCtx.getImageData(0, 0, w, h).data;
 
     // Luminosity Histogram Quantiles
     const histogram = new Uint32Array(256);
@@ -998,9 +1099,7 @@ export class WizardManager {
       cuts[l] = cutVal;
     }
 
-    const fadeBand = Math.round((this.wizardState.layerEdgeFade / 100) * 30);
-    this.previewLayers = [];
-
+    const layerCanvases = [];
     for (let l = 0; l < N; l++) {
       const minLum = cuts[l];
       const maxLum = cuts[l + 1];
@@ -1036,9 +1135,36 @@ export class WizardManager {
         }
       }
       lCtx.putImageData(lImgData, 0, 0);
+      layerCanvases.push(lCanvas);
+    }
+    return layerCanvases;
+  }
+
+  static reprocessPreviewLayers() {
+    const sourceImgs = (this.wizardState.tunnelImages && this.wizardState.tunnelImages.length > 0)
+      ? this.wizardState.tunnelImages.map(item => item.img).filter(Boolean)
+      : (this.wizardState.tunnelImg ? [this.wizardState.tunnelImg] : []);
+
+    if (sourceImgs.length === 0) return;
+
+    const N = this.wizardState.layerCount;
+    const fadeBand = Math.round((this.wizardState.layerEdgeFade / 100) * 30);
+    const maxDim = sourceImgs.length > 1 ? 320 : 420;
+
+    this.previewImageLayerSets = sourceImgs.map(img => this.sliceImageForPreview(img, N, fadeBand, maxDim));
+    this.previewLayers = [];
+
+    const numSets = this.previewImageLayerSets.length;
+    const phase = this.previewPhase;
+    for (let l = 0; l < N; l++) {
+      const initialZ = l / N;
+      const imgIdx = l % numSets;
       this.previewLayers.push({
-        canvas: lCanvas,
-        initialZ: l / N
+        index: l,
+        canvas: this.previewImageLayerSets[imgIdx][l],
+        initialZ,
+        imgIdx,
+        lastCycle: Math.floor(initialZ + phase)
       });
     }
   }
@@ -1089,9 +1215,21 @@ export class WizardManager {
 
     const phase = this.previewPhase;
     const depth = this.wizardState.zoomDepth || 4.0;
+    const numSets = this.previewImageLayerSets.length;
 
     const layerDepths = this.previewLayers.map((layer) => {
-      let z = (layer.initialZ + phase) % 1.0;
+      const zRawLinear = layer.initialZ + phase;
+      const currentCycle = Math.floor(zRawLinear);
+      if (numSets > 1 && currentCycle !== layer.lastCycle) {
+        layer.lastCycle = currentCycle;
+        const nextIdx = (layer.imgIdx + 1 + Math.floor(Math.random() * (numSets - 1))) % numSets;
+        layer.imgIdx = nextIdx;
+        if (this.previewImageLayerSets[nextIdx] && this.previewImageLayerSets[nextIdx][layer.index]) {
+          layer.canvas = this.previewImageLayerSets[nextIdx][layer.index];
+        }
+      }
+
+      let z = zRawLinear % 1.0;
       if (z < 0) z += 1.0;
 
       const scale = Math.pow(depth, (z - 0.5) * 2.0);

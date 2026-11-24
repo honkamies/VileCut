@@ -97,7 +97,7 @@
       <div class="logo-area">
         <i data-lucide="activity" class="logo-icon glow-cyan"></i>
         <h1>VILECUT</h1>
-        <span class="version-tag">v1.20.2</span>
+        <span class="version-tag">v1.21.0</span>
       </div>
       <div class="header-actions">
         <a href="danger/" class="btn-header danger-entrance-btn" title="Open Danger Zone Extended 10-Minute Engine">
@@ -1943,12 +1943,30 @@
                 </label>
                 <input type="file" id="wizard-tunnel-file-input" accept="image/*" multiple style="display: none;">
 
-                <div style="text-align: center; margin: 4px 0;">
-                  <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">— OR —</span>
+                <div style="text-align: center; margin: 2px 0;">
+                  <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;">— OR TRY A SAMPLE PACK —</span>
+                </div>
+
+                <div class="wizard-sample-packs-grid" id="wizard-sample-packs-grid">
+                  <button type="button" class="wizard-sample-pack-card" data-sample-pack="set1">
+                    <img src="samples/set1/thumb.webp" alt="Brutalist Concrete sample pack" loading="lazy">
+                    <span class="sample-pack-count">4 imgs</span>
+                    <span class="sample-pack-title">Brutalist Concrete</span>
+                  </button>
+                  <button type="button" class="wizard-sample-pack-card" data-sample-pack="set2">
+                    <img src="samples/set2/thumb.webp" alt="Twilight Woods sample pack" loading="lazy">
+                    <span class="sample-pack-count">4 imgs</span>
+                    <span class="sample-pack-title">Twilight Woods</span>
+                  </button>
+                  <button type="button" class="wizard-sample-pack-card" data-sample-pack="set3">
+                    <img src="samples/set3/thumb.webp" alt="Winter Forest sample pack" loading="lazy">
+                    <span class="sample-pack-count">6 imgs</span>
+                    <span class="sample-pack-title">Winter Forest</span>
+                  </button>
                 </div>
 
                 <button type="button" id="btn-wizard-load-sample" class="btn secondary wizard-sample-btn">
-                  <i data-lucide="sparkles" class="text-cyan"></i> Generate Procedural Cyber Sigil (Instant Preview)
+                  <i data-lucide="sparkles" class="text-cyan"></i> Procedural Cyber Sigil
                 </button>
 
                 <div class="wizard-slider-row" style="margin-top: 10px;">
@@ -1979,7 +1997,8 @@
               <div class="wizard-preview-col">
                 <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px;">Live Infinite-Zoom Preview</span>
                 <canvas id="wizard-tunnel-preview-canvas" width="320" height="320" class="wizard-canvas-preview"></canvas>
-                <span id="wizard-tunnel-aspect-badge" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 8px;">60 FPS Deterministic Loop • Aspect Ratio: 9:16</span>
+                <span id="wizard-tunnel-deck-status" class="wizard-deck-status">Active: Cyber Sigil (1 image)</span>
+                <span id="wizard-tunnel-aspect-badge" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">60 FPS Deterministic Loop • Aspect Ratio: 9:16</span>
               </div>
             </div>
 

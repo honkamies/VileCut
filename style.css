@@ -2228,14 +2228,97 @@ select:focus, select:hover {
   background: rgba(0, 242, 254, 0.05);
 }
 
+.wizard-sample-packs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.wizard-sample-pack-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-control);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  text-align: left;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.wizard-sample-pack-card img {
+  width: 100%;
+  height: 62px;
+  object-fit: cover;
+  display: block;
+  filter: brightness(0.88);
+  transition: filter var(--transition-fast), transform var(--transition-fast);
+}
+
+.wizard-sample-pack-card:hover {
+  border-color: var(--cyan);
+  transform: translateY(-2px);
+}
+
+.wizard-sample-pack-card:hover img {
+  filter: brightness(1.05);
+  transform: scale(1.04);
+}
+
+.wizard-sample-pack-card.selected {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan), 0 0 14px rgba(0, 242, 254, 0.25);
+}
+
+.wizard-sample-pack-card.loading {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.sample-pack-count {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: rgba(5, 7, 14, 0.78);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  color: var(--cyan);
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+}
+
+.sample-pack-title {
+  padding: 5px 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(8, 11, 20, 0.9);
+}
+
+.wizard-deck-status {
+  margin-top: 8px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: 0.02em;
+}
+
 .wizard-sample-btn {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 0.85rem;
-  padding: 10px;
+  font-size: 0.82rem;
+  padding: 8px 10px;
 }
 
 .wizard-canvas-preview {
